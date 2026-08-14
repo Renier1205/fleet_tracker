@@ -196,15 +196,15 @@ const NAV = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "fleet_performance", label: "Fleet Performance", icon: Layers },
   { key: "assets", label: "Assets", icon: Truck },
-  { key: "daily_hours", label: "Daily Hours", icon: Clock },
-  { key: "fuel_log", label: "Fuel Log", icon: Fuel },
-  { key: "oil_consumption", label: "Oil Consumption", icon: Droplet },
-  { key: "breakdowns", label: "Breakdowns", icon: AlertTriangle },
-  { key: "work_orders", label: "Work Orders", icon: ClipboardList },
+  { key: "daily_hours", label: "Daily Hours", icon: Clock, operatorVisible: true },
+  { key: "fuel_log", label: "Fuel Log", icon: Fuel, operatorVisible: true },
+  { key: "oil_consumption", label: "Oil Consumption", icon: Droplet, operatorVisible: true },
+  { key: "breakdowns", label: "Breakdowns", icon: AlertTriangle, operatorVisible: true },
+  { key: "work_orders", label: "Work Orders", icon: ClipboardList, operatorVisible: true },
   { key: "downtime_summary", label: "Downtime Summary", icon: FileBarChart },
   { key: "mtbf_mttr", label: "MTBF / MTTR Report", icon: Activity },
   { key: "planned_maintenance", label: "Planned Maintenance", icon: CalendarClock },
-  { key: "inspections", label: "Inspections", icon: ShieldCheck },
+  { key: "inspections", label: "Inspections", icon: ShieldCheck, operatorVisible: true },
   { key: "components", label: "Components", icon: CircleDot },
   { key: "tyres", label: "Tyres", icon: CircleDot },
   { key: "parts", label: "Parts Inventory", icon: Package },
@@ -1785,7 +1785,13 @@ function buildDowntimeRows(breakdowns, workOrders, fromDateTime, toDateTime) {
   const overlaps = (start, end) => {
     if (!start) return false;
     const s = new Date(start);
-    const e = end ? new Date(end) : new Date();
+    // Still open/ongoing — always show it regardless of the selected "to"
+    // cutoff. The date picker's "to" is a snapshot from whenever the page
+    // loaded and doesn't auto-extend as time passes, but a currently
+    // active breakdown or planned job is operationally relevant right
+    // now no matter what range someone happened to have selected.
+    if (!end) return true;
+    const e = new Date(end);
     return s < to && e > from;
   };
 
@@ -3776,6 +3782,7 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
   const [sites, setSites] = useState([]);
   const [users, setUsers] = useState([]);
   const [access, setAccess] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newSiteName, setNewSiteName] = useState("");
   const [newSiteLocation, setNewSiteLocation] = useState("");
@@ -3784,14 +3791,16 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
 
   const loadAll = React.useCallback(async () => {
     setLoading(true);
-    const [sitesRes, usersRes, accessRes] = await Promise.all([
+    const [sitesRes, usersRes, accessRes, rolesRes] = await Promise.all([
       supabase.rpc("list_all_sites_for_admin"),
       supabase.rpc("list_users_for_admin"),
       supabase.rpc("list_site_access_for_admin"),
+      supabase.rpc("list_user_roles_for_admin"),
     ]);
     if (!sitesRes.error) setSites(sitesRes.data || []);
     if (!usersRes.error) setUsers(usersRes.data || []);
     if (!accessRes.error) setAccess(accessRes.data || []);
+    if (!rolesRes.error) setRoles(rolesRes.data || []);
     setLoading(false);
   }, []);
 
@@ -3833,6 +3842,17 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
     }
     loadAll();
     onSitesChanged?.();
+  };
+
+  const getRole = (userId) => roles.find((r) => r.user_id === userId)?.role || "manager";
+
+  const handleRoleChange = async (userId, newRole) => {
+    const { error } = await supabase.rpc("set_user_role", { target_user_id: userId, new_role: newRole });
+    if (error) {
+      setMessage({ type: "error", text: error.message });
+    } else {
+      loadAll();
+    }
   };
 
   const fieldStyle = { padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
@@ -3891,7 +3911,7 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
 
       <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 6px", color: NAVY }}>User Access</h3>
       <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 12px" }}>
-        Tick a box to grant a user access to that site. A user with only one site never sees a site switcher — it only appears once someone has more than one, which is what makes them a manager in practice. A newly granted site starts completely blank for that user until data gets logged against it.
+        Tick a box to grant a user access to that site. A user with only one site never sees a site switcher — it only appears once someone has more than one, which is what makes them a manager in practice. A newly granted site starts completely blank for that user until data gets logged against it. Role controls which tabs they see at all: Manager sees everything, Operator sees only the data-entry tabs (Daily Hours, Fuel Log, Oil Consumption, Breakdowns, Work Orders, Inspections) — no dashboards or reports. Admin is granted separately via SQL, not from here, to avoid accidentally locking yourself out.
       </p>
       {loading ? (
         <p style={{ fontSize: 13, color: "#898781" }}>Loading…</p>
@@ -3901,24 +3921,42 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
             <thead>
               <tr style={{ background: "#F7F6F1" }}>
                 <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", borderBottom: "1px solid #E4E2D8", whiteSpace: "nowrap" }}>User</th>
+                <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", borderBottom: "1px solid #E4E2D8", whiteSpace: "nowrap" }}>Role</th>
                 {sites.map((s) => (
                   <th key={s.id} style={{ textAlign: "center", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", borderBottom: "1px solid #E4E2D8", whiteSpace: "nowrap" }}>{s.site_name}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {users.map((u, i) => (
-                <tr key={u.id} style={{ borderBottom: i < users.length - 1 ? "1px solid #EFEEE7" : "none" }}>
-                  <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{u.email}</td>
-                  {sites.map((s) => (
-                    <td key={s.id} style={{ padding: "9px 12px", textAlign: "center" }}>
-                      <input type="checkbox" checked={hasAccess(u.id, s.id)} onChange={() => toggleAccess(u.id, s.id)} style={{ width: 16, height: 16, cursor: "pointer" }} />
+              {users.map((u, i) => {
+                const role = getRole(u.id);
+                return (
+                  <tr key={u.id} style={{ borderBottom: i < users.length - 1 ? "1px solid #EFEEE7" : "none" }}>
+                    <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{u.email}</td>
+                    <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
+                      {role === "admin" ? (
+                        <Badge value="Admin" />
+                      ) : (
+                        <select
+                          value={role}
+                          onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                          style={{ padding: "5px 8px", fontSize: 12.5, border: "1px solid #D3D1C7", borderRadius: 6, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', background: "#fff" }}
+                        >
+                          <option value="manager">Manager</option>
+                          <option value="operator">Operator</option>
+                        </select>
+                      )}
                     </td>
-                  ))}
-                </tr>
-              ))}
+                    {sites.map((s) => (
+                      <td key={s.id} style={{ padding: "9px 12px", textAlign: "center" }}>
+                        <input type="checkbox" checked={hasAccess(u.id, s.id)} onChange={() => toggleAccess(u.id, s.id)} style={{ width: 16, height: 16, cursor: "pointer" }} />
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
               {users.length === 0 && (
-                <tr><td colSpan={sites.length + 1} style={{ padding: 20, textAlign: "center", color: "#898781" }}>No users found.</td></tr>
+                <tr><td colSpan={sites.length + 2} style={{ padding: 20, textAlign: "center", color: "#898781" }}>No users found.</td></tr>
               )}
             </tbody>
           </table>
@@ -5026,6 +5064,8 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
           </div>
         </div>
 
+        <EventTimeline breakdowns={filteredBreakdowns} workOrders={filteredWorkOrders} />
+
         {!monthKpiLoading && filteredMonthKpi.length > 0 && (
           <div style={{ marginBottom: 8 }}>
             <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 12px", color: NAVY }}>MTBF, MTTR & Utilisation, this month</h3>
@@ -5191,8 +5231,8 @@ function buildTableConfig(assets, dailyHours, breakdowns, fuelLog, oilConsumptio
   };
 }
 
-export default function App({ userEmail, isAdmin, mySites = [] }) {
-  const [active, setActive] = useState("dashboard");
+export default function App({ userEmail, isAdmin, myRole = "manager", mySites = [] }) {
+  const [active, setActive] = useState(() => (myRole === "operator" ? "daily_hours" : "dashboard"));
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [engineeringExpanded, setEngineeringExpanded] = useState(true);
   const isMobile = useIsMobile();
@@ -5366,6 +5406,19 @@ export default function App({ userEmail, isAdmin, mySites = [] }) {
   // whole view with no error boundary to catch it.
   const pageTitle = NAV.find((n) => n.key === active)?.label || activeConfig?.title || "";
 
+  // Defense in depth: if an operator's active tab is ever something
+  // they're not supposed to see (role changed mid-session, a stale
+  // value, anything), redirect them rather than silently rendering a
+  // manager-level page. The nav already hides these, this is the
+  // backstop for if it's reached some other way.
+  useEffect(() => {
+    if (myRole !== "operator") return;
+    const navItem = NAV.find((n) => n.key === active);
+    if (navItem && !navItem.operatorVisible) {
+      setActive("daily_hours");
+    }
+  }, [myRole, active]);
+
   const handleNavClick = (key) => {
     setActive(key);
     if (isMobile) setSidebarOpen(false);
@@ -5441,7 +5494,10 @@ export default function App({ userEmail, isAdmin, mySites = [] }) {
               <ChevronDown size={13} style={{ color: "rgba(255,255,255,0.5)", transform: engineeringExpanded ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
             </button>
           )}
-          {(engineeringExpanded || !sidebarOpen) && NAV.filter((n) => (n.key !== "audit" && n.key !== "site_management") || isAdmin).map(({ key, label, icon: Icon }) => (
+          {(engineeringExpanded || !sidebarOpen) && NAV.filter((n) =>
+            ((n.key !== "audit" && n.key !== "site_management") || isAdmin) &&
+            (myRole !== "operator" || n.operatorVisible)
+          ).map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               className="nav-item"

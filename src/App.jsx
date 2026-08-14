@@ -8,6 +8,7 @@ export default function App() {
   const [session, setSession] = useState(undefined); // undefined = still checking
   const [licenseActive, setLicenseActive] = useState(undefined);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [myRole, setMyRole] = useState("manager");
   const [mySites, setMySites] = useState(undefined);
 
   useEffect(() => {
@@ -56,6 +57,23 @@ export default function App() {
 
   useEffect(() => {
     if (!session) {
+      setMyRole("manager");
+      return;
+    }
+    supabase
+      .rpc("get_my_role")
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Role check failed:", error.message);
+          setMyRole("manager"); // fail permissive, not locked-out
+        } else {
+          setMyRole(data || "manager");
+        }
+      });
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) {
       setMySites(undefined);
       return;
     }
@@ -98,11 +116,18 @@ export default function App() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: "-apple-system, sans-serif", padding: 24 }}>
         <div style={{ textAlign: "center", maxWidth: 380 }}>
           <p style={{ fontSize: 16, fontWeight: 700, color: "#1F3864", marginBottom: 8 }}>No site access yet</p>
-          <p style={{ fontSize: 14, color: "#5F5E5A" }}>Your account isn't linked to any site yet. Ask your administrator to grant you access.</p>
+          <p style={{ fontSize: 14, color: "#5F5E5A", marginBottom: 4 }}>Your account isn't linked to any site yet. Ask your administrator to grant you access.</p>
+          <p style={{ fontSize: 12.5, color: "#898781", marginBottom: 20 }}>Signed in as {session.user.email}</p>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 18px", borderRadius: 8, fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}
+          >
+            Sign out
+          </button>
         </div>
       </div>
     );
   }
 
-  return <EngineeringApp userEmail={session.user.email} isAdmin={isAdmin} mySites={mySites} />;
+  return <EngineeringApp userEmail={session.user.email} isAdmin={isAdmin} myRole={myRole} mySites={mySites} />;
 }
