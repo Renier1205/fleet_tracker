@@ -1097,6 +1097,9 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail }) {
   const [downtimeEnd, setDowntimeEnd] = useState(
     existing?.downtime_end ? isoToInputValue(existing.downtime_end) : ""
   );
+  const [expectedUpTime, setExpectedUpTime] = useState(
+    existing?.expected_up_time ? isoToInputValue(existing.expected_up_time) : ""
+  );
   const [reportedBy] = useState(existing?.reported_by || userEmail || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -1112,6 +1115,12 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail }) {
       setDowntimeEnd("");
     }
   }, [status]);
+
+  useEffect(() => {
+    if (status === "Closed" && expectedUpTime) {
+      setExpectedUpTime("");
+    }
+  }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (assets.length === 0) {
     return (
@@ -1173,6 +1182,7 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail }) {
       repair_status: status,
       downtime_start: startDate.toISOString(),
       downtime_end: downtimeEnd ? new Date(downtimeEnd).toISOString() : null,
+      expected_up_time: expectedUpTime ? new Date(expectedUpTime).toISOString() : null,
       // wo_reference is intentionally omitted on new entries — the database
       // auto-generates it (format FT-MM-NNNNN) via a trigger. On edits, we
       // simply don't touch it, so the original number is preserved.
@@ -1217,8 +1227,12 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail }) {
           <label style={labelStyle}>Downtime End {status !== "Closed" && <span style={{ fontWeight: 400, color: "#898781" }}>(set Status to Closed first)</span>}</label>
           <DateTimeField value={downtimeEnd} onChange={setDowntimeEnd} max={nowForInput()} disabled={status !== "Closed"} />
         </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Expected Up Time {status === "Closed" && <span style={{ fontWeight: 400, color: "#898781" }}>(not needed once Closed)</span>}</label>
+          <DateTimeField value={expectedUpTime} onChange={setExpectedUpTime} disabled={status === "Closed"} />
+        </div>
         <p style={{ fontSize: 11.5, color: "#898781", margin: "-6px 0 14px" }}>
-          Downtime Start defaults to right now, but you can set it earlier if you're logging something that happened previously (e.g. catching up after time away from the system) — future dates and times aren't allowed. Downtime End only opens up once Status is Closed — an event that's still active doesn't have an end yet, and having both set at once would throw off MTBF, MTTR, Availability and Utilisation.
+          Downtime Start defaults to right now, but you can set it earlier if you're logging something that happened previously (e.g. catching up after time away from the system) — future dates and times aren't allowed. Downtime End only opens up once Status is Closed — an event that's still active doesn't have an end yet, and having both set at once would throw off MTBF, MTTR, Availability and Utilisation. Expected Up Time is your best estimate of when the machine will be back — unlike the other two, future dates are fine here, since that's the whole point of it.
         </p>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
@@ -1310,7 +1324,7 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail }) {
       const q = query.toLowerCase();
       rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q)));
     }
-    return rows;
+    return [...rows].sort((a, b) => (b.breakdown_date || "").localeCompare(a.breakdown_date || ""));
   }, [breakdowns, assets, query, selectedFleet, selectedAsset]);
 
   const handleSaved = () => {
@@ -2089,7 +2103,7 @@ function InspectionsPage({ assets, inspections, userEmail, onRefresh }) {
     if (selectedAsset) rows = rows.filter((r) => r.asset_id === selectedAsset);
     else if (selectedFleet) rows = rows.filter((r) => { const a = assets.find((x) => x.asset_id === r.asset_id); return a && a.fleet === selectedFleet; });
     if (query.trim()) { const q = query.toLowerCase(); rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q))); }
-    return rows;
+    return [...rows].sort((a, b) => (b.log_date || "").localeCompare(a.log_date || ""));
   }, [inspections, assets, query, selectedFleet, selectedAsset]);
 
   const handleDelete = async (reason) => {
@@ -2634,13 +2648,13 @@ function MtbfMttrReportPage({ assets }) {
             <h4 style={{ fontSize: 13.5, fontWeight: 700, margin: "0 0 8px", color: NAVY }}>MTBF by equipment (hrs)</h4>
             <div style={{ height: 200, background: "#fff", border: "1px solid #E4E2D8", borderRadius: 10, padding: "10px 8px 0" }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={rows}>
+                <BarChart data={rows} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" vertical={false} />
                   <XAxis dataKey="asset_id" tick={{ fontSize: 10.5, fill: "#5F5E5A" }} axisLine={{ stroke: "#E4E2D8" }} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: "#5F5E5A" }} axisLine={false} tickLine={false} />
                   <Tooltip formatter={(v) => `${Number(v).toFixed(1)} hrs`} />
                   <Bar dataKey="mtbf" fill="#5FBF8F" radius={[4, 4, 0, 0]} />
-                  <ReferenceLine y={40} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 40", position: "insideTopRight", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
+                  <ReferenceLine y={40} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 40", position: "top", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -2649,13 +2663,13 @@ function MtbfMttrReportPage({ assets }) {
             <h4 style={{ fontSize: 13.5, fontWeight: 700, margin: "0 0 8px", color: NAVY }}>MTTR by equipment (hrs)</h4>
             <div style={{ height: 200, background: "#fff", border: "1px solid #E4E2D8", borderRadius: 10, padding: "10px 8px 0" }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={rows}>
+                <BarChart data={rows} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" vertical={false} />
                   <XAxis dataKey="asset_id" tick={{ fontSize: 10.5, fill: "#5F5E5A" }} axisLine={{ stroke: "#E4E2D8" }} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: "#5F5E5A" }} axisLine={false} tickLine={false} />
                   <Tooltip formatter={(v) => `${Number(v).toFixed(1)} hrs`} />
                   <Bar dataKey="mttr" fill="#E8734A" radius={[4, 4, 0, 0]} />
-                  <ReferenceLine y={4} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 4", position: "insideTopRight", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
+                  <ReferenceLine y={4} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 4", position: "top", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -2664,13 +2678,13 @@ function MtbfMttrReportPage({ assets }) {
             <h4 style={{ fontSize: 13.5, fontWeight: 700, margin: "0 0 8px", color: NAVY }}>Utilisation by equipment</h4>
             <div style={{ height: 200, background: "#fff", border: "1px solid #E4E2D8", borderRadius: 10, padding: "10px 8px 0" }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={rows.map((r) => ({ ...r, utilisationPct: r.utilisation != null ? Math.round(r.utilisation * 100) : null }))}>
+                <BarChart data={rows.map((r) => ({ ...r, utilisationPct: r.utilisation != null ? Math.round(r.utilisation * 100) : null }))} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" vertical={false} />
                   <XAxis dataKey="asset_id" tick={{ fontSize: 10.5, fill: "#5F5E5A" }} axisLine={{ stroke: "#E4E2D8" }} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: "#5F5E5A" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
                   <Tooltip formatter={(v) => `${v}%`} />
                   <Bar dataKey="utilisationPct" fill="#2E86AB" radius={[4, 4, 0, 0]} />
-                  <ReferenceLine y={85} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 85%", position: "insideTopRight", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
+                  <ReferenceLine y={85} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 85%", position: "top", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -2742,6 +2756,9 @@ function GanttTooltip({ active, payload }) {
       <p style={{ fontWeight: 700, margin: "0 0 3px", color: "#2C2C2A" }}>{item.label}</p>
       <p style={{ margin: 0, color: "#5F5E5A" }}>{item.type} · {item.completed ? "Closed" : "In progress"}</p>
       <p style={{ margin: "4px 0 0", color: "#5F5E5A" }}>{fmt(item.start)} → {fmt(item.end)}</p>
+      {!item.completed && item.expectedUp && (
+        <p style={{ margin: "4px 0 0", color: "#1F3864", fontWeight: 600 }}>Expected up: {fmt(item.expectedUp)}</p>
+      )}
     </div>
   );
 }
@@ -2771,6 +2788,7 @@ function EventTimeline({ breakdowns, workOrders }) {
         id: `b-${b.id}`, label: `${b.asset_id} — ${b.component_affected || b.cause_code || "Breakdown"}`,
         start: new Date(b.downtime_start), end: b.downtime_end ? new Date(b.downtime_end) : null,
         completed: b.repair_status === "Closed", type: "Breakdown",
+        expectedUp: b.expected_up_time ? new Date(b.expected_up_time) : null,
       }));
     const wEvents = workOrders
       .filter((w) => w.work_type === "Preventive" && w.actual_start)
@@ -2778,6 +2796,7 @@ function EventTimeline({ breakdowns, workOrders }) {
         id: `w-${w.id}`, label: `${w.asset_id} — ${w.problem_scope || "Planned Maintenance"}`,
         start: new Date(w.actual_start), end: w.actual_finish ? new Date(w.actual_finish) : null,
         completed: w.status === "Closed", type: "Planned",
+        expectedUp: null,
       }));
 
     return [...bEvents, ...wEvents]
@@ -2787,17 +2806,42 @@ function EventTimeline({ breakdowns, workOrders }) {
         const effectiveEnd = e.end || nowTick;
         const clippedStartMs = Math.max(e.start.getTime(), windowStart.getTime());
         const clippedEndMs = Math.min(effectiveEnd.getTime(), windowEnd.getTime());
-        return {
-          ...e,
-          offsetHrs: (clippedStartMs - windowStart.getTime()) / 3600000,
-          durationHrs: Math.max(0.05, (clippedEndMs - clippedStartMs) / 3600000),
-        };
+        const offsetHrs = (clippedStartMs - windowStart.getTime()) / 3600000;
+        const durationHrs = Math.max(0.05, (clippedEndMs - clippedStartMs) / 3600000);
+        // Only meaningful for still-open events, and only if it actually
+        // falls within this bar's own visible span — otherwise the little
+        // marker line would render outside the bar it's meant to sit on.
+        const expectedUpHrs = (!e.completed && e.expectedUp)
+          ? (e.expectedUp.getTime() - windowStart.getTime()) / 3600000
+          : null;
+        return { ...e, offsetHrs, durationHrs, expectedUpHrs };
       })
       .sort((a, b) => a.offsetHrs - b.offsetHrs);
   }, [breakdowns, workOrders, statusFilter, nowTick, windowStart, windowEnd]);
 
   const nowOffsetHrs = (nowTick.getTime() - windowStart.getTime()) / 3600000;
   const formatHourTick = (h) => new Date(windowStart.getTime() + h * 3600000).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" });
+
+  // Draws the normal bar rect, plus — for a breakdown that's still open
+  // and has an Expected Up Time set — a thin dark line marking where in
+  // the bar that estimate falls. Custom shape rather than a chart-wide
+  // ReferenceLine, since every row's expected time is different.
+  const DurationBarShape = (props) => {
+    const { x, y, width, height, payload, fill } = props;
+    let markerX = null;
+    if (payload.expectedUpHrs != null && payload.durationHrs > 0) {
+      const proportion = (payload.expectedUpHrs - payload.offsetHrs) / payload.durationHrs;
+      if (proportion >= 0 && proportion <= 1) markerX = x + proportion * width;
+    }
+    return (
+      <g>
+        <rect x={x} y={y} width={width} height={height} fill={fill} rx={4} ry={4} />
+        {markerX != null && (
+          <line x1={markerX} y1={y - 2} x2={markerX} y2={y + height + 2} stroke="#1F3864" strokeWidth={2} />
+        )}
+      </g>
+    );
+  };
 
   return (
     <div style={{ marginBottom: 28 }}>
@@ -2830,7 +2874,7 @@ function EventTimeline({ breakdowns, workOrders }) {
               <Tooltip content={<GanttTooltip />} />
               <ReferenceLine x={nowOffsetHrs} stroke="#C0392B" strokeWidth={1.5} strokeDasharray="4 4" label={{ value: "Now", position: "top", fill: "#C0392B", fontSize: 11, fontWeight: 700 }} />
               <Bar dataKey="offsetHrs" stackId="a" fill="transparent" isAnimationActive={false} />
-              <Bar dataKey="durationHrs" stackId="a" radius={[4, 4, 4, 4]} isAnimationActive={false}>
+              <Bar dataKey="durationHrs" stackId="a" radius={[4, 4, 4, 4]} isAnimationActive={false} shape={DurationBarShape}>
                 {events.map((e) => <Cell key={e.id} fill={e.completed ? "#5FBF8F" : "#C0392B"} />)}
               </Bar>
             </BarChart>
@@ -2840,6 +2884,7 @@ function EventTimeline({ breakdowns, workOrders }) {
       <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 11.5, color: "#5F5E5A" }}>
         <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#C0392B", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />In progress</span>
         <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#5FBF8F", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Completed</span>
+        <span><span style={{ display: "inline-block", width: 2, height: 10, background: "#1F3864", marginRight: 6, verticalAlign: "middle" }} />Expected up time</span>
       </div>
     </div>
   );
@@ -3018,9 +3063,12 @@ function WorkOrdersPage({ assets, workOrders, userEmail, onRefresh }) {
   ].map(([key, label]) => ({ key, label }));
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return workOrders;
-    const q = query.toLowerCase();
-    return workOrders.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q)));
+    let rows = workOrders;
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q)));
+    }
+    return [...rows].sort((a, b) => (b.request_date || "").localeCompare(a.request_date || ""));
   }, [workOrders, query]);
 
   const handleSaved = () => { setShowForm(false); setEditing(null); onRefresh(); };
@@ -3340,7 +3388,10 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
   const [pmCheckMessage, setPmCheckMessage] = useState(null);
   const [pmChecking, setPmChecking] = useState(false);
 
-  const plannedJobs = useMemo(() => workOrders.filter((w) => w.work_type === "Preventive"), [workOrders]);
+  const plannedJobs = useMemo(
+    () => [...workOrders].filter((w) => w.work_type === "Preventive").sort((a, b) => (b.request_date || "").localeCompare(a.request_date || "")),
+    [workOrders]
+  );
 
   const checkForDuePM = React.useCallback(async (silent) => {
     setPmChecking(true);
@@ -5074,13 +5125,13 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
                 <p style={{ fontSize: 12.5, fontWeight: 600, margin: "0 0 6px", color: "#5F5E5A" }}>MTBF by equipment (hrs)</p>
                 <div style={{ height: 190, background: "#fff", border: "1px solid #E4E2D8", borderRadius: 10, padding: "10px 8px 0" }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={filteredMonthKpi} onClick={() => onNavigate?.("mtbf_mttr")}>
+                    <BarChart data={filteredMonthKpi} onClick={() => onNavigate?.("mtbf_mttr")} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" vertical={false} />
                       <XAxis dataKey="asset_id" tick={{ fontSize: 10.5, fill: "#5F5E5A" }} axisLine={{ stroke: "#E4E2D8" }} tickLine={false} />
                       <YAxis tick={{ fontSize: 11, fill: "#5F5E5A" }} axisLine={false} tickLine={false} />
                       <Tooltip formatter={(v) => `${Number(v).toFixed(1)} hrs`} />
                       <Bar dataKey="mtbf" fill="#5FBF8F" radius={[4, 4, 0, 0]} cursor="pointer" />
-                      <ReferenceLine y={40} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 40", position: "insideTopRight", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
+                      <ReferenceLine y={40} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 40", position: "top", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -5089,13 +5140,13 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
                 <p style={{ fontSize: 12.5, fontWeight: 600, margin: "0 0 6px", color: "#5F5E5A" }}>MTTR by equipment (hrs)</p>
                 <div style={{ height: 190, background: "#fff", border: "1px solid #E4E2D8", borderRadius: 10, padding: "10px 8px 0" }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={filteredMonthKpi} onClick={() => onNavigate?.("mtbf_mttr")}>
+                    <BarChart data={filteredMonthKpi} onClick={() => onNavigate?.("mtbf_mttr")} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" vertical={false} />
                       <XAxis dataKey="asset_id" tick={{ fontSize: 10.5, fill: "#5F5E5A" }} axisLine={{ stroke: "#E4E2D8" }} tickLine={false} />
                       <YAxis tick={{ fontSize: 11, fill: "#5F5E5A" }} axisLine={false} tickLine={false} />
                       <Tooltip formatter={(v) => `${Number(v).toFixed(1)} hrs`} />
                       <Bar dataKey="mttr" fill="#E8734A" radius={[4, 4, 0, 0]} cursor="pointer" />
-                      <ReferenceLine y={4} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 4", position: "insideTopRight", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
+                      <ReferenceLine y={4} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 4", position: "top", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -5104,13 +5155,13 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
                 <p style={{ fontSize: 12.5, fontWeight: 600, margin: "0 0 6px", color: "#5F5E5A" }}>Utilisation by equipment</p>
                 <div style={{ height: 190, background: "#fff", border: "1px solid #E4E2D8", borderRadius: 10, padding: "10px 8px 0" }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={filteredMonthKpi.map((r) => ({ ...r, utilisationPct: r.utilisation != null ? Math.round(r.utilisation * 100) : null }))} onClick={() => onNavigate?.("mtbf_mttr")}>
+                    <BarChart data={filteredMonthKpi.map((r) => ({ ...r, utilisationPct: r.utilisation != null ? Math.round(r.utilisation * 100) : null }))} onClick={() => onNavigate?.("mtbf_mttr")} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" vertical={false} />
                       <XAxis dataKey="asset_id" tick={{ fontSize: 10.5, fill: "#5F5E5A" }} axisLine={{ stroke: "#E4E2D8" }} tickLine={false} />
                       <YAxis tick={{ fontSize: 11, fill: "#5F5E5A" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
                       <Tooltip formatter={(v) => `${v}%`} />
                       <Bar dataKey="utilisationPct" fill="#2E86AB" radius={[4, 4, 0, 0]} cursor="pointer" />
-                      <ReferenceLine y={85} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 85%", position: "insideTopRight", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
+                      <ReferenceLine y={85} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 85%", position: "top", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -5129,13 +5180,13 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
             ) : (
               <div onClick={() => onNavigate?.("fleet_performance")} style={{ height: 240, background: "#fff", border: "1px solid #E4E2D8", borderRadius: 12, padding: "16px 12px 4px", cursor: "pointer" }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={fleetAvailability}>
+                  <BarChart data={fleetAvailability} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" vertical={false} />
                     <XAxis dataKey="fleet" tick={{ fontSize: 12, fill: "#5F5E5A" }} axisLine={{ stroke: "#E4E2D8" }} tickLine={false} />
                     <YAxis tick={{ fontSize: 12, fill: "#5F5E5A" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
                     <Tooltip formatter={(v) => `${v}%`} />
                     <Bar dataKey="availability" fill={NAVY} radius={[4, 4, 0, 0]} />
-                    <ReferenceLine y={85} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 85%", position: "insideTopRight", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
+                    <ReferenceLine y={85} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 85%", position: "top", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
