@@ -205,6 +205,13 @@ const NAV = [
   { key: "mtbf_mttr", label: "MTBF / MTTR Report", icon: Activity },
   { key: "planned_maintenance", label: "Planned Maintenance", icon: CalendarClock },
   { key: "inspections", label: "Inspections", icon: ShieldCheck, operatorVisible: true },
+  // Backlogs is rendered as its own collapsible group in the sidebar
+  // (see engineeringExpanded/backlogsExpanded below) rather than as flat
+  // NAV entries, but the two keys still need to exist here so the rest of
+  // the app (page routing, operator visibility filtering) treats them
+  // like any other nav destination.
+  { key: "backlog_report", label: "Backlog Report", icon: ClipboardList, group: "backlogs", operatorVisible: true },
+  { key: "daily_service", label: "Daily Service", icon: CalendarClock, group: "backlogs", operatorVisible: true },
   { key: "components", label: "Components", icon: CircleDot },
   { key: "tyres", label: "Tyres", icon: CircleDot },
   { key: "parts", label: "Parts Inventory", icon: Package },
@@ -2242,6 +2249,503 @@ function InspectionsPage({ assets, inspections, userEmail, onRefresh }) {
           userEmail={userEmail}
           onCancel={() => setDeleting(null)}
           onConfirm={handleDelete}
+        />
+      )}
+    </div>
+  );
+}
+
+const BACKLOG_SOURCES = [
+  { value: "daily_service", label: "Daily Service" },
+  { value: "monthly_inspection", label: "Monthly Inspection" },
+  { value: "service_card", label: "Service Card" },
+];
+const backlogSourceLabel = (v) => BACKLOG_SOURCES.find((s) => s.value === v)?.label || v;
+const BACKLOG_PRIORITIES = ["Low", "Medium", "High", "Critical"];
+
+function ageDays(dateStr) {
+  if (!dateStr) return null;
+  const ms = new Date().setHours(0, 0, 0, 0) - new Date(dateStr).setHours(0, 0, 0, 0);
+  return Math.max(0, Math.round(ms / 86400000));
+}
+
+function BacklogForm({ assets, workOrders, existing, userEmail, onClose, onSaved }) {
+  const isEdit = !!existing;
+  const [assetId, setAssetId] = useState(existing?.asset_id || assets[0]?.asset_id || "");
+  const [sourceType, setSourceType] = useState(existing?.source_type || "daily_service");
+  const [workOrderId, setWorkOrderId] = useState(existing?.work_order_id || "");
+  const [componentCode, setComponentCode] = useState(existing?.component_code || "");
+  const [description, setDescription] = useState(existing?.description || "");
+  const [priority, setPriority] = useState(existing?.priority || "Medium");
+  const [status, setStatus] = useState(existing?.status || "Open");
+  const [dateNotified, setDateNotified] = useState(existing?.date_notified || todayForInput());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const woOptionsForAsset = useMemo(
+    () => workOrders.filter((w) => w.asset_id === assetId),
+    [workOrders, assetId]
+  );
+
+  if (assets.length === 0) {
+    return (
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
+        <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
+          <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
+          <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
+        </div>
+      </div>
+    );
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!description.trim()) { setError("Enter a description."); return; }
+    setSaving(true);
+    const payload = {
+      asset_id: assetId,
+      source_type: sourceType,
+      work_order_id: workOrderId || null,
+      component_code: componentCode || null,
+      description: description.trim(),
+      priority,
+      status,
+      date_notified: dateNotified,
+      closed_date: status === "Closed" ? (existing?.closed_date || todayForInput()) : null,
+    };
+    try {
+      const { error: dbError } = isEdit
+        ? await supabase.from("backlogs").update(payload).eq("id", existing.id)
+        : await supabase.from("backlogs").insert(payload);
+      if (dbError) throw dbError;
+      onSaved();
+    } catch (err) {
+      setError(err.message || String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, boxSizing: "border-box", fontFamily: "inherit" };
+  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
+      <form onSubmit={handleSubmit} style={{ background: "#fff", borderRadius: 12, padding: 24, width: 460, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto" }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 16px" }}>{isEdit ? "Edit Backlog Item" : "Add Backlog Item"}</h3>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Equipment</label>
+          <select value={assetId} onChange={(e) => { setAssetId(e.target.value); setWorkOrderId(""); }} required style={fieldStyle}>
+            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} — {a.asset_name}</option>)}
+          </select>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <div>
+            <label style={labelStyle}>Source</label>
+            <select value={sourceType} onChange={(e) => setSourceType(e.target.value)} style={fieldStyle}>
+              {BACKLOG_SOURCES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Date Notified</label>
+            <input type="date" value={dateNotified} onChange={(e) => setDateNotified(e.target.value)} required max={todayForInput()} style={fieldStyle} />
+          </div>
+        </div>
+
+        {sourceType === "service_card" && (
+          <div style={{ marginBottom: 12 }}>
+            <label style={labelStyle}>Work Order # (optional — the scanned card this came from)</label>
+            <select value={workOrderId} onChange={(e) => setWorkOrderId(e.target.value)} style={fieldStyle}>
+              <option value="">— None —</option>
+              {woOptionsForAsset.map((w) => <option key={w.id} value={w.id}>{w.wo_no}</option>)}
+            </select>
+          </div>
+        )}
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Component Code</label>
+          <input type="text" value={componentCode} onChange={(e) => setComponentCode(e.target.value)} placeholder="e.g. 6305.00.GR.0" style={fieldStyle} />
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Description</label>
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} required style={{ ...fieldStyle, resize: "vertical" }} />
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 18 }}>
+          <div>
+            <label style={labelStyle}>Priority</label>
+            <select value={priority} onChange={(e) => setPriority(e.target.value)} style={fieldStyle}>
+              {BACKLOG_PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Status</label>
+            <select value={status} onChange={(e) => setStatus(e.target.value)} style={fieldStyle}>
+              <option value="Open">Open</option>
+              <option value="Closed">Closed</option>
+            </select>
+          </div>
+        </div>
+
+        {error && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
+            {saving ? "Saving…" : isEdit ? "Save Changes" : "Add Backlog Item"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function BacklogsPage({ assets, backlogs, workOrders, userEmail, onRefresh }) {
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [deleting, setDeleting] = useState(null);
+  const [query, setQuery] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("Open");
+  const [selectedFleet, setSelectedFleet] = useState("");
+  const [selectedAsset, setSelectedAsset] = useState("");
+
+  const woNoById = useMemo(() => Object.fromEntries(workOrders.map((w) => [w.id, w.wo_no])), [workOrders]);
+
+  const filtered = useMemo(() => {
+    let rows = backlogs;
+    if (selectedAsset) rows = rows.filter((r) => r.asset_id === selectedAsset);
+    else if (selectedFleet) rows = rows.filter((r) => { const a = assets.find((x) => x.asset_id === r.asset_id); return a && a.fleet === selectedFleet; });
+    if (sourceFilter) rows = rows.filter((r) => r.source_type === sourceFilter);
+    if (statusFilter) rows = rows.filter((r) => r.status === statusFilter);
+    if (query.trim()) { const q = query.toLowerCase(); rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q))); }
+    return [...rows].sort((a, b) => (b.date_notified || "").localeCompare(a.date_notified || ""));
+  }, [backlogs, assets, query, sourceFilter, statusFilter, selectedFleet, selectedAsset]);
+
+  const handleDelete = async (reason) => {
+    await deleteWithReason("backlogs", deleting.id, "id", reason, userEmail);
+    onRefresh();
+    setDeleting(null);
+  };
+
+  const quickClose = async (row) => {
+    await supabase.from("backlogs").update({ status: "Closed", closed_date: todayForInput() }).eq("id", row.id);
+    onRefresh();
+  };
+
+  const columns = [
+    ["asset_id", "Equipment #"], ["source_type", "Source"], ["wo_no", "Work order #"],
+    ["component_code", "Component"], ["description", "Description"], ["priority", "Priority"],
+    ["date_notified", "Date Notified"], ["age_days", "Age (days)"], ["status", "Status"],
+  ];
+
+  const exportToExcel = () => {
+    const now = new Date();
+    const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
+    const headerRow = columns.map((c) => c[1]);
+    const dataRows = filtered.map((row) => [
+      row.asset_id, backlogSourceLabel(row.source_type), row.work_order_id ? (woNoById[row.work_order_id] || "") : "",
+      row.component_code ?? "", row.description ?? "", row.priority, row.date_notified, ageDays(row.date_notified), row.status,
+    ]);
+    const aoa = [["Backlog Management"], [`Exported: ${timestamp}`], [], headerRow, ...dataRows];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: columns.length - 1 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: columns.length - 1 } }];
+    ws["!cols"] = columns.map((c) => ({ wch: Math.max(c[1].length + 2, 14) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Backlogs");
+    XLSX.writeFile(wb, `Backlog_Management_${now.toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  return (
+    <div>
+      <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ position: "relative", flex: 1, minWidth: 200, maxWidth: 280 }}>
+            <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#898781" }} />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search backlogs" style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, outline: "none", boxSizing: "border-box" }} />
+          </div>
+          <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8 }}>
+            <option value="">All sources</option>
+            {BACKLOG_SOURCES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8 }}>
+            <option value="">All statuses</option>
+            <option value="Open">Open</option>
+            <option value="Closed">Closed</option>
+          </select>
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
+            <Download size={14} /> Export to Excel
+          </button>
+          <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+            + Add Backlog
+          </button>
+        </div>
+      </div>
+      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: "#F7F6F1" }}>
+              {columns.map(([key, label]) => <th key={key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>{label}</th>)}
+              <th style={{ borderBottom: "1px solid #E4E2D8" }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((row, i) => (
+              <tr key={row.id ?? i} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none" }}>
+                <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>{row.asset_id}</td>
+                <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>{backlogSourceLabel(row.source_type)}</td>
+                <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>{row.work_order_id ? (woNoById[row.work_order_id] || "—") : <span style={{ color: "#B4B2A9" }}>—</span>}</td>
+                <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", cursor: "pointer" }}>{row.component_code || <span style={{ color: "#B4B2A9" }}>—</span>}</td>
+                <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", cursor: "pointer", maxWidth: 320 }}>{row.description}</td>
+                <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", cursor: "pointer" }}><Badge value={row.priority} /></td>
+                <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>{row.date_notified}</td>
+                <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>{ageDays(row.date_notified)}</td>
+                <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", cursor: "pointer" }}><Badge value={row.status} /></td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
+                  {row.status === "Open" && (
+                    <button onClick={() => quickClose(row)} title="Mark Closed" style={{ background: "none", border: "none", color: "#27500A", cursor: "pointer", padding: 4, fontSize: 12, fontWeight: 600 }}>
+                      Close
+                    </button>
+                  )}
+                  <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#C0392B", cursor: "pointer", padding: 4, display: "inline-flex" }}>
+                    <Trash2 size={15} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#898781" }}>
+                {backlogs.length === 0 ? "No backlog items logged yet." : "No entries match your filters."}
+              </td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {showForm && (
+        <BacklogForm assets={assets} workOrders={workOrders} existing={editing} userEmail={userEmail}
+          onClose={() => { setShowForm(false); setEditing(null); }}
+          onSaved={() => { setShowForm(false); setEditing(null); onRefresh(); }} />
+      )}
+      {deleting && (
+        <DeleteConfirmModal
+          itemLabel={`backlog item on ${deleting.asset_id} (${deleting.description?.slice(0, 40)}${deleting.description?.length > 40 ? "…" : ""})`}
+          userEmail={userEmail}
+          onCancel={() => setDeleting(null)}
+          onConfirm={handleDelete}
+        />
+      )}
+    </div>
+  );
+}
+
+function DailyServiceForm({ assets, defaultAssetId, defaultDate, userEmail, onClose, onSaved }) {
+  const [assetId, setAssetId] = useState(defaultAssetId || assets[0]?.asset_id || "");
+  const [serviceDate, setServiceDate] = useState(defaultDate || todayForInput());
+  const [completedBy, setCompletedBy] = useState(userEmail || "");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSaving(true);
+    const payload = { asset_id: assetId, service_date: serviceDate, completed_by: completedBy || null, notes: notes || null };
+    try {
+      const { error: dbError } = await supabase.from("daily_service_checklist").upsert(payload, { onConflict: "asset_id,service_date" });
+      if (dbError) throw dbError;
+      onSaved();
+    } catch (err) {
+      setError(err.message || String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, boxSizing: "border-box", fontFamily: "inherit" };
+  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
+      <form onSubmit={handleSubmit} style={{ background: "#fff", borderRadius: 12, padding: 24, width: 400, maxWidth: "100%" }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 16px" }}>Log Daily Service</h3>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Equipment</label>
+          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required style={fieldStyle}>
+            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} — {a.asset_name}</option>)}
+          </select>
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Date</label>
+          <input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} required max={todayForInput()} style={fieldStyle} />
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Completed By</label>
+          <input type="text" value={completedBy} onChange={(e) => setCompletedBy(e.target.value)} style={fieldStyle} />
+        </div>
+
+        <div style={{ marginBottom: 18 }}>
+          <label style={labelStyle}>Notes</label>
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} style={{ ...fieldStyle, resize: "vertical" }} />
+        </div>
+
+        {error && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
+            {saving ? "Saving…" : "Log Daily Service"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// DS = a daily_service_checklist entry exists for that asset+day.
+// BD = no DS entry, but a breakdown fully covers the day (down at the
+//      start of day through at least the end of day) — no penalty.
+// NU = no DS entry, not a full-day breakdown, but Daily Hours shows the
+//      asset logged with zero hours run that day — not utilised, no
+//      penalty.
+// gap = none of the above — the cell needing attention, highlighted.
+function dailyServiceStatus(assetId, dateStr, checklistByKey, breakdowns, dailyHours) {
+  if (checklistByKey.has(`${assetId}|${dateStr}`)) return "DS";
+
+  const dayStart = new Date(`${dateStr}T00:00:00`);
+  const dayEnd = new Date(`${dateStr}T23:59:59.999`);
+  const fullDayDown = breakdowns.some((b) => {
+    if (b.asset_id !== assetId) return false;
+    const start = b.downtime_start ? new Date(b.downtime_start) : null;
+    const end = b.downtime_end ? new Date(b.downtime_end) : null;
+    if (!start || start > dayStart) return false;
+    return !end || end >= dayEnd;
+  });
+  if (fullDayDown) return "BD";
+
+  const dayHours = dailyHours.filter((h) => h.asset_id === assetId && h.log_date === dateStr);
+  const notUtilised = dayHours.length > 0 && dayHours.every((h) => Number(h.hours_run || 0) === 0);
+  if (notUtilised) return "NU";
+
+  return null; // gap
+}
+
+function DailyServicePage({ assets, dailyServiceChecklist, breakdowns, dailyHours, userEmail, onRefresh }) {
+  const [monthValue, setMonthValue] = useState(() => todayForInput().slice(0, 7)); // "YYYY-MM"
+  const [showForm, setShowForm] = useState(false);
+  const [formDefaults, setFormDefaults] = useState({ assetId: "", date: "" });
+  const [selectedFleet, setSelectedFleet] = useState("");
+  const [selectedAsset, setSelectedAsset] = useState("");
+
+  const checklistByKey = useMemo(
+    () => new Map(dailyServiceChecklist.map((r) => [`${r.asset_id}|${r.service_date}`, r])),
+    [dailyServiceChecklist]
+  );
+
+  const filteredAssets = useMemo(() => {
+    let rows = assets;
+    if (selectedAsset) rows = rows.filter((a) => a.asset_id === selectedAsset);
+    else if (selectedFleet) rows = rows.filter((a) => a.fleet === selectedFleet);
+    return rows;
+  }, [assets, selectedFleet, selectedAsset]);
+
+  const [year, month] = monthValue.split("-").map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const todayStr = todayForInput();
+
+  const cellStyle = (label) => {
+    if (label === "DS") return { background: "#EAF3DE", color: "#27500A" };
+    if (label === "BD") return { background: "#FCEBEB", color: "#791F1F" };
+    if (label === "NU") return { background: "#F1EFE8", color: "#5F5E5A" };
+    return { background: "#F9D8D8", color: "#791F1F" }; // gap — needs attention
+  };
+
+  const openLogForm = (assetId, dateStr) => {
+    setFormDefaults({ assetId, date: dateStr });
+    setShowForm(true);
+  };
+
+  return (
+    <div>
+      <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
+        <input type="month" value={monthValue} onChange={(e) => setMonthValue(e.target.value)} style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8 }} />
+        <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 10, fontSize: 12, color: "#5F5E5A" }}>
+            <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#EAF3DE", borderRadius: 2, marginRight: 4 }} />DS — serviced</span>
+            <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#FCEBEB", borderRadius: 2, marginRight: 4 }} />BD — breakdown</span>
+            <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#F1EFE8", borderRadius: 2, marginRight: 4 }} />NU — not utilised</span>
+            <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#F9D8D8", borderRadius: 2, marginRight: 4 }} />missing</span>
+          </div>
+          <button onClick={() => openLogForm(filteredAssets[0]?.asset_id || "", todayStr)} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+            + Log Daily Service
+          </button>
+        </div>
+      </div>
+
+      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+        <table style={{ borderCollapse: "collapse", fontSize: 11.5 }}>
+          <thead>
+            <tr style={{ background: "#F7F6F1" }}>
+              <th style={{ textAlign: "left", padding: "8px 10px", fontWeight: 600, color: "#5F5E5A", borderBottom: "1px solid #E4E2D8", position: "sticky", left: 0, background: "#F7F6F1", minWidth: 140 }}>Equipment</th>
+              {days.map((d) => (
+                <th key={d} style={{ textAlign: "center", padding: "6px 4px", fontWeight: 600, color: "#5F5E5A", borderBottom: "1px solid #E4E2D8", minWidth: 26 }}>{d}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filteredAssets.map((a, ri) => (
+              <tr key={a.asset_id} style={{ borderBottom: ri < filteredAssets.length - 1 ? "1px solid #EFEEE7" : "none" }}>
+                <td style={{ padding: "6px 10px", whiteSpace: "nowrap", fontWeight: 600, position: "sticky", left: 0, background: "#fff" }}>{a.asset_id}</td>
+                {days.map((d) => {
+                  const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                  const isFuture = dateStr > todayStr;
+                  const label = isFuture ? "" : (dailyServiceStatus(a.asset_id, dateStr, checklistByKey, breakdowns, dailyHours) || "");
+                  return (
+                    <td key={d} style={{ padding: 0, textAlign: "center", borderLeft: "1px solid #F2F1EA" }}>
+                      <button
+                        onClick={() => !isFuture && openLogForm(a.asset_id, dateStr)}
+                        disabled={isFuture}
+                        title={isFuture ? "" : `${a.asset_id} — ${dateStr}${label ? `: ${label}` : ": no daily service logged"}`}
+                        style={{
+                          width: "100%", minHeight: 26, border: "none", cursor: isFuture ? "default" : "pointer",
+                          fontSize: 10.5, fontWeight: 700, ...(isFuture ? { background: "transparent" } : cellStyle(label)),
+                        }}
+                      >
+                        {label}
+                      </button>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+            {filteredAssets.length === 0 && (
+              <tr><td colSpan={days.length + 1} style={{ padding: 20, textAlign: "center", color: "#898781" }}>No equipment to show.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {showForm && (
+        <DailyServiceForm
+          assets={assets}
+          defaultAssetId={formDefaults.assetId}
+          defaultDate={formDefaults.date}
+          userEmail={userEmail}
+          onClose={() => setShowForm(false)}
+          onSaved={() => { setShowForm(false); onRefresh(); }}
         />
       )}
     </div>
@@ -5343,6 +5847,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
   const [active, setActive] = useState(() => (myRole === "operator" ? "daily_hours" : "dashboard"));
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [engineeringExpanded, setEngineeringExpanded] = useState(true);
+  const [backlogsExpanded, setBacklogsExpanded] = useState(true);
   const isMobile = useIsMobile();
   const [selectedSiteId, setSelectedSiteId] = useState(mySites[0]?.id);
 
@@ -5366,6 +5871,8 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
   const [parts, setParts] = useState([]);
   const [warrantyDocs, setWarrantyDocs] = useState([]);
   const [auditLog, setAuditLog] = useState([]);
+  const [backlogs, setBacklogs] = useState([]);
+  const [dailyServiceChecklist, setDailyServiceChecklist] = useState([]);
   const [restLoading, setRestLoading] = useState(true);
   const [restError, setRestError] = useState(null);
 
@@ -5418,7 +5925,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
     try {
       const [
         siteAssetsRes, fuelRes, oilRes, woRes, serviceRes, inspRes,
-        compRes, tyreRes, partsRes, warrRes, docRes,
+        compRes, tyreRes, partsRes, warrRes, docRes, backlogsRes, dailyServiceRes,
       ] = await Promise.all([
         supabase.from("assets").select("asset_id").eq("site_id", selectedSiteId),
         supabase.from("fuel_log_calc").select("*"),
@@ -5431,8 +5938,10 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
         supabase.from("parts_inventory_calc").select("*").eq("site_id", selectedSiteId),
         supabase.from("warranty_register_calc").select("*"),
         supabase.from("document_register_calc").select("*"),
+        supabase.from("backlogs").select("*"),
+        supabase.from("daily_service_checklist").select("*"),
       ]);
-      const results = { siteAssetsRes, fuelRes, oilRes, woRes, serviceRes, inspRes, compRes, tyreRes, partsRes, warrRes, docRes };
+      const results = { siteAssetsRes, fuelRes, oilRes, woRes, serviceRes, inspRes, compRes, tyreRes, partsRes, warrRes, docRes, backlogsRes, dailyServiceRes };
       for (const [name, res] of Object.entries(results)) {
         if (res.error) throw new Error(`${name}: ${res.error.message}`);
       }
@@ -5473,6 +5982,8 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
         reference: r.reference, expiry: r.expiry_date, status: r.status,
       }));
       setWarrantyDocs([...warrantyRows, ...docRows]);
+      setBacklogs(bySite(backlogsRes.data));
+      setDailyServiceChecklist(bySite(dailyServiceRes.data));
     } catch (err) {
       setRestError(err.message || String(err));
     } finally {
@@ -5603,6 +6114,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
             </button>
           )}
           {(engineeringExpanded || !sidebarOpen) && NAV.filter((n) =>
+            !n.group &&
             ((n.key !== "audit" && n.key !== "site_management") || isAdmin) &&
             (myRole !== "operator" || n.operatorVisible)
           ).map(({ key, label, icon: Icon }) => (
@@ -5623,6 +6135,48 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
               {sidebarOpen && <span>{label}</span>}
             </button>
           ))}
+
+          {/* Backlogs — its own collapsible group inside Engineering, same
+              expand/collapse pattern as the Engineering heading itself. */}
+          {(engineeringExpanded || !sidebarOpen) && (
+            <>
+              {sidebarOpen ? (
+                <button
+                  onClick={() => setBacklogsExpanded((v) => !v)}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, width: "calc(100% - 16px)", background: "transparent", border: "none", cursor: "pointer", padding: isMobile ? "12px 16px" : "9px 16px", margin: "1px 8px", borderRadius: 8, color: "rgba(255,255,255,0.72)" }}
+                >
+                  <span style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14 }}>
+                    <AlertTriangle size={16} style={{ flexShrink: 0 }} />
+                    Backlogs
+                  </span>
+                  <ChevronDown size={13} style={{ transform: backlogsExpanded ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
+                </button>
+              ) : null}
+              {(backlogsExpanded || !sidebarOpen) && NAV.filter((n) =>
+                n.group === "backlogs" && (myRole !== "operator" || n.operatorVisible)
+              ).map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  className="nav-item"
+                  onClick={() => handleNavClick(key)}
+                  title={label}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: isMobile ? "12px 16px" : "9px 16px",
+                    paddingLeft: sidebarOpen ? 30 : (isMobile ? 16 : 9),
+                    margin: "1px 8px", borderRadius: 8,
+                    background: active === key ? "rgba(255,255,255,0.12)" : "transparent",
+                    border: "none", color: active === key ? "#fff" : "rgba(255,255,255,0.72)",
+                    cursor: "pointer", fontSize: 13.5, textAlign: "left", justifyContent: sidebarOpen ? "flex-start" : "center",
+                    width: sidebarOpen ? "calc(100% - 16px)" : "auto", minHeight: 38,
+                  }}
+                >
+                  <Icon size={15} style={{ flexShrink: 0 }} />
+                  {sidebarOpen && <span>{label}</span>}
+                </button>
+              ))}
+            </>
+          )}
 
           {sidebarOpen && <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 700, letterSpacing: 0.5, margin: "18px 16px 6px", textTransform: "uppercase" }}>Production</p>}
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: isMobile ? "12px 16px" : "9px 16px", margin: "1px 8px", borderRadius: 8, color: "rgba(255,255,255,0.32)", fontSize: 14, cursor: "not-allowed", minHeight: 40 }}>
@@ -5675,7 +6229,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
                 </p>
               </div>
             ) : (coreLoading && ["dashboard", "fleet_performance", "assets", "daily_hours", "breakdowns", "downtime_summary"].includes(active)) ||
-             (restLoading && ["dashboard", "fuel_log", "oil_consumption", "work_orders", "downtime_summary", "planned_maintenance", "inspections", "components", "tyres", "parts", "warranty_docs", "audit"].includes(active)) ? (
+             (restLoading && ["dashboard", "fuel_log", "oil_consumption", "work_orders", "downtime_summary", "planned_maintenance", "inspections", "components", "tyres", "parts", "warranty_docs", "audit", "backlog_report", "daily_service"].includes(active)) ? (
               <p style={{ fontSize: 13, color: "#898781" }}>Loading…</p>
             ) : active === "dashboard" ? (
               <Dashboard assets={assets} breakdowns={breakdowns} workOrders={workOrders} plannedMaintenance={plannedMaintenance} components={components} parts={parts} inspections={inspections} onNavigate={setActive} />
@@ -5701,6 +6255,10 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
               <OilConsumptionPage assets={assets} oilConsumption={oilConsumption} userEmail={userEmail} dailyHours={dailyHours} onRefresh={loadRestOfData} />
             ) : active === "inspections" ? (
               <InspectionsPage assets={assets} inspections={inspections} userEmail={userEmail} onRefresh={loadRestOfData} />
+            ) : active === "backlog_report" ? (
+              <BacklogsPage assets={assets} backlogs={backlogs} workOrders={workOrders} userEmail={userEmail} onRefresh={loadRestOfData} />
+            ) : active === "daily_service" ? (
+              <DailyServicePage assets={assets} dailyServiceChecklist={dailyServiceChecklist} breakdowns={breakdowns} dailyHours={dailyHours} userEmail={userEmail} onRefresh={loadRestOfData} />
             ) : active === "parts" ? (
               <PartsPage parts={parts} selectedSiteId={selectedSiteId} onRefresh={loadRestOfData} />
             ) : active === "audit" ? (
