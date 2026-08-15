@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ReferenceLine,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ReferenceLine, LabelList,
 } from "recharts";
 
 const NAVY = "#1F3864";
@@ -3951,10 +3951,10 @@ function EventTimeline({ breakdowns, workOrders, fromDateTime, toDateTime }) {
       .filter((e) => e.start < windowEnd && (e.end || nowTick) > windowStart)
       .map((e) => {
         // Solid bar = actual elapsed time so far (start to now, clipped to
-        // the window). Still-open events also get a thin projected line
-        // continuing on to the end of the window (or Expected Up Time,
-        // whichever is sooner) - "this is still down and will keep
-        // showing here" rather than just stopping dead at "now".
+        // the window). Still-open events with an Expected Up Time also
+        // get a thin projected line continuing on from "now" to that
+        // estimate - no Expected Up Time set means no line at all, since
+        // there's nothing to project towards.
         const effectiveEnd = e.end || nowTick;
         const clippedStartMs = Math.max(e.start.getTime(), windowStart.getTime());
         const clippedEndMs = Math.min(effectiveEnd.getTime(), windowEnd.getTime());
@@ -3962,11 +3962,9 @@ function EventTimeline({ breakdowns, workOrders, fromDateTime, toDateTime }) {
         const durationHrs = Math.max(windowHrs * 0.004, (clippedEndMs - clippedStartMs) / 3600000);
 
         let continuationHrs = 0;
-        if (!e.completed && !e.end && nowTick < windowEnd) {
+        if (!e.completed && !e.end && e.expectedUp && e.expectedUp > nowTick && nowTick < windowEnd) {
           const continuationStartMs = Math.max(clippedEndMs, windowStart.getTime());
-          const projectedEndMs = e.expectedUp && e.expectedUp > nowTick
-            ? Math.min(e.expectedUp.getTime(), windowEnd.getTime())
-            : windowEnd.getTime();
+          const projectedEndMs = Math.min(e.expectedUp.getTime(), windowEnd.getTime());
           continuationHrs = Math.max(0, (projectedEndMs - continuationStartMs) / 3600000);
         }
         return { ...e, offsetHrs, durationHrs, continuationHrs };
@@ -4055,7 +4053,7 @@ function EventTimeline({ breakdowns, workOrders, fromDateTime, toDateTime }) {
       <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 11.5, color: "#5F5E5A", flexWrap: "wrap" }}>
         <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#C0392B", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />In progress</span>
         <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#5FBF8F", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Completed</span>
-        <span><span style={{ display: "inline-block", width: 12, height: 3, background: "#5FBF8F", borderRadius: 2, marginRight: 6, verticalAlign: "middle" }} />Projected, still open</span>
+        <span><span style={{ display: "inline-block", width: 12, height: 3, background: "#5FBF8F", borderRadius: 2, marginRight: 6, verticalAlign: "middle" }} />Projected to Expected Up Time</span>
         <span><span style={{ display: "inline-block", width: 9, height: 9, background: "#E8A33D", transform: "rotate(45deg)", marginRight: 6, verticalAlign: "middle" }} />Scheduled, not booked down yet</span>
       </div>
     </div>
@@ -5369,6 +5367,7 @@ function AuditTrailPage({ auditLog, isAdmin }) {
 }
 
 function PartsPage({ parts, selectedSiteId, onRefresh }) {
+  const [subTab, setSubTab] = useState("inventory"); // "inventory" | "quotes"
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState("");
@@ -5451,6 +5450,27 @@ function PartsPage({ parts, selectedSiteId, onRefresh }) {
 
   return (
     <div>
+      <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #E4E2D8" }}>
+        {[["inventory", "Inventory"], ["quotes", "Quote Price List"]].map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setSubTab(key)}
+            style={{
+              padding: "9px 16px", fontSize: 13.5, fontWeight: 600, border: "none", background: "none", cursor: "pointer",
+              color: subTab === key ? NAVY : "#898781",
+              borderBottom: subTab === key ? `2px solid ${NAVY}` : "2px solid transparent",
+              marginBottom: -1,
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {subTab === "quotes" ? (
+        <QuotePriceListPage selectedSiteId={selectedSiteId} />
+      ) : (
+      <>
       {importMessage && (
         <div style={{
           background: importMessage.type === "error" ? "#FCEBEB" : "#EAF3DE",
@@ -5518,8 +5538,283 @@ function PartsPage({ parts, selectedSiteId, onRefresh }) {
         <PartForm existing={editing} selectedSiteId={selectedSiteId} onClose={() => { setShowForm(false); setEditing(null); }}
           onSaved={() => { setShowForm(false); setEditing(null); onRefresh(); }} />
       )}
+      </>
+      )}
     </div>
   );
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      // reader.result is "data:<mediatype>;base64,<data>" - keep just the data part
+      const result = reader.result;
+      const comma = result.indexOf(",");
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function QuotePriceListPage({ selectedSiteId }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [extractError, setExtractError] = useState("");
+  const [review, setReview] = useState(null); // { file, items: [{supplier, part_no, part_description, price}] }
+  const [saving, setSaving] = useState(false);
+  const fileInputRef = React.useRef(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("quote_prices")
+      .select("*")
+      .eq("site_id", selectedSiteId)
+      .order("price_date", { ascending: false });
+    if (!error) setRows(data || []);
+    setLoading(false);
+  }, [selectedSiteId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return rows;
+    const q = query.toLowerCase();
+    return rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q)));
+  }, [rows, query]);
+
+  const processFile = async (file) => {
+    if (!file) return;
+    setExtractError("");
+    setExtracting(true);
+    try {
+      const base64 = await fileToBase64(file);
+      const mediaType = file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg");
+      const resp = await fetch("/api/extract-quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: base64, mediaType }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.error || "Couldn't read this quote.");
+      const items = (data.items || []).map((it) => ({
+        supplier: it.supplier || "",
+        part_no: it.part_no || "",
+        part_description: it.part_description || "",
+        price: it.price ?? "",
+      }));
+      if (items.length === 0) {
+        setExtractError("No part/price lines were found on this document - you can still add rows manually below, or try a clearer scan.");
+      }
+      setReview({ file, items: items.length ? items : [{ supplier: "", part_no: "", part_description: "", price: "" }] });
+    } catch (err) {
+      setExtractError(err.message || String(err));
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    processFile(file);
+  };
+
+  const updateReviewRow = (i, field, value) => {
+    setReview((r) => ({ ...r, items: r.items.map((row, idx) => (idx === i ? { ...row, [field]: value } : row)) }));
+  };
+  const removeReviewRow = (i) => {
+    setReview((r) => ({ ...r, items: r.items.filter((_, idx) => idx !== i) }));
+  };
+  const addReviewRow = () => {
+    setReview((r) => ({ ...r, items: [...r.items, { supplier: "", part_no: "", part_description: "", price: "" }] }));
+  };
+
+  const saveReview = async () => {
+    if (!review || review.items.length === 0) return;
+    setSaving(true);
+    try {
+      let quoteDocumentPath = null;
+      if (review.file) {
+        const path = `quotes/${selectedSiteId}/${Date.now()}-${review.file.name}`;
+        const { error: uploadErr } = await supabase.storage.from("job-card-scans").upload(path, review.file);
+        if (uploadErr) throw uploadErr;
+        quoteDocumentPath = path;
+      }
+      const today = todayForInput();
+      const payload = review.items
+        .filter((it) => it.supplier || it.part_no || it.part_description)
+        .map((it) => ({
+          site_id: selectedSiteId,
+          supplier: it.supplier || "",
+          part_no: it.part_no || null,
+          part_description: it.part_description || null,
+          price: it.price === "" ? null : Number(it.price),
+          price_date: today,
+          quote_document_path: quoteDocumentPath,
+        }));
+      if (payload.length === 0) { setSaving(false); return; }
+      const { error: insertErr } = await supabase.from("quote_prices").insert(payload);
+      if (insertErr) throw insertErr;
+      setReview(null);
+      load();
+    } catch (err) {
+      setExtractError(err.message || String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const columns = [
+    ["supplier", "Supplier"], ["part_description", "Part"], ["part_no", "Part number"],
+    ["price", "Price"], ["price_date", "Last updated"],
+  ];
+
+  return (
+    <div>
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+        style={{
+          border: `2px dashed ${dragOver ? NAVY : "#D3D1C7"}`, borderRadius: 12, padding: 28, textAlign: "center",
+          background: dragOver ? "#F0F3F8" : "#FAFAF7", cursor: "pointer", marginBottom: 20, transition: "background 0.15s, border-color 0.15s",
+        }}
+      >
+        <Upload size={22} style={{ color: NAVY, marginBottom: 8 }} />
+        <p style={{ fontSize: 13.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" }}>
+          {extracting ? "Reading quote…" : "Drag a scanned quote here, or click to browse"}
+        </p>
+        <p style={{ fontSize: 12, color: "#898781", margin: 0 }}>
+          Image or PDF - Claude will read it and pull out the Supplier, Part, Part Number and Price for you to review before saving.
+        </p>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,.pdf"
+          onChange={(e) => processFile(e.target.files?.[0])}
+          style={{ display: "none" }}
+        />
+      </div>
+
+      {extractError && (
+        <div style={{ background: "#FCEBEB", border: "1px solid #E3A8A8", color: "#791F1F", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13 }}>
+          {extractError}
+        </div>
+      )}
+
+      {review && (
+        <div style={{ border: "1px solid #E4E2D8", borderRadius: 10, padding: 16, marginBottom: 20, background: "#fff" }}>
+          <p style={{ fontSize: 13.5, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>Review before saving</p>
+          <p style={{ fontSize: 12, color: "#898781", margin: "0 0 14px" }}>Check what Claude read off the quote - fix anything that's wrong, remove lines that shouldn't be there, then save.</p>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: "#F7F6F1" }}>
+                  {["Supplier", "Part", "Part number", "Price", ""].map((h) => (
+                    <th key={h} style={{ textAlign: "left", padding: "7px 8px", fontWeight: 600, color: "#5F5E5A", fontSize: 12 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {review.items.map((row, i) => (
+                  <tr key={i}>
+                    {["supplier", "part_description", "part_no", "price"].map((field) => (
+                      <td key={field} style={{ padding: "4px 8px" }}>
+                        <input
+                          type={field === "price" ? "number" : "text"}
+                          value={row[field]}
+                          onChange={(e) => updateReviewRow(i, field, e.target.value)}
+                          style={{ width: "100%", padding: "6px 8px", fontSize: 12.5, border: "1px solid #D3D1C7", borderRadius: 6, boxSizing: "border-box" }}
+                        />
+                      </td>
+                    ))}
+                    <td style={{ padding: "4px 8px" }}>
+                      <button type="button" onClick={() => removeReviewRow(i)} style={{ background: "none", border: "none", color: "#C0392B", cursor: "pointer", padding: 4, display: "flex" }}>
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
+            <button type="button" onClick={addReviewRow} style={{ background: "none", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12.5, fontWeight: 600, padding: "6px 12px", borderRadius: 6, cursor: "pointer" }}>
+              + Add row
+            </button>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button type="button" onClick={() => setReview(null)} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "8px 16px", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
+                Discard
+              </button>
+              <button type="button" onClick={saveReview} disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
+                {saving ? "Saving…" : "Save to Price List"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{ position: "relative", maxWidth: 280, marginBottom: 12 }}>
+        <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#898781" }} />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search price list"
+          style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, outline: "none", boxSizing: "border-box" }} />
+      </div>
+
+      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: "#F7F6F1" }}>
+              {columns.map(([key, label]) => (
+                <th key={key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>{label}</th>
+              ))}
+              <th style={{ borderBottom: "1px solid #E4E2D8" }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#898781" }}>Loading…</td></tr>
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#898781" }}>
+                {rows.length === 0 ? "No quotes added yet - drag one in above to get started." : "No entries match your search."}
+              </td></tr>
+            ) : filtered.map((row, i) => (
+              <tr key={row.id ?? i} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none" }}>
+                <td style={{ padding: "9px 12px" }}>{row.supplier || <span style={{ color: "#B4B2A9" }}>-</span>}</td>
+                <td style={{ padding: "9px 12px" }}>{row.part_description || <span style={{ color: "#B4B2A9" }}>-</span>}</td>
+                <td style={{ padding: "9px 12px" }}>{row.part_no || <span style={{ color: "#B4B2A9" }}>-</span>}</td>
+                <td style={{ padding: "9px 12px" }}>{row.price != null ? Number(row.price).toFixed(2) : <span style={{ color: "#B4B2A9" }}>-</span>}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{row.price_date}</td>
+                <td style={{ padding: "9px 12px" }}>
+                  {row.quote_document_path && <QuoteDocLink path={row.quote_document_path} />}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function QuoteDocLink({ path }) {
+  const [url, setUrl] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    supabase.storage.from("job-card-scans").createSignedUrl(path, 3600).then(({ data }) => {
+      if (!cancelled) setUrl(data?.signedUrl || null);
+    });
+    return () => { cancelled = true; };
+  }, [path]);
+  if (!url) return null;
+  return <a href={url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: NAVY, whiteSpace: "nowrap" }}>View quote</a>;
 }
 
 function AssetsPage({ assets, selectedSiteId, onRefresh }) {
@@ -6025,6 +6320,56 @@ function FleetPerformance({ assets, breakdowns }) {
     </div>
   );
 }
+// Dark, glossy-bar KPI chart matching the plant's existing Excel report
+// style (dark background, gradient bars, value labels on top, a solid
+// target line, legend below) rather than the flatter light chart style
+// used elsewhere in the app - these four are deliberately styled to
+// match that reference rather than the rest of the app's charts.
+function KpiBarChart({ title, data, xKey, dataKey, target, domainMax, valueFormatter, meetsTarget, unitSuffix, onClick }) {
+  const gradGreen = `grad-green-${dataKey}`;
+  const gradRed = `grad-red-${dataKey}`;
+  return (
+    <div>
+      {title && <p style={{ fontSize: 12.5, fontWeight: 600, margin: "0 0 6px", color: "#5F5E5A" }}>{title}</p>}
+      <div onClick={onClick} style={{ height: 220, background: "#292929", border: "1px solid #1C1C1C", borderRadius: 10, padding: "16px 8px 4px", cursor: onClick ? "pointer" : "default" }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 14, right: 8, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id={gradGreen} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#8FE8B4" />
+                <stop offset="100%" stopColor="#2F9E63" />
+              </linearGradient>
+              <linearGradient id={gradRed} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#F3998A" />
+                <stop offset="100%" stopColor="#A62A1E" />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#3D3D3D" vertical={false} />
+            <XAxis dataKey={xKey} tick={{ fontSize: 10.5, fill: "#CFCFCF" }} axisLine={{ stroke: "#4A4A4A" }} tickLine={false} />
+            <YAxis domain={[0, domainMax]} tick={{ fontSize: 11, fill: "#CFCFCF" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}${unitSuffix || ""}`} />
+            <Tooltip formatter={(v) => `${Number(v).toFixed(1)}${unitSuffix || ""}`} contentStyle={{ background: "#1F1F1F", border: "1px solid #444", borderRadius: 8 }} labelStyle={{ color: "#fff" }} itemStyle={{ color: "#fff" }} />
+            <Bar dataKey={dataKey} radius={[3, 3, 0, 0]} cursor={onClick ? "pointer" : "default"}>
+              {data.map((row, i) => <Cell key={i} fill={meetsTarget(row) ? `url(#${gradGreen})` : `url(#${gradRed})`} />)}
+              <LabelList dataKey={dataKey} position="top" formatter={valueFormatter} fill="#fff" fontSize={11} fontWeight={700} />
+            </Bar>
+            <ReferenceLine y={target} stroke="#F5C518" strokeWidth={2.5} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+function KpiLegend({ targetLabel }) {
+  return (
+    <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 11.5, color: "#5F5E5A" }}>
+      <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#2F9E63", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Target met</span>
+      <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#A62A1E", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Target not met</span>
+      <span><span style={{ display: "inline-block", width: 12, height: 3, background: "#F5C518", borderRadius: 2, marginRight: 6, verticalAlign: "middle" }} />{targetLabel || "Target"}</span>
+    </div>
+  );
+}
+
 function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, components, parts, inspections, onNavigate }) {
   const [monthKpi, setMonthKpi] = useState([]);
   const [monthKpiLoading, setMonthKpiLoading] = useState(true);
@@ -6296,58 +6641,42 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
 
         <EventTimeline breakdowns={filteredBreakdowns} workOrders={filteredWorkOrders} />
 
-        {!monthKpiLoading && filteredMonthKpi.length > 0 && (
+        {!monthKpiLoading && filteredMonthKpi.length > 0 && (() => {
+          const mtbfTarget = 40, mttrTarget = 4, utilTarget = 85;
+          const mtbfMax = Math.max(mtbfTarget, ...filteredMonthKpi.map((r) => r.mtbf || 0)) * 1.15;
+          const mttrMax = Math.max(mttrTarget, ...filteredMonthKpi.map((r) => r.mttr || 0)) * 1.15;
+          const utilData = filteredMonthKpi.map((r) => ({ ...r, utilisationPct: r.utilisation != null ? Math.round(r.utilisation * 100) : null }));
+          return (
           <div style={{ marginBottom: 8 }}>
             <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 12px", color: NAVY }}>MTBF, MTTR & Utilisation, this month</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 16, marginBottom: 24 }}>
-              <div>
-                <p style={{ fontSize: 12.5, fontWeight: 600, margin: "0 0 6px", color: "#5F5E5A" }}>MTBF by equipment (hrs)</p>
-                <div style={{ height: 190, background: "#fff", border: "1px solid #E4E2D8", borderRadius: 10, padding: "10px 8px 0" }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={filteredMonthKpi} onClick={() => onNavigate?.("mtbf_mttr")} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" vertical={false} />
-                      <XAxis dataKey="asset_id" tick={{ fontSize: 10.5, fill: "#5F5E5A" }} axisLine={{ stroke: "#E4E2D8" }} tickLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: "#5F5E5A" }} axisLine={false} tickLine={false} />
-                      <Tooltip formatter={(v) => `${Number(v).toFixed(1)} hrs`} />
-                      <Bar dataKey="mtbf" fill="#5FBF8F" radius={[4, 4, 0, 0]} cursor="pointer" />
-                      <ReferenceLine y={40} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 40", position: "top", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-              <div>
-                <p style={{ fontSize: 12.5, fontWeight: 600, margin: "0 0 6px", color: "#5F5E5A" }}>MTTR by equipment (hrs)</p>
-                <div style={{ height: 190, background: "#fff", border: "1px solid #E4E2D8", borderRadius: 10, padding: "10px 8px 0" }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={filteredMonthKpi} onClick={() => onNavigate?.("mtbf_mttr")} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" vertical={false} />
-                      <XAxis dataKey="asset_id" tick={{ fontSize: 10.5, fill: "#5F5E5A" }} axisLine={{ stroke: "#E4E2D8" }} tickLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: "#5F5E5A" }} axisLine={false} tickLine={false} />
-                      <Tooltip formatter={(v) => `${Number(v).toFixed(1)} hrs`} />
-                      <Bar dataKey="mttr" fill="#E8734A" radius={[4, 4, 0, 0]} cursor="pointer" />
-                      <ReferenceLine y={4} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 4", position: "top", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-              <div>
-                <p style={{ fontSize: 12.5, fontWeight: 600, margin: "0 0 6px", color: "#5F5E5A" }}>Utilisation by equipment</p>
-                <div style={{ height: 190, background: "#fff", border: "1px solid #E4E2D8", borderRadius: 10, padding: "10px 8px 0" }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={filteredMonthKpi.map((r) => ({ ...r, utilisationPct: r.utilisation != null ? Math.round(r.utilisation * 100) : null }))} onClick={() => onNavigate?.("mtbf_mttr")} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" vertical={false} />
-                      <XAxis dataKey="asset_id" tick={{ fontSize: 10.5, fill: "#5F5E5A" }} axisLine={{ stroke: "#E4E2D8" }} tickLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: "#5F5E5A" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
-                      <Tooltip formatter={(v) => `${v}%`} />
-                      <Bar dataKey="utilisationPct" fill="#2E86AB" radius={[4, 4, 0, 0]} cursor="pointer" />
-                      <ReferenceLine y={85} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 85%", position: "top", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 16, marginBottom: 8 }}>
+              <KpiBarChart
+                title="MTBF by equipment (hrs)" data={filteredMonthKpi} xKey="asset_id" dataKey="mtbf"
+                target={mtbfTarget} domainMax={mtbfMax} unitSuffix="h"
+                valueFormatter={(v) => Number(v).toFixed(1)}
+                meetsTarget={(r) => (r.mtbf || 0) >= mtbfTarget}
+                onClick={() => onNavigate?.("mtbf_mttr")}
+              />
+              <KpiBarChart
+                title="MTTR by equipment (hrs)" data={filteredMonthKpi} xKey="asset_id" dataKey="mttr"
+                target={mttrTarget} domainMax={mttrMax} unitSuffix="h"
+                valueFormatter={(v) => Number(v).toFixed(1)}
+                // Lower is better for MTTR, so "meets target" means at or below it.
+                meetsTarget={(r) => (r.mttr || 0) <= mttrTarget}
+                onClick={() => onNavigate?.("mtbf_mttr")}
+              />
+              <KpiBarChart
+                title="Utilisation by equipment" data={utilData} xKey="asset_id" dataKey="utilisationPct"
+                target={utilTarget} domainMax={100} unitSuffix="%"
+                valueFormatter={(v) => `${v}%`}
+                meetsTarget={(r) => (r.utilisationPct || 0) >= utilTarget}
+                onClick={() => onNavigate?.("mtbf_mttr")}
+              />
             </div>
+            <KpiLegend targetLabel="Target" />
           </div>
-        )}
+          );
+        })()}
 
         <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 20, marginBottom: 24, alignItems: "start" }}>
           <div>
@@ -6357,18 +6686,16 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
             ) : fleetAvailability.length === 0 ? (
               <p style={{ fontSize: 13, color: "#898781" }}>No hours logged yet this month.</p>
             ) : (
-              <div onClick={() => onNavigate?.("fleet_performance")} style={{ height: 240, background: "#fff", border: "1px solid #E4E2D8", borderRadius: 12, padding: "16px 12px 4px", cursor: "pointer" }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={fleetAvailability} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" vertical={false} />
-                    <XAxis dataKey="fleet" tick={{ fontSize: 12, fill: "#5F5E5A" }} axisLine={{ stroke: "#E4E2D8" }} tickLine={false} />
-                    <YAxis tick={{ fontSize: 12, fill: "#5F5E5A" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
-                    <Tooltip formatter={(v) => `${v}%`} />
-                    <Bar dataKey="availability" fill={NAVY} radius={[4, 4, 0, 0]} />
-                    <ReferenceLine y={85} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 85%", position: "top", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <>
+                <KpiBarChart
+                  title="" data={fleetAvailability} xKey="fleet" dataKey="availability"
+                  target={85} domainMax={100} unitSuffix="%"
+                  valueFormatter={(v) => `${v}%`}
+                  meetsTarget={(r) => (r.availability || 0) >= 85}
+                  onClick={() => onNavigate?.("fleet_performance")}
+                />
+                <KpiLegend targetLabel="Avail Target" />
+              </>
             )}
           </div>
 
