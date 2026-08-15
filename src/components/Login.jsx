@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
-const NAVY = "#3DA35D";
-const GREEN = "#F4801F";
+const NAVY = "#1F6668";
+const GREEN = "#2B7A78";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -24,12 +24,12 @@ export default function Login() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F7F6F1", fontFamily: "Arial, sans-serif", padding: 16, boxSizing: "border-box" }}>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F7F8F6", fontFamily: "Arial, sans-serif", padding: 16, boxSizing: "border-box" }}>
       <form onSubmit={handleSubmit} style={{ background: "#fff", padding: 36, borderRadius: 12, width: 340, maxWidth: "100%", boxSizing: "border-box", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
         <p style={{ color: GREEN, fontWeight: 700, fontSize: 18, margin: "0 0 4px" }}>Fleet Tracker</p>
-        <p style={{ color: "#5F5E5A", fontSize: 13, margin: "0 0 24px" }}>Sign in to continue</p>
+        <p style={{ color: "#4B5659", fontSize: 13, margin: "0 0 24px" }}>Sign in to continue</p>
 
-        <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", marginBottom: 4 }}>Email</label>
+        <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", marginBottom: 4 }}>Email</label>
         <input
           type="email"
           value={email}
@@ -37,20 +37,20 @@ export default function Login() {
           required
           autoCapitalize="none"
           autoCorrect="off"
-          style={{ width: "100%", padding: "9px 11px", fontSize: 16, border: "1px solid #D3D1C7", borderRadius: 8, marginBottom: 14, boxSizing: "border-box" }}
+          style={{ width: "100%", padding: "9px 11px", fontSize: 16, border: "1px solid #E2E6E3", borderRadius: 8, marginBottom: 14, boxSizing: "border-box" }}
         />
 
-        <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", marginBottom: 4 }}>Password</label>
+        <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", marginBottom: 4 }}>Password</label>
         <input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          style={{ width: "100%", padding: "9px 11px", fontSize: 16, border: "1px solid #D3D1C7", borderRadius: 8, marginBottom: 18, boxSizing: "border-box" }}
+          style={{ width: "100%", padding: "9px 11px", fontSize: 16, border: "1px solid #E2E6E3", borderRadius: 8, marginBottom: 18, boxSizing: "border-box" }}
         />
 
         {error && (
-          <p style={{ color: "#C0392B", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>
+          <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>
         )}
 
         <button
@@ -61,7 +61,7 @@ export default function Login() {
           {loading ? "Signing in…" : "Sign in"}
         </button>
 
-        <p style={{ fontSize: 11.5, color: "#898781", marginTop: 18, marginBottom: 0 }}>
+        <p style={{ fontSize: 11.5, color: "#859195", marginTop: 18, marginBottom: 0 }}>
           Accounts are created by your administrator — there's no self-signup here.
         </p>
       </form>

@@ -11,8 +11,11 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ReferenceLine, LabelList,
 } from "recharts";
 
-const NAVY = "#3DA35D";
-const GREEN = "#F4801F";
+const NAVY = "#1F6668";
+const SIDEBAR = "#203B46";
+const ACCENT = "#3D7379";
+const ACCENT_LIGHT = "#DCEFED";
+const GREEN = "#DCEFED";
 const MOBILE_BREAKPOINT = 720;
 
 function useIsMobile() {
@@ -226,11 +229,11 @@ const NAV = [
 function statusColor(status) {
   const s = (status || "").toUpperCase();
   if (["OVERDUE", "CRITICAL", "CHANGE OUT", "REORDER", "REPLACE NOW", "EXPIRED", "FAIL", "OPEN", "OVER SCHEDULED HOURS"].includes(s))
-    return { bg: "#FCEBEB", text: "#791F1F" };
+    return { bg: "#F6E2E0", text: "#7A3330" };
   if (["DUE SOON", "PLAN CHANGE", "EXPIRING SOON", "MEDIUM", "PLANNED", "APPROACHING LIMIT"].includes(s))
-    return { bg: "#FAEEDA", text: "#633806" };
+    return { bg: "#F5E9D8", text: "#7A5320" };
   if (["OK", "CLOSED", "PASS", "ACTIVE", "VALID"].includes(s))
-    return { bg: "#EAF3DE", text: "#27500A" };
+    return { bg: "#E2EFE9", text: "#2C5646" };
   return { bg: "#F1EFE8", text: "#444441" };
 }
 
@@ -260,12 +263,12 @@ class PageErrorBoundary extends React.Component {
   render() {
     if (this.state.error) {
       return (
-        <div style={{ background: "#FCEBEB", border: "1px solid #E3A8A8", borderRadius: 10, padding: 20, color: "#791F1F" }}>
+        <div style={{ background: "#F6E2E0", border: "1px solid #DDB6B2", borderRadius: 10, padding: 20, color: "#7A3330" }}>
           <p style={{ fontWeight: 700, fontSize: 14, margin: "0 0 6px" }}>This page hit an error and couldn't display.</p>
           <p style={{ fontSize: 13, margin: "0 0 10px" }}>{String(this.state.error.message || this.state.error)}</p>
           <button
             onClick={() => this.setState({ error: null })}
-            style={{ background: "#fff", border: "1px solid #E3A8A8", color: "#791F1F", padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+            style={{ background: "#fff", border: "1px solid #DDB6B2", color: "#7A3330", padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
           >
             Try again
           </button>
@@ -325,12 +328,12 @@ function DataTable({ columns, rows, exportName }) {
     <div>
       <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", marginBottom: 12, gap: 10 }}>
         <div style={{ position: "relative", flex: 1, maxWidth: isMobile ? "none" : 280 }}>
-          <Search size={15} style={{ position: "absolute", left: 10, top: 13, color: "#898781" }} />
+          <Search size={15} style={{ position: "absolute", left: 10, top: 13, color: "#859195" }} />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search this table"
-            style={{ width: "100%", padding: "10px 10px 10px 32px", fontSize: 14, border: "1px solid #D3D1C7", borderRadius: 8, outline: "none", boxSizing: "border-box", minHeight: 42 }}
+            style={{ width: "100%", padding: "10px 10px 10px 32px", fontSize: 14, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none", boxSizing: "border-box", minHeight: 42 }}
           />
         </div>
         <button
@@ -340,12 +343,12 @@ function DataTable({ columns, rows, exportName }) {
           <Download size={14} /> Export to Excel
         </button>
       </div>
-      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10, WebkitOverflowScrolling: "touch" }}>
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10, WebkitOverflowScrolling: "touch" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: isMobile ? 12.5 : 13 }}>
           <thead>
-            <tr style={{ background: "#F7F6F1" }}>
+            <tr style={{ background: "#F7F8F6" }}>
               {columns.map((c) => (
-                <th key={c.key} style={{ textAlign: "left", padding: isMobile ? "9px 10px" : "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>
+                <th key={c.key} style={{ textAlign: "left", padding: isMobile ? "9px 10px" : "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>
                   {c.label}
                 </th>
               ))}
@@ -360,7 +363,7 @@ function DataTable({ columns, rows, exportName }) {
                     : typeof val === "number" && !Number.isInteger(val) ? val.toFixed(2)
                     : (val ?? <span style={{ color: "#B4B2A9" }}>-</span>);
                   return (
-                    <td key={c.key} style={{ padding: isMobile ? "9px 10px" : "9px 12px", color: "#2C2C2A", whiteSpace: "nowrap" }}>
+                    <td key={c.key} style={{ padding: isMobile ? "9px 10px" : "9px 12px", color: "#183642", whiteSpace: "nowrap" }}>
                       {display}
                     </td>
                   );
@@ -368,12 +371,12 @@ function DataTable({ columns, rows, exportName }) {
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={columns.length} style={{ padding: 20, textAlign: "center", color: "#898781" }}>No rows match your search.</td></tr>
+              <tr><td colSpan={columns.length} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No rows match your search.</td></tr>
             )}
           </tbody>
         </table>
       </div>
-      {isMobile && <p style={{ fontSize: 11.5, color: "#898781", margin: "8px 2px 0" }}>Swipe the table sideways to see more columns.</p>}
+      {isMobile && <p style={{ fontSize: 11.5, color: "#859195", margin: "8px 2px 0" }}>Swipe the table sideways to see more columns.</p>}
     </div>
   );
 }
@@ -381,9 +384,9 @@ function DataTable({ columns, rows, exportName }) {
 function MetricCard({ label, value, icon: Icon, accentColor, onClick }) {
   if (!Icon) {
     return (
-      <div onClick={onClick} style={{ background: "#F7F6F1", borderRadius: 10, padding: "14px 16px", cursor: onClick ? "pointer" : "default" }}>
-        <p style={{ fontSize: 12, color: "#5F5E5A", margin: "0 0 4px" }}>{label}</p>
-        <p style={{ fontSize: 22, fontWeight: 700, margin: 0, color: "#2C2C2A" }}>{value}</p>
+      <div onClick={onClick} style={{ background: "#F7F8F6", borderRadius: 10, padding: "14px 16px", cursor: onClick ? "pointer" : "default" }}>
+        <p style={{ fontSize: 12, color: "#4B5659", margin: "0 0 4px" }}>{label}</p>
+        <p style={{ fontSize: 22, fontWeight: 700, margin: 0, color: "#183642" }}>{value}</p>
       </div>
     );
   }
@@ -391,14 +394,14 @@ function MetricCard({ label, value, icon: Icon, accentColor, onClick }) {
   return (
     <div
       onClick={onClick}
-      style={{ background: "#fff", border: "1px solid #E4E2D8", borderRadius: 12, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, cursor: onClick ? "pointer" : "default" }}
+      style={{ background: "#fff", border: "1px solid #E2E6E3", borderRadius: 12, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, cursor: onClick ? "pointer" : "default" }}
     >
       <div style={{ width: 42, height: 42, borderRadius: 10, background: `${color}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
         <Icon size={20} style={{ color }} />
       </div>
       <div style={{ minWidth: 0 }}>
-        <p style={{ fontSize: 12, color: "#5F5E5A", margin: "0 0 2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</p>
-        <p style={{ fontSize: 21, fontWeight: 700, margin: 0, color: "#2C2C2A" }}>{value}</p>
+        <p style={{ fontSize: 12, color: "#4B5659", margin: "0 0 2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</p>
+        <p style={{ fontSize: 21, fontWeight: 700, margin: 0, color: "#183642" }}>{value}</p>
       </div>
       {onClick && <ChevronRight size={16} style={{ color: "#B4B2A9", flexShrink: 0 }} />}
     </div>
@@ -493,8 +496,8 @@ function checkHourMeterPlausibility(assetId, newHourMeter, newDateStr, dailyHour
 }
 
 function DateTimeField({ value, onChange, max, required, disabled }) {
-  const baseFieldStyle = { padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
-  const fieldStyle = disabled ? { ...baseFieldStyle, background: "#F2F1EA", color: "#898781" } : baseFieldStyle;
+  const baseFieldStyle = { padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
+  const fieldStyle = disabled ? { ...baseFieldStyle, background: "#F2F1EA", color: "#859195" } : baseFieldStyle;
 
   const [datePart, timePart] = value ? value.split("T") : ["", ""];
   const [maxDate, maxTimeRaw] = max ? max.split("T") : [undefined, undefined];
@@ -514,7 +517,7 @@ function DateTimeField({ value, onChange, max, required, disabled }) {
         onClick={() => onChange(nowForInput())}
         disabled={disabled}
         title="Set to right now"
-        style={{ background: disabled ? "#F2F1EA" : "#F2F1EA", border: "1px solid #D3D1C7", color: disabled ? "#B4B2A9" : NAVY, fontSize: 12.5, fontWeight: 600, padding: "0 12px", borderRadius: 8, cursor: disabled ? "default" : "pointer", whiteSpace: "nowrap" }}
+        style={{ background: disabled ? "#F2F1EA" : "#F2F1EA", border: "1px solid #E2E6E3", color: disabled ? "#B4B2A9" : NAVY, fontSize: 12.5, fontWeight: 600, padding: "0 12px", borderRadius: 8, cursor: disabled ? "default" : "pointer", whiteSpace: "nowrap" }}
       >
         Now
       </button>
@@ -579,7 +582,7 @@ function DailyHoursForm({ assets, dailyHours, existing, onClose, onSaved }) {
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
-          <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 18px" }}>Add at least one asset on the Assets tab before logging hours.</p>
+          <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab before logging hours.</p>
           <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
             Close
           </button>
@@ -620,8 +623,8 @@ function DailyHoursForm({ assets, dailyHours, existing, onClose, onSaved }) {
     }
   };
 
-  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
-  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" };
+  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
+  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
@@ -632,7 +635,7 @@ function DailyHoursForm({ assets, dailyHours, existing, onClose, onSaved }) {
 
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Equipment</label>
-          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#5F5E5A" } : {}) }}>
+          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#4B5659" } : {}) }}>
             {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
           </select>
         </div>
@@ -640,11 +643,11 @@ function DailyHoursForm({ assets, dailyHours, existing, onClose, onSaved }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
           <div>
             <label style={labelStyle}>Date</label>
-            <input type="date" value={logDate} onChange={(e) => setLogDate(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#5F5E5A" } : {}) }} />
+            <input type="date" value={logDate} onChange={(e) => setLogDate(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#4B5659" } : {}) }} />
           </div>
           <div>
             <label style={labelStyle}>Shift</label>
-            <select value={shift} onChange={(e) => setShift(e.target.value)} disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#5F5E5A" } : {}) }}>
+            <select value={shift} onChange={(e) => setShift(e.target.value)} disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#4B5659" } : {}) }}>
               {SHIFTS.map((s) => <option key={s} value={s}>{s} {s === "Day" ? "(07:00–19:00)" : "(19:00–07:00)"}</option>)}
             </select>
           </div>
@@ -653,26 +656,26 @@ function DailyHoursForm({ assets, dailyHours, existing, onClose, onSaved }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 4 }}>
           <div>
             <label style={labelStyle}>Opening Hours</label>
-            <input type="text" value={openingHours != null ? openingHours : "-"} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#5F5E5A" }} />
+            <input type="text" value={openingHours != null ? openingHours : "-"} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#4B5659" }} />
           </div>
           <div>
             <label style={labelStyle}>Closing Hours</label>
             <input type="number" step="0.1" value={closingHours} onChange={(e) => setClosingHours(e.target.value)} required style={fieldStyle} />
           </div>
         </div>
-        <p style={{ fontSize: 11.5, color: "#898781", margin: "0 0 14px" }}>
+        <p style={{ fontSize: 11.5, color: "#859195", margin: "0 0 14px" }}>
           Opening Hours fills in automatically from the previous shift - just enter Closing Hours.
         </p>
 
         {hoursRun != null && (
           <div style={{
-            background: exceedsShiftLimit ? "#FCEBEB" : "#F7F6F1",
-            border: `1px solid ${exceedsShiftLimit ? "#E3A8A8" : "#E4E2D8"}`,
+            background: exceedsShiftLimit ? "#F6E2E0" : "#F7F8F6",
+            border: `1px solid ${exceedsShiftLimit ? "#DDB6B2" : "#E2E6E3"}`,
             borderRadius: 8, padding: "10px 12px", marginBottom: 14, fontSize: 13,
           }}>
             Hours run this shift: <b>{hoursRun.toFixed(1)}</b>
             {exceedsShiftLimit && (
-              <div style={{ color: "#791F1F", marginTop: 4 }}>
+              <div style={{ color: "#7A3330", marginTop: 4 }}>
                 ⚠ This exceeds 12 hours for a single shift - double check the reading before saving.
               </div>
             )}
@@ -692,10 +695,10 @@ function DailyHoursForm({ assets, dailyHours, existing, onClose, onSaved }) {
           </div>
         </div>
 
-        {error && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>
             Cancel
           </button>
           <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
@@ -732,8 +735,8 @@ function ScheduledHoursForm({ fleets, existing, onClose, onSaved }) {
     }
   };
 
-  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
-  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" };
+  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
+  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
@@ -749,9 +752,9 @@ function ScheduledHoursForm({ fleets, existing, onClose, onSaved }) {
           <label style={labelStyle}>Scheduled Hours (this month)</label>
           <input type="number" step="1" value={scheduledHours} onChange={(e) => setScheduledHours(e.target.value)} style={fieldStyle} />
         </div>
-        {error && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
           <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
             {saving ? "Saving…" : "Save"}
           </button>
@@ -960,9 +963,9 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
     <div>
       <h4 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 10px", color: NAVY }}>Monthly Scheduled Hours</h4>
       {budgetLoading ? (
-        <p style={{ fontSize: 13, color: "#898781" }}>Loading…</p>
+        <p style={{ fontSize: 13, color: "#859195" }}>Loading…</p>
       ) : (
-        <div style={{ border: "1px solid #E4E2D8", borderRadius: 10, overflow: "hidden", marginBottom: 20 }}>
+        <div style={{ border: "1px solid #E2E6E3", borderRadius: 10, overflow: "hidden", marginBottom: 20 }}>
           {budget.map((row, i) => (
             <div key={row.fleet} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderTop: i > 0 ? "1px solid #EFEEE7" : "none" }}>
               <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600 }}>{row.fleet}</span>
@@ -970,7 +973,7 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
               <Badge value={row.status} />
             </div>
           ))}
-          {budget.length === 0 && <p style={{ padding: 14, fontSize: 13, color: "#898781" }}>No fleets yet.</p>}
+          {budget.length === 0 && <p style={{ padding: 14, fontSize: 13, color: "#859195" }}>No fleets yet.</p>}
         </div>
       )}
       <div style={{ marginBottom: 20 }}>
@@ -979,9 +982,9 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
         </button>
       </div>
 
-      <div style={{ border: "1px solid #E4E2D8", borderRadius: 10, background: "#F7F6F1", padding: "14px 16px", marginBottom: 24 }}>
+      <div style={{ border: "1px solid #E2E6E3", borderRadius: 10, background: "#F7F8F6", padding: "14px 16px", marginBottom: 24 }}>
         <h4 style={{ fontSize: 13.5, fontWeight: 700, margin: "0 0 4px", color: NAVY }}>Bulk Upload - a faster way to load a month of hours</h4>
-        <p style={{ fontSize: 12, color: "#5F5E5A", margin: "0 0 12px" }}>
+        <p style={{ fontSize: 12, color: "#4B5659", margin: "0 0 12px" }}>
           Download the template for a month, type in Closing Hours in Excel, then upload it back. Opening Hours and running totals are calculated automatically - you only ever need to fill in the reading at the end of each shift. Existing entries are pre-filled in the template so you can see gaps at a glance.
         </p>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -989,7 +992,7 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
             type="month"
             value={templateMonth}
             onChange={(e) => setTemplateMonth(e.target.value)}
-            style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}
+            style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}
           />
           <button onClick={downloadBulkTemplate} disabled={assets.length === 0} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: assets.length === 0 ? "default" : "pointer", opacity: assets.length === 0 ? 0.5 : 1 }}>
             <Download size={14} /> Download Template
@@ -1002,9 +1005,9 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
         {bulkMessage && (
           <div style={{
             marginTop: 12, padding: "10px 12px", borderRadius: 8, fontSize: 12.5, whiteSpace: "pre-line",
-            background: bulkMessage.type === "error" ? "#FCEBEB" : bulkMessage.type === "warning" ? "#FAEEDA" : "#EAF3DE",
-            border: `1px solid ${bulkMessage.type === "error" ? "#E3A8A8" : bulkMessage.type === "warning" ? "#EBCA95" : "#B7D89A"}`,
-            color: bulkMessage.type === "error" ? "#791F1F" : bulkMessage.type === "warning" ? "#633806" : "#27500A",
+            background: bulkMessage.type === "error" ? "#F6E2E0" : bulkMessage.type === "warning" ? "#F5E9D8" : "#E2EFE9",
+            border: `1px solid ${bulkMessage.type === "error" ? "#DDB6B2" : bulkMessage.type === "warning" ? "#E3C79B" : "#B7D89A"}`,
+            color: bulkMessage.type === "error" ? "#7A3330" : bulkMessage.type === "warning" ? "#7A5320" : "#2C5646",
           }}>
             {bulkMessage.text}
           </div>
@@ -1013,9 +1016,9 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
-          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#898781" }} />
+          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search daily hours"
-            style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, outline: "none" }} />
+            style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }} />
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
@@ -1027,12 +1030,12 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
         </div>
       </div>
 
-      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr style={{ background: "#F7F6F1" }}>
-              {columns.map((c) => <th key={c.key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>{c.label}</th>)}
-              <th style={{ borderBottom: "1px solid #E4E2D8" }}></th>
+            <tr style={{ background: "#F7F8F6" }}>
+              {columns.map((c) => <th key={c.key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{c.label}</th>)}
+              <th style={{ borderBottom: "1px solid #E2E6E3" }}></th>
             </tr>
           </thead>
           <tbody>
@@ -1043,17 +1046,17 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
                 <React.Fragment key={row.id ?? i}>
                   {showHeader && (
                     <tr>
-                      <td colSpan={columns.length + 1} style={{ padding: "8px 12px", background: "#F2F1EA", fontWeight: 700, fontSize: 12.5, color: NAVY, borderTop: i > 0 ? "1px solid #E4E2D8" : "none" }}>
+                      <td colSpan={columns.length + 1} style={{ padding: "8px 12px", background: "#F2F1EA", fontWeight: 700, fontSize: 12.5, color: NAVY, borderTop: i > 0 ? "1px solid #E2E6E3" : "none" }}>
                         {row.log_date ? new Date(row.log_date + "T12:00:00").toLocaleDateString("en-ZA", { weekday: "long", day: "2-digit", month: "short", year: "numeric" }) : "No date"}
                       </td>
                     </tr>
                   )}
-                  <tr style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none", background: row.exceeds_shift_limit ? "#FCEBEB" : "transparent" }}>
+                  <tr style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none", background: row.exceeds_shift_limit ? "#F6E2E0" : "transparent" }}>
                     {columns.map((c) => (
                       <td key={c.key} onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>{row[c.key] ?? <span style={{ color: "#B4B2A9" }}>-</span>}</td>
                     ))}
                     <td style={{ padding: "9px 12px" }}>
-                      <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#C0392B", cursor: "pointer", padding: 4, display: "inline-flex" }}>
+                      <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
                         <Trash2 size={15} />
                       </button>
                     </td>
@@ -1062,7 +1065,7 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
               );
             })}
             {filtered.length === 0 && (
-              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#898781" }}>
+              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
                 {dailyHours.length === 0 ? "No hours logged yet." : "No entries match your search."}
               </td></tr>
             )}
@@ -1143,7 +1146,7 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
-          <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 18px" }}>Add at least one asset on the Assets tab before logging a breakdown.</p>
+          <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab before logging a breakdown.</p>
           <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
             Close
           </button>
@@ -1281,8 +1284,8 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
     }
   };
 
-  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
-  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" };
+  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
+  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
@@ -1292,7 +1295,7 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
         </h3>
 
         {activatingWorkOrder && !hasSavedRecord && (
-          <p style={{ fontSize: 12.5, color: "#633806", background: "#FCE9C8", border: "1px solid #E8A33D", borderRadius: 8, padding: "8px 10px", margin: "0 0 16px" }}>
+          <p style={{ fontSize: 12.5, color: "#7A5320", background: "#F3E4C8", border: "1px solid #E8A33D", borderRadius: 8, padding: "8px 10px", margin: "0 0 16px" }}>
             This was scheduled as {activatingWorkOrder.wo_no}. Confirm the details below to book it down as a real event - the Work Order stays linked, now with its actual start time.
           </p>
         )}
@@ -1309,14 +1312,14 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
           <DateTimeField value={downtimeStart} onChange={setDowntimeStart} max={nowForInput()} required />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>Downtime End {status !== "Closed" && <span style={{ fontWeight: 400, color: "#898781" }}>(set Status to Closed first)</span>}</label>
+          <label style={labelStyle}>Downtime End {status !== "Closed" && <span style={{ fontWeight: 400, color: "#859195" }}>(set Status to Closed first)</span>}</label>
           <DateTimeField value={downtimeEnd} onChange={setDowntimeEnd} max={nowForInput()} disabled={status !== "Closed"} />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>Expected Up Time {status === "Closed" && <span style={{ fontWeight: 400, color: "#898781" }}>(not needed once Closed)</span>}</label>
+          <label style={labelStyle}>Expected Up Time {status === "Closed" && <span style={{ fontWeight: 400, color: "#859195" }}>(not needed once Closed)</span>}</label>
           <DateTimeField value={expectedUpTime} onChange={setExpectedUpTime} disabled={status === "Closed"} />
         </div>
-        <p style={{ fontSize: 11.5, color: "#898781", margin: "-6px 0 14px" }}>
+        <p style={{ fontSize: 11.5, color: "#859195", margin: "-6px 0 14px" }}>
           Downtime Start defaults to right now, but you can set it earlier if you're logging something that happened previously (e.g. catching up after time away from the system) - future dates and times aren't allowed. Downtime End only opens up once Status is Closed - an event that's still active doesn't have an end yet, and having both set at once would throw off MTBF, MTTR, Availability and Utilisation. Expected Up Time is your best estimate of when the machine will be back - unlike the other two, future dates are fine here, since that's the whole point of it.
         </p>
 
@@ -1354,15 +1357,15 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
           </div>
           <div>
             <label style={labelStyle}>Work Order #</label>
-            <input type="text" value={savedRecord?.wo_reference || "Generated automatically on save"} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#5F5E5A" }} />
+            <input type="text" value={savedRecord?.wo_reference || "Generated automatically on save"} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#4B5659" }} />
           </div>
         </div>
 
-        <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, color: "#2C2C2A", margin: "0 0 18px", cursor: "pointer" }}>
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, color: "#183642", margin: "0 0 18px", cursor: "pointer" }}>
           <input type="checkbox" checked={isDailyService} onChange={(e) => setIsDailyService(e.target.checked)} style={{ width: 16, height: 16, marginTop: 2 }} />
           <span>
             This event was the Daily Service
-            <span style={{ display: "block", fontSize: 11.5, color: "#898781", fontWeight: 400 }}>
+            <span style={{ display: "block", fontSize: 11.5, color: "#859195", fontWeight: 400 }}>
               Marks {breakdownDateLabel} as serviced for {assetId} on the Daily Service report - same as logging it there directly.
             </span>
           </span>
@@ -1370,16 +1373,16 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
 
         <div style={{ marginBottom: 18 }}>
           <label style={labelStyle}>Reported By</label>
-          <input type="text" value={reportedBy} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#5F5E5A" }} />
-          <p style={{ fontSize: 11.5, color: "#898781", margin: "4px 0 0" }}>
+          <input type="text" value={reportedBy} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#4B5659" }} />
+          <p style={{ fontSize: 11.5, color: "#859195", margin: "4px 0 0" }}>
             {existing ? "Original reporter - kept as-is when editing." : "Automatically captured from your signed-in account."}
           </p>
         </div>
 
-        {error && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" onClick={() => { if (hasSavedRecord) onSaved(); else onClose(); }} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>
+          <button type="button" onClick={() => { if (hasSavedRecord) onSaved(); else onClose(); }} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>
             {hasSavedRecord ? "Close" : "Cancel"}
           </button>
           <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
@@ -1388,7 +1391,7 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
         </div>
 
         {!hasSavedRecord && (
-          <p style={{ fontSize: 11.5, color: "#898781", margin: "10px 0 0", textAlign: "center" }}>
+          <p style={{ fontSize: 11.5, color: "#859195", margin: "10px 0 0", textAlign: "center" }}>
             Save the event first - Work Orders and parts can be added right here once it's saved.
           </p>
         )}
@@ -1524,12 +1527,12 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
       <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
-          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#898781" }} />
+          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search events"
-            style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, outline: "none" }}
+            style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }}
           />
         </div>
         <div style={{ display: "flex", gap: 10 }}>
@@ -1548,16 +1551,16 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
         </div>
       </div>
 
-      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr style={{ background: "#F7F6F1" }}>
+            <tr style={{ background: "#F7F8F6" }}>
               {columns.map((c) => (
                 <th
                   key={c.key}
                   onClick={() => toggleSort(c.key)}
                   title="Click to sort"
-                  style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8", cursor: "pointer", userSelect: "none" }}
+                  style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3", cursor: "pointer", userSelect: "none" }}
                 >
                   {c.label}
                   <span style={{ display: "inline-block", width: 12, textAlign: "center", color: sortKey === c.key ? NAVY : "#C7C5BB" }}>
@@ -1565,7 +1568,7 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
                   </span>
                 </th>
               ))}
-              <th style={{ padding: "9px 12px", borderBottom: "1px solid #E4E2D8" }}></th>
+              <th style={{ padding: "9px 12px", borderBottom: "1px solid #E2E6E3" }}></th>
             </tr>
           </thead>
           <tbody>
@@ -1578,7 +1581,7 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
               return (
                 <tr
                   key={row.id ?? i}
-                  style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none", background: row.isScheduledPlaceholder ? "#FFF8EB" : isRepeat ? "#FAEEDA" : "transparent" }}
+                  style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none", background: row.isScheduledPlaceholder ? "#FFF8EB" : isRepeat ? "#F5E9D8" : "transparent" }}
                 >
                   {columns.map((c) => (
                     <td key={c.key} onClick={openRow} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>
@@ -1588,7 +1591,7 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
                         : c.key === "component_affected" && isRepeat ? (
                           <span title={`${row.repeat_count} breakdowns on this component for this machine`} style={{ display: "flex", alignItems: "center", gap: 5 }}>
                             {row[c.key] || <span style={{ color: "#B4B2A9" }}>-</span>}
-                            <span style={{ fontSize: 10.5, fontWeight: 700, color: "#633806", background: "#FCE2B8", padding: "1px 6px", borderRadius: 6 }}>REPEAT ×{row.repeat_count}</span>
+                            <span style={{ fontSize: 10.5, fontWeight: 700, color: "#7A5320", background: "#FCE2B8", padding: "1px 6px", borderRadius: 6 }}>REPEAT ×{row.repeat_count}</span>
                           </span>
                         ) : typeof row[c.key] === "number" && !Number.isInteger(row[c.key]) ? row[c.key].toFixed(2)
                         : (row[c.key] ?? <span style={{ color: "#B4B2A9" }}>-</span>)}
@@ -1596,11 +1599,11 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
                   ))}
                   <td style={{ padding: "9px 12px" }}>
                     {row.isScheduledPlaceholder ? (
-                      <span title="Scheduled from Planned Maintenance - manage or remove it from that tab" style={{ fontSize: 10.5, fontWeight: 700, color: "#B87F1F", background: "#FCE9C8", padding: "3px 8px", borderRadius: 6, whiteSpace: "nowrap" }}>
+                      <span title="Scheduled from Planned Maintenance - manage or remove it from that tab" style={{ fontSize: 10.5, fontWeight: 700, color: "#C58A32", background: "#F3E4C8", padding: "3px 8px", borderRadius: 6, whiteSpace: "nowrap" }}>
                         SCHEDULED
                       </span>
                     ) : (
-                      <button onClick={() => setDeleting(row)} title="Delete this entry" style={{ background: "none", border: "none", color: "#C0392B", cursor: "pointer", padding: 4, display: "flex" }}>
+                      <button onClick={() => setDeleting(row)} title="Delete this entry" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "flex" }}>
                         <Trash2 size={15} />
                       </button>
                     )}
@@ -1609,7 +1612,7 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
               );
             })}
             {filtered.length === 0 && (
-              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#898781" }}>
+              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
                 {allRows.length === 0 ? "No events logged yet." : "No events match your search."}
               </td></tr>
             )}
@@ -1677,7 +1680,7 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
-          <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
+          <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
           <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
         </div>
       </div>
@@ -1741,8 +1744,8 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
     }
   };
 
-  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
-  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" };
+  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
+  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
@@ -1751,13 +1754,13 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
           {isEdit ? "Edit Work Order" : workType === "Preventive" ? "Add Planned Maintenance" : "Add Work Order"}
         </h3>
         {isEdit && existing?.wo_no && (
-          <p style={{ fontSize: 12.5, color: "#898781", margin: "0 0 16px" }}>{existing.wo_no}</p>
+          <p style={{ fontSize: 12.5, color: "#859195", margin: "0 0 16px" }}>{existing.wo_no}</p>
         )}
         {!isEdit && <div style={{ marginBottom: 16 }} />}
 
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Equipment</label>
-          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit || !!eventId} style={{ ...fieldStyle, ...((isEdit || eventId) ? { background: "#F2F1EA", color: "#5F5E5A" } : {}) }}>
+          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit || !!eventId} style={{ ...fieldStyle, ...((isEdit || eventId) ? { background: "#F2F1EA", color: "#4B5659" } : {}) }}>
             {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
           </select>
         </div>
@@ -1801,13 +1804,13 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
         </div>
 
         <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>Planned Start <span style={{ fontWeight: 400, color: "#898781" }}>(this is where you schedule ahead - future dates are fine here)</span></label>
+          <label style={labelStyle}>Planned Start <span style={{ fontWeight: 400, color: "#859195" }}>(this is where you schedule ahead - future dates are fine here)</span></label>
           <input type="date" value={plannedStart} onChange={(e) => setPlannedStart(e.target.value)} style={fieldStyle} />
         </div>
 
         {isEdit && (
           <>
-            <p style={{ fontSize: 11.5, color: "#898781", margin: "0 0 8px" }}>
+            <p style={{ fontSize: 11.5, color: "#859195", margin: "0 0 8px" }}>
               The two fields below are for logging when the work actually happened - leave them blank until it's done. They only accept past or present times, not future ones. Actual Finish only opens up once Status is Closed.
             </p>
             <div style={{ marginBottom: 12 }}>
@@ -1815,7 +1818,7 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
               <DateTimeField value={actualStart} onChange={setActualStart} max={nowForInput()} />
             </div>
             <div style={{ marginBottom: 12 }}>
-              <label style={labelStyle}>Actual Finish {status !== "Closed" && <span style={{ fontWeight: 400, color: "#898781" }}>(set Status to Closed first)</span>}</label>
+              <label style={labelStyle}>Actual Finish {status !== "Closed" && <span style={{ fontWeight: 400, color: "#859195" }}>(set Status to Closed first)</span>}</label>
               <DateTimeField value={actualFinish} onChange={setActualFinish} max={nowForInput()} disabled={status !== "Closed"} />
             </div>
           </>
@@ -1826,10 +1829,10 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
           <textarea value={closeoutNotes} onChange={(e) => setCloseoutNotes(e.target.value)} rows={2} style={{ ...fieldStyle, resize: "vertical" }} />
         </div>
 
-        {error && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
           <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
             {saving ? "Saving…" : isEdit ? "Save Changes" : "Create"}
           </button>
@@ -1853,7 +1856,7 @@ function PartUsedForm({ parts, workOrder, onClose, onSaved }) {
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 70, padding: 16 }}>
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No parts in inventory yet</p>
-          <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 18px" }}>Add parts on the Parts Inventory tab first.</p>
+          <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add parts on the Parts Inventory tab first.</p>
           <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
         </div>
       </div>
@@ -1895,14 +1898,14 @@ function PartUsedForm({ parts, workOrder, onClose, onSaved }) {
     }
   };
 
-  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, boxSizing: "border-box", fontFamily: "inherit" };
-  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" };
+  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", fontFamily: "inherit" };
+  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 70, padding: 16 }}>
       <form onSubmit={handleSubmit} style={{ background: "#fff", borderRadius: 12, padding: 24, width: 400, maxWidth: "100%" }}>
         <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>Add Part Used</h3>
-        <p style={{ fontSize: 12, color: "#898781", margin: "0 0 16px" }}>Against Work Order {workOrder.wo_no}</p>
+        <p style={{ fontSize: 12, color: "#859195", margin: "0 0 16px" }}>Against Work Order {workOrder.wo_no}</p>
 
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Part</label>
@@ -1921,10 +1924,10 @@ function PartUsedForm({ parts, workOrder, onClose, onSaved }) {
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} style={{ ...fieldStyle, resize: "vertical" }} />
         </div>
 
-        {error && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
           <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
             {saving ? "Saving…" : "Add Part"}
           </button>
@@ -1958,26 +1961,26 @@ function PartsUsedList({ workOrder, parts }) {
   return (
     <div style={{ background: "#F9F8F4", borderRadius: 8, padding: "10px 12px", marginTop: 6 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: "#5F5E5A", textTransform: "uppercase", letterSpacing: 0.3 }}>Parts Used</span>
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: "#4B5659", textTransform: "uppercase", letterSpacing: 0.3 }}>Parts Used</span>
         <button onClick={() => setShowAdd(true)} style={{ background: "none", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 11.5, fontWeight: 600, padding: "3px 10px", borderRadius: 6, cursor: "pointer" }}>
           + Add Part
         </button>
       </div>
       {loading ? (
-        <p style={{ fontSize: 12, color: "#898781", margin: 0 }}>Loading…</p>
+        <p style={{ fontSize: 12, color: "#859195", margin: 0 }}>Loading…</p>
       ) : rows.length === 0 ? (
-        <p style={{ fontSize: 12, color: "#898781", margin: 0 }}>No parts logged against this Work Order yet.</p>
+        <p style={{ fontSize: 12, color: "#859195", margin: 0 }}>No parts logged against this Work Order yet.</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {rows.map((r) => {
             const p = partById[r.part_id];
             return (
-              <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, background: "#fff", border: "1px solid #E4E2D8", borderRadius: 6, padding: "5px 9px" }}>
+              <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, background: "#fff", border: "1px solid #E2E6E3", borderRadius: 6, padding: "5px 9px" }}>
                 <span>{p ? `${p.part_no} - ${p.description}` : "Part"} × {r.qty_used}</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Badge value={r.status} />
                   {r.status === "Pending" && (
-                    <button onClick={() => confirmRow(r)} style={{ background: "none", border: "none", color: "#27500A", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>Confirm</button>
+                    <button onClick={() => confirmRow(r)} style={{ background: "none", border: "none", color: "#2C5646", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>Confirm</button>
                   )}
                 </span>
               </div>
@@ -2020,7 +2023,7 @@ function EventWorkOrdersPanel({ event, assets, parts, onRefresh }) {
   };
 
   return (
-    <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid #E4E2D8" }}>
+    <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid #E2E6E3" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: 0 }}>Linked Work Orders</p>
         <button type="button" onClick={() => { setEditingWo(null); setShowWoForm(true); }} style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12.5, fontWeight: 600, padding: "6px 12px", borderRadius: 8, cursor: "pointer" }}>
@@ -2029,17 +2032,17 @@ function EventWorkOrdersPanel({ event, assets, parts, onRefresh }) {
       </div>
 
       {loading ? (
-        <p style={{ fontSize: 12.5, color: "#898781", margin: 0 }}>Loading…</p>
+        <p style={{ fontSize: 12.5, color: "#859195", margin: 0 }}>Loading…</p>
       ) : linked.length === 0 ? (
-        <p style={{ fontSize: 12.5, color: "#898781", margin: 0 }}>No Work Orders linked to this event yet - each one gets its own work order number, and you can log parts used against it once it's created.</p>
+        <p style={{ fontSize: 12.5, color: "#859195", margin: 0 }}>No Work Orders linked to this event yet - each one gets its own work order number, and you can log parts used against it once it's created.</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {linked.map((w) => (
-            <div key={w.id} style={{ border: "1px solid #E4E2D8", borderRadius: 8, padding: "10px 12px" }}>
+            <div key={w.id} style={{ border: "1px solid #E2E6E3", borderRadius: 8, padding: "10px 12px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => { setEditingWo(w); setShowWoForm(true); }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: NAVY }}>{w.wo_no}</span>
-                  <span style={{ fontSize: 12.5, color: "#5F5E5A" }}>{w.component || "No component set"}</span>
+                  <span style={{ fontSize: 12.5, color: "#4B5659" }}>{w.component || "No component set"}</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Badge value={w.priority} />
@@ -2146,8 +2149,8 @@ function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
 
   const row = (label, value) => (
     <tr>
-      <td style={{ padding: "6px 10px", fontWeight: 700, fontSize: 12.5, color: "#2C2C2A", width: 160, border: "1px solid #ccc" }}>{label}</td>
-      <td style={{ padding: "6px 10px", fontSize: 12.5, color: "#2C2C2A", border: "1px solid #ccc" }}>{value || "-"}</td>
+      <td style={{ padding: "6px 10px", fontWeight: 700, fontSize: 12.5, color: "#183642", width: 160, border: "1px solid #ccc" }}>{label}</td>
+      <td style={{ padding: "6px 10px", fontSize: 12.5, color: "#183642", border: "1px solid #ccc" }}>{value || "-"}</td>
     </tr>
   );
 
@@ -2166,7 +2169,7 @@ function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
         <div className="job-card-no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <p style={{ fontSize: 15, fontWeight: 700, color: NAVY, margin: 0 }}>Job Card</p>
           <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={onClose} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Close</button>
+            <button onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Close</button>
             <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, background: NAVY, border: "none", color: "#fff", padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
               <Printer size={14} /> Print / Save as PDF
             </button>
@@ -2176,7 +2179,7 @@ function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
         <div className="job-card-print">
           <div style={{ textAlign: "center", marginBottom: 16 }}>
             <p style={{ fontSize: 18, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>Job Card</p>
-            <p style={{ fontSize: 13, color: "#5F5E5A", margin: 0 }}>{workOrder.wo_no}</p>
+            <p style={{ fontSize: 13, color: "#4B5659", margin: 0 }}>{workOrder.wo_no}</p>
           </div>
 
           <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 16 }}>
@@ -2197,10 +2200,10 @@ function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
             </tbody>
           </table>
 
-          <p style={{ fontSize: 12.5, fontWeight: 700, color: "#2C2C2A", margin: "0 0 6px" }}>Work Done</p>
+          <p style={{ fontSize: 12.5, fontWeight: 700, color: "#183642", margin: "0 0 6px" }}>Work Done</p>
           <div style={{ border: "1px solid #ccc", height: 70, marginBottom: 14 }} />
 
-          <p style={{ fontSize: 12.5, fontWeight: 700, color: "#2C2C2A", margin: "0 0 6px" }}>Parts Used</p>
+          <p style={{ fontSize: 12.5, fontWeight: 700, color: "#183642", margin: "0 0 6px" }}>Parts Used</p>
           <div style={{ border: "1px solid #ccc", height: 50, marginBottom: 14 }} />
 
           <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 20 }}>
@@ -2214,21 +2217,21 @@ function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginTop: 30 }}>
             <div>
-              <div style={{ borderTop: "1px solid #2C2C2A", paddingTop: 6, fontSize: 12 }}>Technician Signature / Date</div>
+              <div style={{ borderTop: "1px solid #183642", paddingTop: 6, fontSize: 12 }}>Technician Signature / Date</div>
             </div>
             <div>
-              <div style={{ borderTop: "1px solid #2C2C2A", paddingTop: 6, fontSize: 12 }}>Supervisor Signature / Date</div>
+              <div style={{ borderTop: "1px solid #183642", paddingTop: 6, fontSize: 12 }}>Supervisor Signature / Date</div>
             </div>
           </div>
         </div>
 
-        <div className="job-card-no-print" style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid #E4E2D8" }}>
+        <div className="job-card-no-print" style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid #E2E6E3" }}>
           <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>Completed document scans</p>
 
           {scansLoading ? (
-            <p style={{ fontSize: 12.5, color: "#898781", margin: "0 0 10px" }}>Loading history…</p>
+            <p style={{ fontSize: 12.5, color: "#859195", margin: "0 0 10px" }}>Loading history…</p>
           ) : scans.length === 0 ? (
-            <p style={{ fontSize: 12.5, color: "#898781", margin: "0 0 10px" }}>Once the technician has completed and signed this document, scan it and upload it here. Every service done against this Work Order can be scanned and kept here - nothing gets overwritten.</p>
+            <p style={{ fontSize: 12.5, color: "#859195", margin: "0 0 10px" }}>Once the technician has completed and signed this document, scan it and upload it here. Every service done against this Work Order can be scanned and kept here - nothing gets overwritten.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 4 }}>
               {scans.map((s) => (
@@ -2240,7 +2243,7 @@ function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
                     fontSize: 13, color: s.url ? NAVY : "#B0AEA6",
-                    background: "#F7F6F2", border: "1px solid #E4E2D8", borderRadius: 8,
+                    background: "#F7F6F2", border: "1px solid #E2E6E3", borderRadius: 8,
                     padding: "8px 12px", textDecoration: "none",
                     pointerEvents: s.url ? "auto" : "none",
                   }}
@@ -2248,7 +2251,7 @@ function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {s.file_name || "Scanned document"}
                   </span>
-                  <span style={{ fontSize: 11.5, color: "#898781", flexShrink: 0 }}>
+                  <span style={{ fontSize: 11.5, color: "#859195", flexShrink: 0 }}>
                     {new Date(s.uploaded_at).toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" })}
                   </span>
                 </a>
@@ -2262,7 +2265,7 @@ function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
             </button>
             <input ref={fileInputRef} type="file" accept="image/*,.pdf" onChange={handleUpload} style={{ display: "none" }} />
           </div>
-          {uploadError && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "8px 0 0" }}>{uploadError}</p>}
+          {uploadError && <p style={{ color: "#B85450", fontSize: 12.5, margin: "8px 0 0" }}>{uploadError}</p>}
         </div>
       </div>
     </div>
@@ -2331,7 +2334,7 @@ function FuelLogForm({ assets, existing, userEmail, dailyHours, onClose, onSaved
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
-          <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
+          <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
           <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
         </div>
       </div>
@@ -2360,8 +2363,8 @@ function FuelLogForm({ assets, existing, userEmail, dailyHours, onClose, onSaved
     }
   };
 
-  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
-  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" };
+  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
+  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
@@ -2369,7 +2372,7 @@ function FuelLogForm({ assets, existing, userEmail, dailyHours, onClose, onSaved
         <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 16px" }}>{isEdit ? "Edit Fuel Entry" : "Log Fuel"}</h3>
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Equipment</label>
-          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#5F5E5A" } : {}) }}>
+          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#4B5659" } : {}) }}>
             {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
           </select>
         </div>
@@ -2384,7 +2387,7 @@ function FuelLogForm({ assets, existing, userEmail, dailyHours, onClose, onSaved
           </div>
         </div>
         {hourMeterWarning && (
-          <div style={{ background: "#FAEEDA", border: "1px solid #EBCA95", borderRadius: 8, padding: "8px 10px", marginBottom: 12, fontSize: 12, color: "#633806" }}>
+          <div style={{ background: "#F5E9D8", border: "1px solid #E3C79B", borderRadius: 8, padding: "8px 10px", marginBottom: 12, fontSize: 12, color: "#7A5320" }}>
             {hourMeterWarning}
           </div>
         )}
@@ -2394,15 +2397,15 @@ function FuelLogForm({ assets, existing, userEmail, dailyHours, onClose, onSaved
         </div>
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Recorded By</label>
-          <input type="text" value={recordedBy} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#5F5E5A" }} />
+          <input type="text" value={recordedBy} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#4B5659" }} />
         </div>
         <div style={{ marginBottom: 18 }}>
           <label style={labelStyle}>Notes</label>
           <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} style={fieldStyle} />
         </div>
-        {error && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
           <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
             {saving ? "Saving…" : isEdit ? "Save Changes" : "Log Fuel"}
           </button>
@@ -2437,7 +2440,7 @@ function InspectionForm({ assets, existing, userEmail, onClose, onSaved }) {
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
-          <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
+          <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
           <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
         </div>
       </div>
@@ -2470,8 +2473,8 @@ function InspectionForm({ assets, existing, userEmail, onClose, onSaved }) {
     }
   };
 
-  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, boxSizing: "border-box", fontFamily: 'inherit' };
-  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" };
+  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", fontFamily: 'inherit' };
+  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
@@ -2480,7 +2483,7 @@ function InspectionForm({ assets, existing, userEmail, onClose, onSaved }) {
 
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Equipment</label>
-          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#5F5E5A" } : {}) }}>
+          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#4B5659" } : {}) }}>
             {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
           </select>
         </div>
@@ -2535,7 +2538,7 @@ function InspectionForm({ assets, existing, userEmail, onClose, onSaved }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
           <div>
             <label style={labelStyle}>Inspector</label>
-            <input type="text" value={inspector} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#5F5E5A" }} />
+            <input type="text" value={inspector} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#4B5659" }} />
           </div>
           <div>
             <label style={labelStyle}>Next Inspection Due</label>
@@ -2543,15 +2546,15 @@ function InspectionForm({ assets, existing, userEmail, onClose, onSaved }) {
           </div>
         </div>
 
-        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#2C2C2A", marginBottom: 18, cursor: "pointer" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#183642", marginBottom: 18, cursor: "pointer" }}>
           <input type="checkbox" checked={signedOff} onChange={(e) => setSignedOff(e.target.checked)} style={{ width: 16, height: 16 }} />
           Signed off
         </label>
 
-        {error && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
           <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
             {saving ? "Saving…" : isEdit ? "Save Changes" : "Log Inspection"}
           </button>
@@ -2607,8 +2610,8 @@ function InspectionsPage({ assets, inspections, userEmail, onRefresh }) {
       <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
-          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#898781" }} />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search inspections" style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, outline: "none" }} />
+          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search inspections" style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }} />
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
@@ -2619,12 +2622,12 @@ function InspectionsPage({ assets, inspections, userEmail, onRefresh }) {
           </button>
         </div>
       </div>
-      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr style={{ background: "#F7F6F1" }}>
-              {columns.map((c) => <th key={c.key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>{c.label}</th>)}
-              <th style={{ borderBottom: "1px solid #E4E2D8" }}></th>
+            <tr style={{ background: "#F7F8F6" }}>
+              {columns.map((c) => <th key={c.key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{c.label}</th>)}
+              <th style={{ borderBottom: "1px solid #E2E6E3" }}></th>
             </tr>
           </thead>
           <tbody>
@@ -2636,14 +2639,14 @@ function InspectionsPage({ assets, inspections, userEmail, onRefresh }) {
                   </td>
                 ))}
                 <td style={{ padding: "9px 12px" }}>
-                  <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#C0392B", cursor: "pointer", padding: 4, display: "inline-flex" }}>
+                  <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
                     <Trash2 size={15} />
                   </button>
                 </td>
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#898781" }}>
+              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
                 {inspections.length === 0 ? "No inspections logged yet." : "No entries match your filters."}
               </td></tr>
             )}
@@ -2704,7 +2707,7 @@ function BacklogForm({ assets, workOrders, existing, userEmail, onClose, onSaved
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
-          <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
+          <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
           <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
         </div>
       </div>
@@ -2740,8 +2743,8 @@ function BacklogForm({ assets, workOrders, existing, userEmail, onClose, onSaved
     }
   };
 
-  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, boxSizing: "border-box", fontFamily: "inherit" };
-  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" };
+  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", fontFamily: "inherit" };
+  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
@@ -2804,10 +2807,10 @@ function BacklogForm({ assets, workOrders, existing, userEmail, onClose, onSaved
           </div>
         </div>
 
-        {error && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
           <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
             {saving ? "Saving…" : isEdit ? "Save Changes" : "Add Backlog Item"}
           </button>
@@ -2879,14 +2882,14 @@ function BacklogsPage({ assets, backlogs, workOrders, userEmail, onRefresh }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <div style={{ position: "relative", flex: 1, minWidth: 200, maxWidth: 280 }}>
-            <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#898781" }} />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search backlogs" style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, outline: "none", boxSizing: "border-box" }} />
+            <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search backlogs" style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none", boxSizing: "border-box" }} />
           </div>
-          <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8 }}>
+          <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8 }}>
             <option value="">All sources</option>
             {BACKLOG_SOURCES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8 }}>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8 }}>
             <option value="">All statuses</option>
             <option value="Open">Open</option>
             <option value="Closed">Closed</option>
@@ -2901,12 +2904,12 @@ function BacklogsPage({ assets, backlogs, workOrders, userEmail, onRefresh }) {
           </button>
         </div>
       </div>
-      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr style={{ background: "#F7F6F1" }}>
-              {columns.map(([key, label]) => <th key={key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>{label}</th>)}
-              <th style={{ borderBottom: "1px solid #E4E2D8" }}></th>
+            <tr style={{ background: "#F7F8F6" }}>
+              {columns.map(([key, label]) => <th key={key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{label}</th>)}
+              <th style={{ borderBottom: "1px solid #E2E6E3" }}></th>
             </tr>
           </thead>
           <tbody>
@@ -2923,18 +2926,18 @@ function BacklogsPage({ assets, backlogs, workOrders, userEmail, onRefresh }) {
                 <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", cursor: "pointer" }}><Badge value={row.status} /></td>
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
                   {row.status === "Open" && (
-                    <button onClick={() => quickClose(row)} title="Mark Closed" style={{ background: "none", border: "none", color: "#27500A", cursor: "pointer", padding: 4, fontSize: 12, fontWeight: 600 }}>
+                    <button onClick={() => quickClose(row)} title="Mark Closed" style={{ background: "none", border: "none", color: "#2C5646", cursor: "pointer", padding: 4, fontSize: 12, fontWeight: 600 }}>
                       Close
                     </button>
                   )}
-                  <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#C0392B", cursor: "pointer", padding: 4, display: "inline-flex" }}>
+                  <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
                     <Trash2 size={15} />
                   </button>
                 </td>
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#898781" }}>
+              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
                 {backlogs.length === 0 ? "No backlog items logged yet." : "No entries match your filters."}
               </td></tr>
             )}
@@ -3088,8 +3091,8 @@ function DailyServiceForm({ assets, defaultAssetId, defaultDate, existing, userE
     }
   };
 
-  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, boxSizing: "border-box", fontFamily: "inherit" };
-  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" };
+  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", fontFamily: "inherit" };
+  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" };
   const flagged = qualityResult && qualityResult.status !== "ok" && qualityResult.status !== "unchecked";
 
   return (
@@ -3147,15 +3150,15 @@ function DailyServiceForm({ assets, defaultAssetId, defaultDate, existing, userE
           />
 
           {newFile && (
-            <p style={{ fontSize: 12, color: "#5F5E5A", margin: "8px 0 0" }}>{newFile.name}</p>
+            <p style={{ fontSize: 12, color: "#4B5659", margin: "8px 0 0" }}>{newFile.name}</p>
           )}
           {checkingQuality && (
-            <p style={{ fontSize: 12, color: "#898781", margin: "6px 0 0" }}>Checking photo quality…</p>
+            <p style={{ fontSize: 12, color: "#859195", margin: "6px 0 0" }}>Checking photo quality…</p>
           )}
           {qualityResult && !checkingQuality && (
             <div style={{
               marginTop: 8, padding: "8px 10px", borderRadius: 8, fontSize: 12,
-              background: flagged ? "#FCEBEB" : "#EAF3DE", color: flagged ? "#791F1F" : "#27500A",
+              background: flagged ? "#F6E2E0" : "#E2EFE9", color: flagged ? "#7A3330" : "#2C5646",
             }}>
               {flagged
                 ? `${PHOTO_QUALITY_LABEL[qualityResult.status]} - consider retaking this photo before saving. (${qualityResult.notes})`
@@ -3164,10 +3167,10 @@ function DailyServiceForm({ assets, defaultAssetId, defaultDate, existing, userE
           )}
         </div>
 
-        {error && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
           <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
             {saving ? "Saving…" : "Log Daily Service"}
           </button>
@@ -3230,10 +3233,10 @@ function DailyServicePage({ assets, dailyServiceChecklist, breakdowns, dailyHour
   const todayStr = todayForInput();
 
   const cellStyle = (label) => {
-    if (label === "DS") return { background: "#EAF3DE", color: "#27500A" };
-    if (label === "BD") return { background: "#FCEBEB", color: "#791F1F" };
-    if (label === "NU") return { background: "#F1EFE8", color: "#5F5E5A" };
-    return { background: "#F9D8D8", color: "#791F1F" }; // gap - needs attention
+    if (label === "DS") return { background: "#E2EFE9", color: "#2C5646" };
+    if (label === "BD") return { background: "#F6E2E0", color: "#7A3330" };
+    if (label === "NU") return { background: "#F1EFE8", color: "#4B5659" };
+    return { background: "#F9D8D8", color: "#7A3330" }; // gap - needs attention
   };
 
   const openLogForm = (assetId, dateStr) => {
@@ -3245,11 +3248,11 @@ function DailyServicePage({ assets, dailyServiceChecklist, breakdowns, dailyHour
     <div>
       <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
-        <input type="month" value={monthValue} onChange={(e) => setMonthValue(e.target.value)} style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8 }} />
+        <input type="month" value={monthValue} onChange={(e) => setMonthValue(e.target.value)} style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8 }} />
         <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ display: "flex", gap: 10, fontSize: 12, color: "#5F5E5A" }}>
-            <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#EAF3DE", borderRadius: 2, marginRight: 4 }} />DS - serviced</span>
-            <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#FCEBEB", borderRadius: 2, marginRight: 4 }} />BD - breakdown</span>
+          <div style={{ display: "flex", gap: 10, fontSize: 12, color: "#4B5659" }}>
+            <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#E2EFE9", borderRadius: 2, marginRight: 4 }} />DS - serviced</span>
+            <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#F6E2E0", borderRadius: 2, marginRight: 4 }} />BD - breakdown</span>
             <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#F1EFE8", borderRadius: 2, marginRight: 4 }} />NU - not utilised</span>
             <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#F9D8D8", borderRadius: 2, marginRight: 4 }} />missing</span>
           </div>
@@ -3259,13 +3262,13 @@ function DailyServicePage({ assets, dailyServiceChecklist, breakdowns, dailyHour
         </div>
       </div>
 
-      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ borderCollapse: "collapse", fontSize: 11.5 }}>
           <thead>
-            <tr style={{ background: "#F7F6F1" }}>
-              <th style={{ textAlign: "left", padding: "8px 10px", fontWeight: 600, color: "#5F5E5A", borderBottom: "1px solid #E4E2D8", position: "sticky", left: 0, background: "#F7F6F1", minWidth: 140 }}>Equipment</th>
+            <tr style={{ background: "#F7F8F6" }}>
+              <th style={{ textAlign: "left", padding: "8px 10px", fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3", position: "sticky", left: 0, background: "#F7F8F6", minWidth: 140 }}>Equipment</th>
               {days.map((d) => (
-                <th key={d} style={{ textAlign: "center", padding: "6px 4px", fontWeight: 600, color: "#5F5E5A", borderBottom: "1px solid #E4E2D8", minWidth: 26 }}>{d}</th>
+                <th key={d} style={{ textAlign: "center", padding: "6px 4px", fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3", minWidth: 26 }}>{d}</th>
               ))}
             </tr>
           </thead>
@@ -3296,7 +3299,7 @@ function DailyServicePage({ assets, dailyServiceChecklist, breakdowns, dailyHour
               </tr>
             ))}
             {filteredAssets.length === 0 && (
-              <tr><td colSpan={days.length + 1} style={{ padding: 20, textAlign: "center", color: "#898781" }}>No equipment to show.</td></tr>
+              <tr><td colSpan={days.length + 1} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No equipment to show.</td></tr>
             )}
           </tbody>
         </table>
@@ -3363,8 +3366,8 @@ function FuelLogPage({ assets, fuelLog, userEmail, dailyHours, onRefresh }) {
       <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
-          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#898781" }} />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search fuel log" style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, outline: "none" }} />
+          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search fuel log" style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }} />
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
@@ -3375,12 +3378,12 @@ function FuelLogPage({ assets, fuelLog, userEmail, dailyHours, onRefresh }) {
           </button>
         </div>
       </div>
-      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr style={{ background: "#F7F6F1" }}>
-              {columns.map((c) => <th key={c.key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>{c.label}</th>)}
-              <th style={{ borderBottom: "1px solid #E4E2D8" }}></th>
+            <tr style={{ background: "#F7F8F6" }}>
+              {columns.map((c) => <th key={c.key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{c.label}</th>)}
+              <th style={{ borderBottom: "1px solid #E2E6E3" }}></th>
             </tr>
           </thead>
           <tbody>
@@ -3391,7 +3394,7 @@ function FuelLogPage({ assets, fuelLog, userEmail, dailyHours, onRefresh }) {
                 <React.Fragment key={row.id ?? i}>
                   {showHeader && (
                     <tr>
-                      <td colSpan={columns.length + 1} style={{ padding: "8px 12px", background: "#F2F1EA", fontWeight: 700, fontSize: 12.5, color: NAVY, borderTop: i > 0 ? "1px solid #E4E2D8" : "none" }}>
+                      <td colSpan={columns.length + 1} style={{ padding: "8px 12px", background: "#F2F1EA", fontWeight: 700, fontSize: 12.5, color: NAVY, borderTop: i > 0 ? "1px solid #E2E6E3" : "none" }}>
                         {row.fill_date ? new Date(row.fill_date + "T12:00:00").toLocaleDateString("en-ZA", { weekday: "long", day: "2-digit", month: "short", year: "numeric" }) : "No date"}
                       </td>
                     </tr>
@@ -3403,7 +3406,7 @@ function FuelLogPage({ assets, fuelLog, userEmail, dailyHours, onRefresh }) {
                       </td>
                     ))}
                     <td style={{ padding: "9px 12px" }}>
-                      <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#C0392B", cursor: "pointer", padding: 4, display: "inline-flex" }}>
+                      <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
                         <Trash2 size={15} />
                       </button>
                     </td>
@@ -3412,7 +3415,7 @@ function FuelLogPage({ assets, fuelLog, userEmail, dailyHours, onRefresh }) {
               );
             })}
             {filtered.length === 0 && (
-              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#898781" }}>
+              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
                 {fuelLog.length === 0 ? "No fuel entries yet." : "No entries match your filters."}
               </td></tr>
             )}
@@ -3462,7 +3465,7 @@ function OilConsumptionForm({ assets, existing, userEmail, dailyHours, onClose, 
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
-          <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
+          <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
           <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
         </div>
       </div>
@@ -3491,8 +3494,8 @@ function OilConsumptionForm({ assets, existing, userEmail, dailyHours, onClose, 
     }
   };
 
-  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
-  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" };
+  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
+  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
@@ -3500,7 +3503,7 @@ function OilConsumptionForm({ assets, existing, userEmail, dailyHours, onClose, 
         <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 16px" }}>{isEdit ? "Edit Oil Entry" : "Log Oil"}</h3>
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Equipment</label>
-          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#5F5E5A" } : {}) }}>
+          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#4B5659" } : {}) }}>
             {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
           </select>
         </div>
@@ -3515,7 +3518,7 @@ function OilConsumptionForm({ assets, existing, userEmail, dailyHours, onClose, 
           </div>
         </div>
         {hourMeterWarning && (
-          <div style={{ background: "#FAEEDA", border: "1px solid #EBCA95", borderRadius: 8, padding: "8px 10px", marginBottom: 12, fontSize: 12, color: "#633806" }}>
+          <div style={{ background: "#F5E9D8", border: "1px solid #E3C79B", borderRadius: 8, padding: "8px 10px", marginBottom: 12, fontSize: 12, color: "#7A5320" }}>
             {hourMeterWarning}
           </div>
         )}
@@ -3539,15 +3542,15 @@ function OilConsumptionForm({ assets, existing, userEmail, dailyHours, onClose, 
         </div>
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Recorded By</label>
-          <input type="text" value={recordedBy} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#5F5E5A" }} />
+          <input type="text" value={recordedBy} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#4B5659" }} />
         </div>
         <div style={{ marginBottom: 18 }}>
           <label style={labelStyle}>Notes</label>
           <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} style={fieldStyle} />
         </div>
-        {error && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
           <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
             {saving ? "Saving…" : isEdit ? "Save Changes" : "Log Oil"}
           </button>
@@ -3603,8 +3606,8 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, dailyHours, onR
       <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
-          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#898781" }} />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search oil consumption" style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, outline: "none" }} />
+          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search oil consumption" style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }} />
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
@@ -3615,12 +3618,12 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, dailyHours, onR
           </button>
         </div>
       </div>
-      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr style={{ background: "#F7F6F1" }}>
-              {columns.map((c) => <th key={c.key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>{c.label}</th>)}
-              <th style={{ borderBottom: "1px solid #E4E2D8" }}></th>
+            <tr style={{ background: "#F7F8F6" }}>
+              {columns.map((c) => <th key={c.key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{c.label}</th>)}
+              <th style={{ borderBottom: "1px solid #E2E6E3" }}></th>
             </tr>
           </thead>
           <tbody>
@@ -3631,7 +3634,7 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, dailyHours, onR
                 <React.Fragment key={row.id ?? i}>
                   {showHeader && (
                     <tr>
-                      <td colSpan={columns.length + 1} style={{ padding: "8px 12px", background: "#F2F1EA", fontWeight: 700, fontSize: 12.5, color: NAVY, borderTop: i > 0 ? "1px solid #E4E2D8" : "none" }}>
+                      <td colSpan={columns.length + 1} style={{ padding: "8px 12px", background: "#F2F1EA", fontWeight: 700, fontSize: 12.5, color: NAVY, borderTop: i > 0 ? "1px solid #E2E6E3" : "none" }}>
                         {row.fill_date ? new Date(row.fill_date + "T12:00:00").toLocaleDateString("en-ZA", { weekday: "long", day: "2-digit", month: "short", year: "numeric" }) : "No date"}
                       </td>
                     </tr>
@@ -3643,7 +3646,7 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, dailyHours, onR
                       </td>
                     ))}
                     <td style={{ padding: "9px 12px" }}>
-                      <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#C0392B", cursor: "pointer", padding: 4, display: "inline-flex" }}>
+                      <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
                         <Trash2 size={15} />
                       </button>
                     </td>
@@ -3652,7 +3655,7 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, dailyHours, onR
               );
             })}
             {filtered.length === 0 && (
-              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#898781" }}>
+              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
                 {oilConsumption.length === 0 ? "No oil entries yet." : "No entries match your filters."}
               </td></tr>
             )}
@@ -3801,7 +3804,7 @@ function MtbfMttrReportPage({ assets }) {
       })()}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <p style={{ fontSize: 13, color: "#5F5E5A", margin: 0 }}>
+        <p style={{ fontSize: 13, color: "#4B5659", margin: 0 }}>
           Sorted by most breakdowns first, so problem equipment surfaces automatically. Click any column to sort by it instead.
         </p>
         <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer", whiteSpace: "nowrap" }}>
@@ -3810,23 +3813,23 @@ function MtbfMttrReportPage({ assets }) {
       </div>
 
       {error && (
-        <div style={{ background: "#FCEBEB", border: "1px solid #E3A8A8", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#791F1F" }}>
+        <div style={{ background: "#F6E2E0", border: "1px solid #DDB6B2", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#7A3330" }}>
           Couldn't load report: {error}
         </div>
       )}
 
       {loading ? (
-        <p style={{ fontSize: 13, color: "#898781" }}>Loading…</p>
+        <p style={{ fontSize: 13, color: "#859195" }}>Loading…</p>
       ) : (
-        <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+        <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
-              <tr style={{ background: "#F7F6F1" }}>
+              <tr style={{ background: "#F7F8F6" }}>
                 {MTBF_MTTR_COLUMNS.map(([key, label]) => (
                   <th
                     key={key}
                     onClick={() => handleSort(key)}
-                    style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8", cursor: "pointer", userSelect: "none" }}
+                    style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3", cursor: "pointer", userSelect: "none" }}
                   >
                     {label} {sortKey === key ? (sortDir === "asc" ? "▲" : "▼") : ""}
                   </th>
@@ -3837,14 +3840,14 @@ function MtbfMttrReportPage({ assets }) {
               {rows.map((row, i) => (
                 <tr key={row.asset_id ?? i} style={{ borderBottom: i < rows.length - 1 ? "1px solid #EFEEE7" : "none" }}>
                   {MTBF_MTTR_COLUMNS.map(([key]) => (
-                    <td key={key} style={{ padding: "9px 12px", whiteSpace: "nowrap", fontWeight: key === "num_unplanned_events" && row[key] >= 3 ? 700 : 400, color: key === "num_unplanned_events" && row[key] >= 3 ? "#C0392B" : "#2C2C2A" }}>
+                    <td key={key} style={{ padding: "9px 12px", whiteSpace: "nowrap", fontWeight: key === "num_unplanned_events" && row[key] >= 3 ? 700 : 400, color: key === "num_unplanned_events" && row[key] >= 3 ? "#B85450" : "#183642" }}>
                       {fmt(key, row[key])}
                     </td>
                   ))}
                 </tr>
               ))}
               {rows.length === 0 && (
-                <tr><td colSpan={MTBF_MTTR_COLUMNS.length} style={{ padding: 20, textAlign: "center", color: "#898781" }}>No data for this date range.</td></tr>
+                <tr><td colSpan={MTBF_MTTR_COLUMNS.length} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No data for this date range.</td></tr>
               )}
             </tbody>
           </table>
@@ -3861,13 +3864,13 @@ function GanttTooltip({ active, payload }) {
   const fmt = (d) => d ? d.toLocaleString("en-ZA", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" }) : "ongoing";
   const statusLabel = item.kind === "scheduled" ? "Scheduled - not booked down yet" : item.completed ? "Closed" : "In progress";
   return (
-    <div style={{ background: "#fff", border: "1px solid #E4E2D8", borderRadius: 8, padding: "9px 12px", fontSize: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
-      <p style={{ fontWeight: 700, margin: "0 0 3px", color: "#2C2C2A" }}>{item.label}</p>
-      <p style={{ margin: 0, color: "#5F5E5A" }}>{item.category} · {statusLabel}</p>
+    <div style={{ background: "#fff", border: "1px solid #E2E6E3", borderRadius: 8, padding: "9px 12px", fontSize: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
+      <p style={{ fontWeight: 700, margin: "0 0 3px", color: "#183642" }}>{item.label}</p>
+      <p style={{ margin: 0, color: "#4B5659" }}>{item.category} · {statusLabel}</p>
       {item.kind === "scheduled" ? (
-        <p style={{ margin: "4px 0 0", color: "#5F5E5A" }}>Planned for {fmt(item.start)}</p>
+        <p style={{ margin: "4px 0 0", color: "#4B5659" }}>Planned for {fmt(item.start)}</p>
       ) : (
-        <p style={{ margin: "4px 0 0", color: "#5F5E5A" }}>{fmt(item.start)} → {fmt(item.end)}</p>
+        <p style={{ margin: "4px 0 0", color: "#4B5659" }}>{fmt(item.start)} → {fmt(item.end)}</p>
       )}
       {!item.completed && item.expectedUp && (
         <p style={{ margin: "4px 0 0", color: NAVY, fontWeight: 600 }}>Expected up: {fmt(item.expectedUp)}</p>
@@ -3978,7 +3981,7 @@ function EventTimeline({ breakdowns, workOrders, fromDateTime, toDateTime }) {
     const { x, y, width, height, payload, fill } = props;
     if (payload.kind === "scheduled") {
       const cx = x + width / 2, cy = y + height / 2, r = Math.max(5, height / 2.4);
-      return <polygon points={`${cx},${cy - r} ${cx + r},${cy} ${cx},${cy + r} ${cx - r},${cy}`} fill="#E8A33D" stroke="#B87F1F" strokeWidth={1} />;
+      return <polygon points={`${cx},${cy - r} ${cx + r},${cy} ${cx},${cy + r} ${cx - r},${cy}`} fill="#E8A33D" stroke="#C58A32" strokeWidth={1} />;
     }
     const pxPerHour = payload.durationHrs > 0 ? width / payload.durationHrs : 0;
     const continuationWidth = pxPerHour > 0 ? payload.continuationHrs * pxPerHour : 0;
@@ -3986,7 +3989,7 @@ function EventTimeline({ breakdowns, workOrders, fromDateTime, toDateTime }) {
       <g>
         <rect x={x} y={y} width={width} height={height} fill={fill} rx={4} ry={4} />
         {continuationWidth > 0 && (
-          <rect x={x + width} y={y + height / 2 - 1.5} width={continuationWidth} height={3} fill="#5FBF8F" rx={1.5} ry={1.5} />
+          <rect x={x + width} y={y + height / 2 - 1.5} width={continuationWidth} height={3} fill="#3F7D65" rx={1.5} ry={1.5} />
         )}
       </g>
     );
@@ -3999,43 +4002,43 @@ function EventTimeline({ breakdowns, workOrders, fromDateTime, toDateTime }) {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          style={{ padding: "7px 10px", fontSize: 12.5, border: "1px solid #D3D1C7", borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', background: "#fff" }}
+          style={{ padding: "7px 10px", fontSize: 12.5, border: "1px solid #E2E6E3", borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', background: "#fff" }}
         >
           <option value="all">All events</option>
           <option value="completed">Completed only</option>
           <option value="in_progress">In progress only</option>
         </select>
       </div>
-      <p style={{ fontSize: 12, color: "#898781", margin: "0 0 12px" }}>
+      <p style={{ fontSize: 12, color: "#859195", margin: "0 0 12px" }}>
         {formatTick(0)} to {formatTick(windowHrs)}{fromDateTime && toDateTime ? " - matches the date range selected below." : " - 6 hours either side of now."} Includes upcoming scheduled jobs, not just what's already down.
       </p>
       {events.length === 0 ? (
-        <div style={{ border: "1px solid #E4E2D8", borderRadius: 10, background: "#fff", padding: 24, textAlign: "center" }}>
-          <p style={{ fontSize: 13, color: "#898781", margin: 0 }}>No events in this date range.</p>
+        <div style={{ border: "1px solid #E2E6E3", borderRadius: 10, background: "#fff", padding: 24, textAlign: "center" }}>
+          <p style={{ fontSize: 13, color: "#859195", margin: 0 }}>No events in this date range.</p>
         </div>
       ) : (
-        <div style={{ height: Math.max(180, events.length * 38 + 50), background: "#fff", border: "1px solid #E4E2D8", borderRadius: 10, padding: "10px 8px" }}>
+        <div style={{ height: Math.max(180, events.length * 38 + 50), background: "#fff", border: "1px solid #E2E6E3", borderRadius: 10, padding: "10px 8px" }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={events} layout="vertical" margin={{ left: 4, right: 12, top: 6, bottom: 6 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" horizontal={false} />
-              <XAxis type="number" domain={[0, windowHrs]} ticks={ticks} tickFormatter={formatTick} tick={{ fontSize: 11, fill: "#5F5E5A" }} axisLine={{ stroke: "#E4E2D8" }} tickLine={false} />
-              <YAxis type="category" dataKey="label" width={220} tick={{ fontSize: 11, fill: "#2C2C2A" }} axisLine={false} tickLine={false} />
+              <XAxis type="number" domain={[0, windowHrs]} ticks={ticks} tickFormatter={formatTick} tick={{ fontSize: 11, fill: "#4B5659" }} axisLine={{ stroke: "#E2E6E3" }} tickLine={false} />
+              <YAxis type="category" dataKey="label" width={220} tick={{ fontSize: 11, fill: "#183642" }} axisLine={false} tickLine={false} />
               <Tooltip content={<GanttTooltip />} />
               {nowInWindow && (
-                <ReferenceLine x={nowOffsetHrs} stroke="#C0392B" strokeWidth={1.5} strokeDasharray="4 4" label={{ value: "Now", position: "top", fill: "#C0392B", fontSize: 11, fontWeight: 700 }} />
+                <ReferenceLine x={nowOffsetHrs} stroke="#B85450" strokeWidth={1.5} strokeDasharray="4 4" label={{ value: "Now", position: "top", fill: "#B85450", fontSize: 11, fontWeight: 700 }} />
               )}
               <Bar dataKey="offsetHrs" stackId="a" fill="transparent" isAnimationActive={false} />
               <Bar dataKey="durationHrs" stackId="a" radius={[4, 4, 4, 4]} isAnimationActive={false} shape={DurationBarShape}>
-                {events.map((e) => <Cell key={e.id} fill={e.kind === "scheduled" ? "transparent" : e.completed ? "#5FBF8F" : "#C0392B"} />)}
+                {events.map((e) => <Cell key={e.id} fill={e.kind === "scheduled" ? "transparent" : e.completed ? "#3F7D65" : "#B85450"} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
       )}
-      <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 11.5, color: "#5F5E5A", flexWrap: "wrap" }}>
-        <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#C0392B", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />In progress</span>
-        <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#5FBF8F", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Completed</span>
-        <span><span style={{ display: "inline-block", width: 12, height: 3, background: "#5FBF8F", borderRadius: 2, marginRight: 6, verticalAlign: "middle" }} />Projected to Expected Up Time</span>
+      <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 11.5, color: "#4B5659", flexWrap: "wrap" }}>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#B85450", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />In progress</span>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#3F7D65", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Completed</span>
+        <span><span style={{ display: "inline-block", width: 12, height: 3, background: "#3F7D65", borderRadius: 2, marginRight: 6, verticalAlign: "middle" }} />Projected to Expected Up Time</span>
         <span><span style={{ display: "inline-block", width: 9, height: 9, background: "#E8A33D", transform: "rotate(45deg)", marginRight: 6, verticalAlign: "middle" }} />Scheduled, not booked down yet</span>
       </div>
     </div>
@@ -4112,12 +4115,12 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
         </button>
       </div>
 
-      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr style={{ background: "#F7F6F1" }}>
+            <tr style={{ background: "#F7F8F6" }}>
               {DOWNTIME_SUMMARY_COLUMNS.map(([key, label]) => (
-                <th key={key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>{label}</th>
+                <th key={key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{label}</th>
               ))}
             </tr>
           </thead>
@@ -4135,7 +4138,7 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={DOWNTIME_SUMMARY_COLUMNS.length} style={{ padding: 20, textAlign: "center", color: "#898781" }}>No downtime events in this date range.</td></tr>
+              <tr><td colSpan={DOWNTIME_SUMMARY_COLUMNS.length} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No downtime events in this date range.</td></tr>
             )}
           </tbody>
         </table>
@@ -4156,7 +4159,7 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
             <div className="job-card-no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <p style={{ fontSize: 15, fontWeight: 700, color: NAVY, margin: 0 }}>Shift Downtime Summary</p>
               <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => setShowPrint(false)} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Close</button>
+                <button onClick={() => setShowPrint(false)} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Close</button>
                 <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, background: NAVY, border: "none", color: "#fff", padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                   <Printer size={14} /> Print / Save as PDF
                 </button>
@@ -4165,7 +4168,7 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
 
             <div className="job-card-print">
               <p style={{ fontSize: 18, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>Shift Downtime Summary</p>
-              <p style={{ fontSize: 12.5, color: "#5F5E5A", margin: "0 0 16px" }}>Date Range: {formatRangeForDisplay(fromDateTime, toDateTime)}</p>
+              <p style={{ fontSize: 12.5, color: "#4B5659", margin: "0 0 16px" }}>Date Range: {formatRangeForDisplay(fromDateTime, toDateTime)}</p>
 
               <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 30, fontSize: 11.5 }}>
                 <thead>
@@ -4190,7 +4193,7 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
                 </tbody>
               </table>
 
-              <p style={{ fontSize: 14, fontWeight: 700, color: "#2C2C2A", margin: "0 0 20px" }}>Sign Off</p>
+              <p style={{ fontSize: 14, fontWeight: 700, color: "#183642", margin: "0 0 20px" }}>Sign Off</p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40 }}>
                 <div>
                   <p style={{ fontSize: 12, margin: "0 0 30px" }}>Maintenance (Name): _______________________</p>
@@ -4259,9 +4262,9 @@ function WorkOrdersPage({ assets, workOrders, userEmail, onRefresh }) {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
-          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#898781" }} />
+          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search work orders"
-            style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, outline: "none" }} />
+            style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }} />
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
@@ -4273,12 +4276,12 @@ function WorkOrdersPage({ assets, workOrders, userEmail, onRefresh }) {
         </div>
       </div>
 
-      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr style={{ background: "#F7F6F1" }}>
-              {columns.map((c) => <th key={c.key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>{c.label}</th>)}
-              <th style={{ borderBottom: "1px solid #E4E2D8" }}></th>
+            <tr style={{ background: "#F7F8F6" }}>
+              {columns.map((c) => <th key={c.key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{c.label}</th>)}
+              <th style={{ borderBottom: "1px solid #E2E6E3" }}></th>
             </tr>
           </thead>
           <tbody>
@@ -4293,14 +4296,14 @@ function WorkOrdersPage({ assets, workOrders, userEmail, onRefresh }) {
                   <button onClick={() => setPrinting(row)} title="Print Job Card" style={{ background: "none", border: "none", color: NAVY, cursor: "pointer", padding: 4, display: "inline-flex", marginRight: 4 }}>
                     <Printer size={15} />
                   </button>
-                  <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#C0392B", cursor: "pointer", padding: 4, display: "inline-flex" }}>
+                  <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
                     <Trash2 size={15} />
                   </button>
                 </td>
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#898781" }}>
+              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
                 {workOrders.length === 0 ? "No work orders yet." : "No work orders match your search."}
               </td></tr>
             )}
@@ -4363,7 +4366,7 @@ function ServiceScheduleForm({ assets, existing, onClose, onSaved }) {
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
-          <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
+          <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
           <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
         </div>
       </div>
@@ -4414,9 +4417,9 @@ function ServiceScheduleForm({ assets, existing, onClose, onSaved }) {
     }
   };
 
-  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
-  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" };
-  const triggerBox = { border: "1px solid #E4E2D8", borderRadius: 8, padding: "10px 12px", marginBottom: 12 };
+  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
+  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" };
+  const triggerBox = { border: "1px solid #E2E6E3", borderRadius: 8, padding: "10px 12px", marginBottom: 12 };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
@@ -4424,13 +4427,13 @@ function ServiceScheduleForm({ assets, existing, onClose, onSaved }) {
         <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>
           {isEdit ? "Edit Service Schedule" : "Add Service Schedule"}
         </h3>
-        <p style={{ fontSize: 12, color: "#898781", margin: "0 0 16px" }}>
+        <p style={{ fontSize: 12, color: "#859195", margin: "0 0 16px" }}>
           Turn on any combination of triggers below - whichever one is reached first generates the work order.
         </p>
 
         <div style={{ marginBottom: 14 }}>
           <label style={labelStyle}>Equipment</label>
-          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#5F5E5A" } : {}) }}>
+          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#4B5659" } : {}) }}>
             {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
           </select>
         </div>
@@ -4470,7 +4473,7 @@ function ServiceScheduleForm({ assets, existing, onClose, onSaved }) {
         <div style={triggerBox}>
           <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 700, color: NAVY, marginBottom: useCounter ? 10 : 0, cursor: "pointer" }}>
             <input type="checkbox" checked={useCounter} onChange={(e) => setUseCounter(e.target.checked)} style={{ width: 16, height: 16 }} />
-            Usage Counter Trigger <span style={{ fontWeight: 400, color: "#898781" }}>(cycles, rotations, anything numeric besides hours)</span>
+            Usage Counter Trigger <span style={{ fontWeight: 400, color: "#859195" }}>(cycles, rotations, anything numeric besides hours)</span>
           </label>
           {useCounter && (
             <div>
@@ -4498,7 +4501,7 @@ function ServiceScheduleForm({ assets, existing, onClose, onSaved }) {
             <input type="text" value={assignedTechnician} onChange={(e) => setAssignedTechnician(e.target.value)} style={fieldStyle} />
           </div>
           <div>
-            <label style={labelStyle}>Manually Scheduled Date <span style={{ fontWeight: 400, color: "#898781" }}>(optional)</span></label>
+            <label style={labelStyle}>Manually Scheduled Date <span style={{ fontWeight: 400, color: "#859195" }}>(optional)</span></label>
             <input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} style={fieldStyle} />
           </div>
         </div>
@@ -4516,15 +4519,15 @@ function ServiceScheduleForm({ assets, existing, onClose, onSaved }) {
           </div>
         </div>
 
-        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#2C2C2A", marginBottom: 18, cursor: "pointer" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#183642", marginBottom: 18, cursor: "pointer" }}>
           <input type="checkbox" checked={autoGenerate} onChange={(e) => setAutoGenerate(e.target.checked)} style={{ width: 16, height: 16 }} />
           Automatically create a work order when due
         </label>
 
-        {error && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
           <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
             {saving ? "Saving…" : isEdit ? "Save Changes" : "Add Schedule"}
           </button>
@@ -4608,9 +4611,9 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
     <div>
       {pmCheckMessage && (
         <div style={{
-          background: pmCheckMessage.type === "error" ? "#FCEBEB" : pmCheckMessage.type === "success" ? "#EAF3DE" : "#F2F1EA",
-          border: `1px solid ${pmCheckMessage.type === "error" ? "#E3A8A8" : pmCheckMessage.type === "success" ? "#B7D89A" : "#D3D1C7"}`,
-          color: pmCheckMessage.type === "error" ? "#791F1F" : pmCheckMessage.type === "success" ? "#27500A" : "#5F5E5A",
+          background: pmCheckMessage.type === "error" ? "#F6E2E0" : pmCheckMessage.type === "success" ? "#E2EFE9" : "#F2F1EA",
+          border: `1px solid ${pmCheckMessage.type === "error" ? "#DDB6B2" : pmCheckMessage.type === "success" ? "#B7D89A" : "#E2E6E3"}`,
+          color: pmCheckMessage.type === "error" ? "#7A3330" : pmCheckMessage.type === "success" ? "#2C5646" : "#4B5659",
           borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13,
         }}>
           {pmCheckMessage.text}
@@ -4622,7 +4625,7 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
           {pmChecking ? "Checking…" : "Check for Due Maintenance"}
         </button>
       </div>
-      <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 16px" }}>
+      <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 16px" }}>
         Overdue hours keep counting even when past due - nothing is capped or hidden. Due maintenance is checked automatically every time this page loads, and generates a work order under Planned Maintenance Jobs below. Use "Mark Serviced" once work is done to reset the interval and start the next count from now.
       </p>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
@@ -4631,12 +4634,12 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
         </button>
       </div>
 
-      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10, marginBottom: 32 }}>
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10, marginBottom: 32 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr style={{ background: "#F7F6F1" }}>
+            <tr style={{ background: "#F7F8F6" }}>
               {["Equipment #", "Name", "Current hours", "Triggers", "Hours remaining", "Status", "Technician", ""].map((h) => (
-                <th key={h} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>{h}</th>
+                <th key={h} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -4653,7 +4656,7 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
                     row.counter_interval != null ? `${row.counter_label || "Counter"}: every ${row.counter_interval}` : null,
                   ].filter(Boolean).join(" · ") || <span style={{ color: "#B4B2A9" }}>-</span>}
                 </td>
-                <td style={{ padding: "9px 12px", color: row.remaining != null && row.remaining < 0 ? "#C0392B" : "#2C2C2A", fontWeight: row.remaining != null && row.remaining < 0 ? 700 : 400 }}>
+                <td style={{ padding: "9px 12px", color: row.remaining != null && row.remaining < 0 ? "#B85450" : "#183642", fontWeight: row.remaining != null && row.remaining < 0 ? 700 : 400 }}>
                   {row.remaining != null ? row.remaining.toFixed(1) : "-"}
                 </td>
                 <td style={{ padding: "9px 12px" }}><Badge value={row.status} /></td>
@@ -4666,14 +4669,14 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
               </tr>
             ))}
             {plannedMaintenance.length === 0 && (
-              <tr><td colSpan={8} style={{ padding: 20, textAlign: "center", color: "#898781" }}>No service schedules set up yet.</td></tr>
+              <tr><td colSpan={8} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No service schedules set up yet.</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
       <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 6px", color: NAVY }}>Planned Maintenance Jobs</h3>
-      <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 16px" }}>
+      <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 16px" }}>
         Add a specific planned maintenance task, print its Job Card for the technician to take on site, then upload the completed (signed) scan back here once it's done.
       </p>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
@@ -4682,12 +4685,12 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
         </button>
       </div>
 
-      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr style={{ background: "#F7F6F1" }}>
+            <tr style={{ background: "#F7F8F6" }}>
               {["Work order #", "Equipment #", "Scope", "Priority", "Status", "Planned Start", ""].map((h) => (
-                <th key={h} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>{h}</th>
+                <th key={h} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -4704,14 +4707,14 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
                   <button onClick={() => setPrintingJob(row)} title="Print Job Card" style={{ background: "none", border: "none", color: NAVY, cursor: "pointer", padding: 4, display: "inline-flex", marginRight: 4 }}>
                     <Printer size={15} />
                   </button>
-                  <button onClick={() => setDeletingJob(row)} title="Delete" style={{ background: "none", border: "none", color: "#C0392B", cursor: "pointer", padding: 4, display: "inline-flex" }}>
+                  <button onClick={() => setDeletingJob(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
                     <Trash2 size={15} />
                   </button>
                 </td>
               </tr>
             ))}
             {plannedJobs.length === 0 && (
-              <tr><td colSpan={7} style={{ padding: 20, textAlign: "center", color: "#898781" }}>No planned maintenance jobs yet.</td></tr>
+              <tr><td colSpan={7} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No planned maintenance jobs yet.</td></tr>
             )}
           </tbody>
         </table>
@@ -4751,11 +4754,11 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
           <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 380, maxWidth: "100%" }}>
             <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>Mark {servicing.asset_id} as serviced?</p>
-            <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 18px" }}>
+            <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>
               This resets the interval - Last Service Hours becomes the asset's current hours ({assets.find((a) => a.asset_id === servicing.asset_id)?.current_hours ?? "-"}), and the next due point starts counting from here.
             </p>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button onClick={() => setServicing(null)} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => setServicing(null)} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
               <button onClick={() => handleMarkServiced(servicing)} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Confirm</button>
             </div>
           </div>
@@ -4806,8 +4809,8 @@ function AssetForm({ existing, selectedSiteId, onClose, onSaved }) {
     }
   };
 
-  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
-  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" };
+  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
+  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
@@ -4819,7 +4822,7 @@ function AssetForm({ existing, selectedSiteId, onClose, onSaved }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
           <div>
             <label style={labelStyle}>Equipment #</label>
-            <input type="text" value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit} placeholder="EQ-008" style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#5F5E5A" } : {}) }} />
+            <input type="text" value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit} placeholder="EQ-008" style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#4B5659" } : {}) }} />
           </div>
           <div>
             <label style={labelStyle}>Name</label>
@@ -4865,7 +4868,7 @@ function AssetForm({ existing, selectedSiteId, onClose, onSaved }) {
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Current Hours (at intake)</label>
           <input type="number" step="0.1" value={openingHours} onChange={(e) => setOpeningHours(e.target.value)} placeholder="e.g. 12450" style={fieldStyle} />
-          <p style={{ fontSize: 11.5, color: "#898781", margin: "4px 0 0" }}>
+          <p style={{ fontSize: 11.5, color: "#859195", margin: "4px 0 0" }}>
             The hour-meter reading when this machine was loaded into the system. Shows as Current Hours immediately - once Daily Hours entries start coming in for this asset, those take over automatically.
           </p>
         </div>
@@ -4875,10 +4878,10 @@ function AssetForm({ existing, selectedSiteId, onClose, onSaved }) {
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} style={{ ...fieldStyle, resize: "vertical" }} />
         </div>
 
-        {error && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>
             Cancel
           </button>
           <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
@@ -4924,8 +4927,8 @@ function PartForm({ existing, selectedSiteId, onClose, onSaved }) {
     }
   };
 
-  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
-  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" };
+  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
+  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
@@ -4933,7 +4936,7 @@ function PartForm({ existing, selectedSiteId, onClose, onSaved }) {
         <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 16px" }}>{isEdit ? "Edit Part" : "Add Part"}</h3>
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Part No</label>
-          <input type="text" value={partNo} onChange={(e) => setPartNo(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#5F5E5A" } : {}) }} />
+          <input type="text" value={partNo} onChange={(e) => setPartNo(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#4B5659" } : {}) }} />
         </div>
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Description</label>
@@ -4959,9 +4962,9 @@ function PartForm({ existing, selectedSiteId, onClose, onSaved }) {
             <input type="number" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} style={fieldStyle} />
           </div>
         </div>
-        {error && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
           <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
             {saving ? "Saving…" : isEdit ? "Save Changes" : "Add Part"}
           </button>
@@ -5018,9 +5021,9 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
 
   if (!isAdmin) {
     return (
-      <div style={{ background: "#FCEBEB", border: "1px solid #E3A8A8", borderRadius: 10, padding: 28, textAlign: "center" }}>
-        <p style={{ fontWeight: 700, fontSize: 14, color: "#791F1F", margin: "0 0 6px" }}>Admins only</p>
-        <p style={{ fontSize: 13, color: "#791F1F", margin: 0 }}>Site management is restricted to administrators.</p>
+      <div style={{ background: "#F6E2E0", border: "1px solid #DDB6B2", borderRadius: 10, padding: 28, textAlign: "center" }}>
+        <p style={{ fontWeight: 700, fontSize: 14, color: "#7A3330", margin: "0 0 6px" }}>Admins only</p>
+        <p style={{ fontSize: 13, color: "#7A3330", margin: 0 }}>Site management is restricted to administrators.</p>
       </div>
     );
   }
@@ -5065,15 +5068,15 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
     }
   };
 
-  const fieldStyle = { padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
+  const fieldStyle = { padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
 
   return (
     <div>
       {message && (
         <div style={{
-          background: message.type === "error" ? "#FCEBEB" : "#EAF3DE",
-          border: `1px solid ${message.type === "error" ? "#E3A8A8" : "#B7D89A"}`,
-          color: message.type === "error" ? "#791F1F" : "#27500A",
+          background: message.type === "error" ? "#F6E2E0" : "#E2EFE9",
+          border: `1px solid ${message.type === "error" ? "#DDB6B2" : "#B7D89A"}`,
+          color: message.type === "error" ? "#7A3330" : "#2C5646",
           borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13,
         }}>
           {message.text}
@@ -5083,11 +5086,11 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
       <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 12px", color: NAVY }}>Sites</h3>
       <form onSubmit={handleAddSite} style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
         <div>
-          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" }}>Site Name</label>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#183642", margin: "0 0 4px" }}>Site Name</label>
           <input type="text" value={newSiteName} onChange={(e) => setNewSiteName(e.target.value)} placeholder="e.g. Maaden Mahd" required style={fieldStyle} />
         </div>
         <div>
-          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" }}>Location</label>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#183642", margin: "0 0 4px" }}>Location</label>
           <input type="text" value={newSiteLocation} onChange={(e) => setNewSiteLocation(e.target.value)} placeholder="Optional" style={fieldStyle} />
         </div>
         <button type="submit" disabled={savingSite} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: savingSite ? "default" : "pointer" }}>
@@ -5095,13 +5098,13 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
         </button>
       </form>
 
-      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10, marginBottom: 28 }}>
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10, marginBottom: 28 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr style={{ background: "#F7F6F1" }}>
-              <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", borderBottom: "1px solid #E4E2D8" }}>Site</th>
-              <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", borderBottom: "1px solid #E4E2D8" }}>Location</th>
-              <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", borderBottom: "1px solid #E4E2D8" }}>Status</th>
+            <tr style={{ background: "#F7F8F6" }}>
+              <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3" }}>Site</th>
+              <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3" }}>Location</th>
+              <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3" }}>Status</th>
             </tr>
           </thead>
           <tbody>
@@ -5113,27 +5116,27 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
               </tr>
             ))}
             {sites.length === 0 && !loading && (
-              <tr><td colSpan={3} style={{ padding: 20, textAlign: "center", color: "#898781" }}>No sites yet - add one above.</td></tr>
+              <tr><td colSpan={3} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No sites yet - add one above.</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
       <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 6px", color: NAVY }}>User Access</h3>
-      <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 12px" }}>
+      <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 12px" }}>
         Tick a box to grant a user access to that site. A user with only one site never sees a site switcher - it only appears once someone has more than one, which is what makes them a manager in practice. A newly granted site starts completely blank for that user until data gets logged against it. Role controls which tabs they see at all: Manager sees everything, Operator sees only the data-entry tabs (Daily Hours, Fuel Log, Oil Consumption, Breakdowns, Work Orders, Inspections) - no dashboards or reports. Admin is granted separately via SQL, not from here, to avoid accidentally locking yourself out.
       </p>
       {loading ? (
-        <p style={{ fontSize: 13, color: "#898781" }}>Loading…</p>
+        <p style={{ fontSize: 13, color: "#859195" }}>Loading…</p>
       ) : (
-        <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+        <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
-              <tr style={{ background: "#F7F6F1" }}>
-                <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", borderBottom: "1px solid #E4E2D8", whiteSpace: "nowrap" }}>User</th>
-                <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", borderBottom: "1px solid #E4E2D8", whiteSpace: "nowrap" }}>Role</th>
+              <tr style={{ background: "#F7F8F6" }}>
+                <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3", whiteSpace: "nowrap" }}>User</th>
+                <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3", whiteSpace: "nowrap" }}>Role</th>
                 {sites.map((s) => (
-                  <th key={s.id} style={{ textAlign: "center", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", borderBottom: "1px solid #E4E2D8", whiteSpace: "nowrap" }}>{s.site_name}</th>
+                  <th key={s.id} style={{ textAlign: "center", padding: "9px 12px", fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3", whiteSpace: "nowrap" }}>{s.site_name}</th>
                 ))}
               </tr>
             </thead>
@@ -5150,7 +5153,7 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
                         <select
                           value={role}
                           onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                          style={{ padding: "5px 8px", fontSize: 12.5, border: "1px solid #D3D1C7", borderRadius: 6, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', background: "#fff" }}
+                          style={{ padding: "5px 8px", fontSize: 12.5, border: "1px solid #E2E6E3", borderRadius: 6, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', background: "#fff" }}
                         >
                           <option value="manager">Manager</option>
                           <option value="operator">Operator</option>
@@ -5166,7 +5169,7 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
                 );
               })}
               {users.length === 0 && (
-                <tr><td colSpan={sites.length + 2} style={{ padding: 20, textAlign: "center", color: "#898781" }}>No users found.</td></tr>
+                <tr><td colSpan={sites.length + 2} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No users found.</td></tr>
               )}
             </tbody>
           </table>
@@ -5186,9 +5189,9 @@ function AuditTrailPage({ auditLog, isAdmin }) {
 
   if (!isAdmin) {
     return (
-      <div style={{ background: "#FCEBEB", border: "1px solid #E3A8A8", borderRadius: 10, padding: 28, textAlign: "center" }}>
-        <p style={{ fontWeight: 700, fontSize: 14, color: "#791F1F", margin: "0 0 6px" }}>Admins only</p>
-        <p style={{ fontSize: 13, color: "#791F1F", margin: 0 }}>The Audit Trail is restricted to administrators.</p>
+      <div style={{ background: "#F6E2E0", border: "1px solid #DDB6B2", borderRadius: 10, padding: 28, textAlign: "center" }}>
+        <p style={{ fontWeight: 700, fontSize: 14, color: "#7A3330", margin: "0 0 6px" }}>Admins only</p>
+        <p style={{ fontSize: 13, color: "#7A3330", margin: 0 }}>The Audit Trail is restricted to administrators.</p>
       </div>
     );
   }
@@ -5229,7 +5232,7 @@ function AuditTrailPage({ auditLog, isAdmin }) {
     XLSX.writeFile(wb, `Audit_Trail_${now.toISOString().slice(0, 10)}.xlsx`);
   };
 
-  const selectStyle = { padding: "8px 10px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', background: "#fff" };
+  const selectStyle = { padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', background: "#fff" };
 
   return (
     <div>
@@ -5253,7 +5256,7 @@ function AuditTrailPage({ auditLog, isAdmin }) {
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <p style={{ fontSize: 13, color: "#5F5E5A", margin: 0 }}>{filtered.length} of {auditLog.length} entries shown</p>
+        <p style={{ fontSize: 13, color: "#4B5659", margin: 0 }}>{filtered.length} of {auditLog.length} entries shown</p>
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
             <Download size={14} /> Export to Excel
@@ -5264,12 +5267,12 @@ function AuditTrailPage({ auditLog, isAdmin }) {
         </div>
       </div>
 
-      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr style={{ background: "#F7F6F1" }}>
+            <tr style={{ background: "#F7F8F6" }}>
               {AUDIT_COLUMNS.map(([key, label]) => (
-                <th key={key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>{label}</th>
+                <th key={key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{label}</th>
               ))}
             </tr>
           </thead>
@@ -5285,7 +5288,7 @@ function AuditTrailPage({ auditLog, isAdmin }) {
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={AUDIT_COLUMNS.length} style={{ padding: 20, textAlign: "center", color: "#898781" }}>No audit entries match your filters.</td></tr>
+              <tr><td colSpan={AUDIT_COLUMNS.length} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No audit entries match your filters.</td></tr>
             )}
           </tbody>
         </table>
@@ -5306,7 +5309,7 @@ function AuditTrailPage({ auditLog, isAdmin }) {
             <div className="job-card-no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <p style={{ fontSize: 15, fontWeight: 700, color: NAVY, margin: 0 }}>Audit Report</p>
               <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => setShowPrint(false)} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Close</button>
+                <button onClick={() => setShowPrint(false)} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Close</button>
                 <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, background: NAVY, border: "none", color: "#fff", padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                   <Printer size={14} /> Print / Save as PDF
                 </button>
@@ -5315,7 +5318,7 @@ function AuditTrailPage({ auditLog, isAdmin }) {
 
             <div className="job-card-print">
               <p style={{ fontSize: 18, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>Audit Report</p>
-              <p style={{ fontSize: 12.5, color: "#5F5E5A", margin: "0 0 16px" }}>
+              <p style={{ fontSize: 12.5, color: "#4B5659", margin: "0 0 16px" }}>
                 {fromDate || toDate ? `${fromDate || "earliest"} to ${toDate || "latest"}` : "All recorded activity"} · Generated {new Date().toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" })}
               </p>
 
@@ -5432,14 +5435,14 @@ function PartsPage({ parts, selectedSiteId, onRefresh }) {
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #E4E2D8" }}>
+      <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #E2E6E3" }}>
         {[["inventory", "Inventory"], ["quotes", "Quote Price List"]].map(([key, label]) => (
           <button
             key={key}
             onClick={() => setSubTab(key)}
             style={{
               padding: "9px 16px", fontSize: 13.5, fontWeight: 600, border: "none", background: "none", cursor: "pointer",
-              color: subTab === key ? NAVY : "#898781",
+              color: subTab === key ? NAVY : "#859195",
               borderBottom: subTab === key ? `2px solid ${NAVY}` : "2px solid transparent",
               marginBottom: -1,
             }}
@@ -5455,9 +5458,9 @@ function PartsPage({ parts, selectedSiteId, onRefresh }) {
       <>
       {importMessage && (
         <div style={{
-          background: importMessage.type === "error" ? "#FCEBEB" : "#EAF3DE",
-          border: `1px solid ${importMessage.type === "error" ? "#E3A8A8" : "#B7D89A"}`,
-          color: importMessage.type === "error" ? "#791F1F" : "#27500A",
+          background: importMessage.type === "error" ? "#F6E2E0" : "#E2EFE9",
+          border: `1px solid ${importMessage.type === "error" ? "#DDB6B2" : "#B7D89A"}`,
+          color: importMessage.type === "error" ? "#7A3330" : "#2C5646",
           borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13,
         }}>
           {importMessage.text}
@@ -5466,9 +5469,9 @@ function PartsPage({ parts, selectedSiteId, onRefresh }) {
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
-          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#898781" }} />
+          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search parts"
-            style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, outline: "none" }} />
+            style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }} />
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
@@ -5483,16 +5486,16 @@ function PartsPage({ parts, selectedSiteId, onRefresh }) {
           </button>
         </div>
       </div>
-      <p style={{ fontSize: 11.5, color: "#898781", margin: "-6px 0 16px" }}>
+      <p style={{ fontSize: 11.5, color: "#859195", margin: "-6px 0 16px" }}>
         Export the current list, edit it in Excel (add rows, change quantities), then Upload the same file - existing Part Nos get updated, new ones get added. Nothing gets deleted by an upload.
       </p>
 
-      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr style={{ background: "#F7F6F1" }}>
+            <tr style={{ background: "#F7F8F6" }}>
               {["Part Number", "Part", "Qty in Stock", "Minimum Qty", "Status"].map((h) => (
-                <th key={h} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>{h}</th>
+                <th key={h} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -5508,7 +5511,7 @@ function PartsPage({ parts, selectedSiteId, onRefresh }) {
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={5} style={{ padding: 20, textAlign: "center", color: "#898781" }}>
+              <tr><td colSpan={5} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
                 {parts.length === 0 ? "No parts added yet." : "No parts match your search."}
               </td></tr>
             )}
@@ -5693,15 +5696,15 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
         style={{
-          border: `2px dashed ${dragOver ? NAVY : "#D3D1C7"}`, borderRadius: 12, padding: 28, textAlign: "center",
+          border: `2px dashed ${dragOver ? NAVY : "#E2E6E3"}`, borderRadius: 12, padding: 28, textAlign: "center",
           background: dragOver ? "#F0F3F8" : "#FAFAF7", cursor: "pointer", marginBottom: 20, transition: "background 0.15s, border-color 0.15s",
         }}
       >
         <Upload size={22} style={{ color: NAVY, marginBottom: 8 }} />
-        <p style={{ fontSize: 13.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" }}>
+        <p style={{ fontSize: 13.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" }}>
           {extracting ? "Reading quote…" : "Drag a scanned quote here, or click to browse"}
         </p>
-        <p style={{ fontSize: 12, color: "#898781", margin: 0 }}>
+        <p style={{ fontSize: 12, color: "#859195", margin: 0 }}>
           Image or PDF - Claude will read it and pull out the Supplier, Part, Part Number and Price for you to review before saving.
         </p>
         <input
@@ -5714,21 +5717,21 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
       </div>
 
       {extractError && (
-        <div style={{ background: "#FCEBEB", border: "1px solid #E3A8A8", color: "#791F1F", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13 }}>
+        <div style={{ background: "#F6E2E0", border: "1px solid #DDB6B2", color: "#7A3330", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13 }}>
           {extractError}
         </div>
       )}
 
       {review && (
-        <div style={{ border: "1px solid #E4E2D8", borderRadius: 10, padding: 16, marginBottom: 20, background: "#fff" }}>
+        <div style={{ border: "1px solid #E2E6E3", borderRadius: 10, padding: 16, marginBottom: 20, background: "#fff" }}>
           <p style={{ fontSize: 13.5, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>Review before saving</p>
-          <p style={{ fontSize: 12, color: "#898781", margin: "0 0 14px" }}>Check what Claude read off the quote - fix anything that's wrong, remove lines that shouldn't be there, then save. Lines flagged "In stock" already have some on hand - worth checking before ordering more.</p>
+          <p style={{ fontSize: 12, color: "#859195", margin: "0 0 14px" }}>Check what Claude read off the quote - fix anything that's wrong, remove lines that shouldn't be there, then save. Lines flagged "In stock" already have some on hand - worth checking before ordering more.</p>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
-                <tr style={{ background: "#F7F6F1" }}>
+                <tr style={{ background: "#F7F8F6" }}>
                   {["Supplier", "Part", "Part Number", "Price", "Stock", ""].map((h) => (
-                    <th key={h} style={{ textAlign: "left", padding: "7px 8px", fontWeight: 600, color: "#5F5E5A", fontSize: 12 }}>{h}</th>
+                    <th key={h} style={{ textAlign: "left", padding: "7px 8px", fontWeight: 600, color: "#4B5659", fontSize: 12 }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -5743,13 +5746,13 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
                           type={field === "price" ? "number" : "text"}
                           value={row[field]}
                           onChange={(e) => updateReviewRow(i, field, e.target.value)}
-                          style={{ width: "100%", padding: "6px 8px", fontSize: 12.5, border: "1px solid #D3D1C7", borderRadius: 6, boxSizing: "border-box" }}
+                          style={{ width: "100%", padding: "6px 8px", fontSize: 12.5, border: "1px solid #E2E6E3", borderRadius: 6, boxSizing: "border-box" }}
                         />
                       </td>
                     ))}
                     <td style={{ padding: "4px 8px", whiteSpace: "nowrap" }}>
                       {stock ? (
-                        <span title={`Already have ${stock.qty_in_stock ?? 0} of ${stock.part_no} in stock`} style={{ fontSize: 10.5, fontWeight: 700, color: "#B87F1F", background: "#FCE9C8", padding: "3px 8px", borderRadius: 6 }}>
+                        <span title={`Already have ${stock.qty_in_stock ?? 0} of ${stock.part_no} in stock`} style={{ fontSize: 10.5, fontWeight: 700, color: "#C58A32", background: "#F3E4C8", padding: "3px 8px", borderRadius: 6 }}>
                           In stock: {stock.qty_in_stock ?? 0}
                         </span>
                       ) : row.part_no ? (
@@ -5757,7 +5760,7 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
                       ) : null}
                     </td>
                     <td style={{ padding: "4px 8px" }}>
-                      <button type="button" onClick={() => removeReviewRow(i)} style={{ background: "none", border: "none", color: "#C0392B", cursor: "pointer", padding: 4, display: "flex" }}>
+                      <button type="button" onClick={() => removeReviewRow(i)} style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "flex" }}>
                         <Trash2 size={14} />
                       </button>
                     </td>
@@ -5772,7 +5775,7 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
               + Add row
             </button>
             <div style={{ display: "flex", gap: 10 }}>
-              <button type="button" onClick={() => setReview(null)} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "8px 16px", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
+              <button type="button" onClick={() => setReview(null)} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "8px 16px", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
                 Discard
               </button>
               <button type="button" onClick={saveReview} disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
@@ -5785,38 +5788,38 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
         <div style={{ position: "relative", flex: 1, minWidth: 200, maxWidth: 280 }}>
-          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#898781" }} />
+          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search price list"
-            style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, outline: "none", boxSizing: "border-box" }} />
+            style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none", boxSizing: "border-box" }} />
         </div>
         <input
           value={partNoFilter}
           onChange={(e) => setPartNoFilter(e.target.value)}
           placeholder="Filter by part number"
-          style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, outline: "none", minWidth: 180 }}
+          style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none", minWidth: 180 }}
         />
-        <select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)} style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8 }}>
+        <select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)} style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8 }}>
           <option value="">All suppliers</option>
           {supplierOptions.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
 
-      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr style={{ background: "#F7F6F1" }}>
+            <tr style={{ background: "#F7F8F6" }}>
               {columns.map(([key, label]) => (
-                <th key={key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>{label}</th>
+                <th key={key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{label}</th>
               ))}
-              <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>Current stock</th>
-              <th style={{ borderBottom: "1px solid #E4E2D8" }}></th>
+              <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>Current stock</th>
+              <th style={{ borderBottom: "1px solid #E2E6E3" }}></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={columns.length + 2} style={{ padding: 20, textAlign: "center", color: "#898781" }}>Loading…</td></tr>
+              <tr><td colSpan={columns.length + 2} style={{ padding: 20, textAlign: "center", color: "#859195" }}>Loading…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={columns.length + 2} style={{ padding: 20, textAlign: "center", color: "#898781" }}>
+              <tr><td colSpan={columns.length + 2} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
                 {rows.length === 0 ? "No quotes added yet - drag one in above to get started." : "No entries match your filters."}
               </td></tr>
             ) : filtered.map((row, i) => {
@@ -5830,7 +5833,7 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{row.price_date}</td>
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
                   {stock ? (
-                    <span style={{ fontSize: 10.5, fontWeight: 700, color: "#B87F1F", background: "#FCE9C8", padding: "3px 8px", borderRadius: 6 }}>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: "#C58A32", background: "#F3E4C8", padding: "3px 8px", borderRadius: 6 }}>
                       {stock.qty_in_stock ?? 0} in stock
                     </span>
                   ) : <span style={{ color: "#B4B2A9" }}>-</span>}
@@ -5904,12 +5907,12 @@ function AssetsPage({ assets, selectedSiteId, onRefresh }) {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
-          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#898781" }} />
+          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search assets"
-            style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, outline: "none" }}
+            style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }}
           />
         </div>
         <div style={{ display: "flex", gap: 10 }}>
@@ -5928,12 +5931,12 @@ function AssetsPage({ assets, selectedSiteId, onRefresh }) {
         </div>
       </div>
 
-      <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr style={{ background: "#F7F6F1" }}>
+            <tr style={{ background: "#F7F8F6" }}>
               {columns.map((c) => (
-                <th key={c.key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>{c.label}</th>
+                <th key={c.key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{c.label}</th>
               ))}
             </tr>
           </thead>
@@ -5952,7 +5955,7 @@ function AssetsPage({ assets, selectedSiteId, onRefresh }) {
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={columns.length} style={{ padding: 20, textAlign: "center", color: "#898781" }}>
+              <tr><td colSpan={columns.length} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
                 {assets.length === 0 ? "No assets added yet." : "No assets match your search."}
               </td></tr>
             )}
@@ -6043,21 +6046,21 @@ function DeleteConfirmModal({ itemLabel, userEmail, onCancel, onConfirm }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 55, padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 400, maxWidth: "100%" }}>
         <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>Delete {itemLabel}?</p>
-        <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 14px" }}>
+        <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 14px" }}>
           This removes it from the list, but the record and your reason both stay in the Audit Trail for accountability.
         </p>
-        <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" }}>Reason for deletion (required)</label>
+        <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" }}>Reason for deletion (required)</label>
         <textarea
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           rows={2}
           autoFocus
-          style={{ width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, boxSizing: "border-box", resize: "vertical", fontFamily: "inherit" }}
+          style={{ width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", resize: "vertical", fontFamily: "inherit" }}
         />
-        {error && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "8px 0 0" }}>{error}</p>}
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "8px 0 0" }}>{error}</p>}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-          <button onClick={onCancel} disabled={deleting} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
-          <button onClick={handleConfirm} disabled={deleting} style={{ background: "#C0392B", border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: deleting ? "default" : "pointer", opacity: deleting ? 0.7 : 1 }}>
+          <button onClick={onCancel} disabled={deleting} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button onClick={handleConfirm} disabled={deleting} style={{ background: "#B85450", border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: deleting ? "default" : "pointer", opacity: deleting ? 0.7 : 1 }}>
             {deleting ? "Deleting…" : "Delete"}
           </button>
         </div>
@@ -6069,7 +6072,7 @@ function DeleteConfirmModal({ itemLabel, userEmail, onCancel, onConfirm }) {
 function FleetEquipmentFilter({ assets, selectedFleet, setSelectedFleet, selectedAsset, setSelectedAsset }) {
   const fleets = useMemo(() => [...new Set(assets.map((a) => a.fleet))].filter(Boolean), [assets]);
   const filteredAssets = selectedFleet ? assets.filter((a) => a.fleet === selectedFleet) : assets;
-  const selectStyle = { padding: "8px 10px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', background: "#fff", minWidth: 160 };
+  const selectStyle = { padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', background: "#fff", minWidth: 160 };
 
   return (
     <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
@@ -6096,20 +6099,20 @@ function FleetEquipmentFilter({ assets, selectedFleet, setSelectedFleet, selecte
 function DateRangePicker({ fromDateTime, toDateTime, setFromDateTime, setToDateTime }) {
   const invalid = new Date(fromDateTime) > new Date(toDateTime);
   const inputStyle = {
-    fontSize: 13, padding: "7px 10px", border: `1px solid ${invalid ? "#C0392B" : "#D3D1C7"}`,
-    borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', color: "#2C2C2A",
+    fontSize: 13, padding: "7px 10px", border: `1px solid ${invalid ? "#B85450" : "#E2E6E3"}`,
+    borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', color: "#183642",
   };
   return (
     <div style={{ marginBottom: 18 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 12.5, color: "#5F5E5A", fontWeight: 600 }}>Show data from:</span>
+        <span style={{ fontSize: 12.5, color: "#4B5659", fontWeight: 600 }}>Show data from:</span>
         <input
           type="datetime-local"
           value={fromDateTime}
           onChange={(e) => setFromDateTime(e.target.value)}
           style={inputStyle}
         />
-        <span style={{ fontSize: 12.5, color: "#5F5E5A", fontWeight: 600 }}>to:</span>
+        <span style={{ fontSize: 12.5, color: "#4B5659", fontWeight: 600 }}>to:</span>
         <input
           type="datetime-local"
           value={toDateTime}
@@ -6118,7 +6121,7 @@ function DateRangePicker({ fromDateTime, toDateTime, setFromDateTime, setToDateT
         />
       </div>
       {invalid && (
-        <p style={{ fontSize: 12, color: "#C0392B", margin: "6px 0 0" }}>The "from" date/time must be before the "to" date/time.</p>
+        <p style={{ fontSize: 12, color: "#B85450", margin: "6px 0 0" }}>The "from" date/time must be before the "to" date/time.</p>
       )}
     </div>
   );
@@ -6178,18 +6181,18 @@ function FleetPerformance({ assets, breakdowns }) {
   };
 
   const crumbs = (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#5F5E5A", marginBottom: 16, flexWrap: "wrap" }}>
-      <button onClick={resetToFleetList} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: selectedFleet ? NAVY : "#5F5E5A", fontWeight: selectedFleet ? 400 : 700, fontSize: 13 }}>All fleets</button>
+    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#4B5659", marginBottom: 16, flexWrap: "wrap" }}>
+      <button onClick={resetToFleetList} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: selectedFleet ? NAVY : "#4B5659", fontWeight: selectedFleet ? 400 : 700, fontSize: 13 }}>All fleets</button>
       {selectedFleet && (
         <>
           <ChevronRight size={13} />
-          <button onClick={backToFleet} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: selectedEquipment ? NAVY : "#5F5E5A", fontWeight: selectedEquipment ? 400 : 700, fontSize: 13 }}>{selectedFleet}</button>
+          <button onClick={backToFleet} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: selectedEquipment ? NAVY : "#4B5659", fontWeight: selectedEquipment ? 400 : 700, fontSize: 13 }}>{selectedFleet}</button>
         </>
       )}
       {selectedEquipment && (
         <>
           <ChevronRight size={13} />
-          <span style={{ fontWeight: 700, color: "#5F5E5A" }}>{selectedEquipment}</span>
+          <span style={{ fontWeight: 700, color: "#4B5659" }}>{selectedEquipment}</span>
         </>
       )}
     </div>
@@ -6201,7 +6204,7 @@ function FleetPerformance({ assets, breakdowns }) {
     return (
       <div>
         <DateRangePicker fromDateTime={fromDateTime} toDateTime={toDateTime} setFromDateTime={setFromDateTime} setToDateTime={setToDateTime} />
-        <div style={{ background: "#FCEBEB", border: "1px solid #E3A8A8", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#791F1F" }}>
+        <div style={{ background: "#F6E2E0", border: "1px solid #DDB6B2", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#7A3330" }}>
           Couldn't load performance data: {kpiError}
         </div>
       </div>
@@ -6212,7 +6215,7 @@ function FleetPerformance({ assets, breakdowns }) {
     return (
       <div>
         <DateRangePicker fromDateTime={fromDateTime} toDateTime={toDateTime} setFromDateTime={setFromDateTime} setToDateTime={setToDateTime} />
-        <p style={{ fontSize: 13, color: "#898781" }}>Loading…</p>
+        <p style={{ fontSize: 13, color: "#859195" }}>Loading…</p>
       </div>
     );
   }
@@ -6228,16 +6231,16 @@ function FleetPerformance({ assets, breakdowns }) {
     // Level 1: fleet cards
     content = (
       <div>
-        <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 16px" }}>Select a fleet to see its performance, then drill into an individual machine. Figures below are for {rangeLabel}.</p>
+        <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 16px" }}>Select a fleet to see its performance, then drill into an individual machine. Figures below are for {rangeLabel}.</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14 }}>
           {fleets.map((f) => (
             <button
               key={f.fleet}
               onClick={() => setSelectedFleet(f.fleet)}
-              style={{ textAlign: "left", background: "#F7F6F1", border: "1px solid #E4E2D8", borderRadius: 10, padding: 16, cursor: "pointer" }}
+              style={{ textAlign: "left", background: "#F7F8F6", border: "1px solid #E2E6E3", borderRadius: 10, padding: 16, cursor: "pointer" }}
             >
               <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>{f.fleet}</p>
-              <p style={{ fontSize: 12, color: "#5F5E5A", margin: "0 0 10px" }}>{f.count} equipment</p>
+              <p style={{ fontSize: 12, color: "#4B5659", margin: "0 0 10px" }}>{f.count} equipment</p>
               <div style={{ display: "flex", gap: 14 }}>
                 <span style={{ fontSize: 13 }}><b>{f.metrics.availability != null ? Math.round(f.metrics.availability * 100) : "-"}%</b> avail.</span>
                 <span style={{ fontSize: 13 }}><b>{f.metrics.utilisation != null ? Math.round(f.metrics.utilisation * 100) : "-"}%</b> util.</span>
@@ -6257,11 +6260,11 @@ function FleetPerformance({ assets, breakdowns }) {
       <div>
         {crumbs}
         <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 4px", color: NAVY }}>{asset.asset_name}</h3>
-        <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 16px" }}>{asset.make} {asset.model} · Serial {asset.serial_number} · <Badge value={asset.status} /></p>
+        <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 16px" }}>{asset.make} {asset.model} · Serial {asset.serial_number} · <Badge value={asset.status} /></p>
         <KpiRow metrics={{ ...metrics, hours_worked: metrics.worked_hours, breakdown_count: metrics.num_unplanned_events }} />
         <h4 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 10px", color: NAVY }}>Events - {rangeLabel}</h4>
         {eqBreakdowns.length === 0 ? (
-          <p style={{ fontSize: 13, color: "#898781" }}>No events for this machine in the selected date range.</p>
+          <p style={{ fontSize: 13, color: "#859195" }}>No events for this machine in the selected date range.</p>
         ) : (
           <DataTable
             columns={[["breakdown_date","Date"],["wo_reference","Work order #"],["component_affected","Component"],["severity","Severity"],["repair_status","Status"],["downtime_hours","Downtime (hrs)"]].map(([key,label])=>({key,label}))}
@@ -6289,7 +6292,7 @@ function FleetPerformance({ assets, breakdowns }) {
           </button>
         </div>
 
-        <div style={{ border: "1px solid #E4E2D8", borderRadius: 10, overflow: "hidden", marginBottom: compareMode && compareIds.length >= 2 ? 24 : 0 }}>
+        <div style={{ border: "1px solid #E2E6E3", borderRadius: 10, overflow: "hidden", marginBottom: compareMode && compareIds.length >= 2 ? 24 : 0 }}>
           {fleetAssets.map((a, i) => {
             const m = kpiByAsset[a.asset_id] || {};
             return (
@@ -6302,8 +6305,8 @@ function FleetPerformance({ assets, breakdowns }) {
                   <input type="checkbox" checked={compareIds.includes(a.asset_id)} onChange={() => toggleCompare(a.asset_id)} onClick={(e) => e.stopPropagation()} style={{ width: 16, height: 16 }} />
                 )}
                 <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 13.5, fontWeight: 600, margin: 0, color: "#2C2C2A" }}>{a.asset_id} - {a.asset_name}</p>
-                  <p style={{ fontSize: 12, color: "#898781", margin: "2px 0 0" }}>{a.serial_number}</p>
+                  <p style={{ fontSize: 13.5, fontWeight: 600, margin: 0, color: "#183642" }}>{a.asset_id} - {a.asset_name}</p>
+                  <p style={{ fontSize: 12, color: "#859195", margin: "2px 0 0" }}>{a.serial_number}</p>
                 </div>
                 <span style={{ fontSize: 13 }}>{m.availability != null ? Math.round(m.availability * 100) : "-"}% avail.</span>
                 <span style={{ fontSize: 13 }}>{m.utilisation != null ? Math.round(m.utilisation * 100) : "-"}% util.</span>
@@ -6318,13 +6321,13 @@ function FleetPerformance({ assets, breakdowns }) {
         {compareMode && compareIds.length >= 2 && (
           <div>
             <h4 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 10px", color: NAVY }}>Comparison - {rangeLabel}</h4>
-            <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
+            <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
-                  <tr style={{ background: "#F7F6F1" }}>
-                    <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", borderBottom: "1px solid #E4E2D8" }}>Metric</th>
+                  <tr style={{ background: "#F7F8F6" }}>
+                    <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3" }}>Metric</th>
                     {compareIds.map((id) => (
-                      <th key={id} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", borderBottom: "1px solid #E4E2D8", whiteSpace: "nowrap" }}>{id}</th>
+                      <th key={id} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3", whiteSpace: "nowrap" }}>{id}</th>
                     ))}
                   </tr>
                 </thead>
@@ -6346,7 +6349,7 @@ function FleetPerformance({ assets, breakdowns }) {
           </div>
         )}
         {compareMode && compareIds.length === 1 && (
-          <p style={{ fontSize: 13, color: "#898781" }}>Select at least one more machine to compare.</p>
+          <p style={{ fontSize: 13, color: "#859195" }}>Select at least one more machine to compare.</p>
         )}
       </div>
     );
@@ -6374,7 +6377,7 @@ function KpiBarChart({ title, data, xKey, dataKey, target, domainMax, valueForma
   const gradRed = `grad-red-${dataKey}`;
   return (
     <div>
-      {title && <p style={{ fontSize: 12.5, fontWeight: 600, margin: "0 0 6px", color: "#5F5E5A" }}>{title}</p>}
+      {title && <p style={{ fontSize: 12.5, fontWeight: 600, margin: "0 0 6px", color: "#4B5659" }}>{title}</p>}
       <div onClick={onClick} style={{ height: 220, background: "#292929", border: "1px solid #1C1C1C", borderRadius: 10, padding: "16px 8px 4px", cursor: onClick ? "pointer" : "default" }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 14, right: 8, left: 0, bottom: 0 }}>
@@ -6406,7 +6409,7 @@ function KpiBarChart({ title, data, xKey, dataKey, target, domainMax, valueForma
 
 function KpiLegend({ targetLabel }) {
   return (
-    <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 11.5, color: "#5F5E5A" }}>
+    <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 11.5, color: "#4B5659" }}>
       <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#2F9E63", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Target met</span>
       <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#A62A1E", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Target not met</span>
       <span><span style={{ display: "inline-block", width: 12, height: 3, background: "#F5C518", borderRadius: 2, marginRight: 6, verticalAlign: "middle" }} />{targetLabel || "Target"}</span>
@@ -6436,15 +6439,15 @@ function AboutPage() {
       <h2 style={{ fontSize: 15, fontWeight: 700, color: NAVY, margin: "0 0 14px" }}>What it does</h2>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 14, marginBottom: 28 }}>
         {capabilities.map(([title, desc]) => (
-          <div key={title} style={{ border: "1px solid #E4E2D8", borderRadius: 10, padding: "14px 16px", background: "#fff" }}>
+          <div key={title} style={{ border: "1px solid #E2E6E3", borderRadius: 10, padding: "14px 16px", background: "#fff" }}>
             <p style={{ fontSize: 13.5, fontWeight: 700, color: NAVY, margin: "0 0 6px" }}>{title}</p>
-            <p style={{ fontSize: 13, color: "#5F5E5A", margin: 0, lineHeight: 1.5 }}>{desc}</p>
+            <p style={{ fontSize: 13, color: "#4B5659", margin: 0, lineHeight: 1.5 }}>{desc}</p>
           </div>
         ))}
       </div>
 
-      <div style={{ borderTop: "1px solid #E4E2D8", paddingTop: 16 }}>
-        <p style={{ fontSize: 12.5, color: "#898781", margin: 0 }}>Built by Datavera Analytics.</p>
+      <div style={{ borderTop: "1px solid #E2E6E3", paddingTop: 16 }}>
+        <p style={{ fontSize: 12.5, color: "#859195", margin: 0 }}>Built by Datavera Analytics.</p>
       </div>
     </div>
   );
@@ -6579,8 +6582,8 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
   }, [filteredAssets]);
 
   const STATUS_COLORS = {
-    Operating: "#5FBF8F", "Under Maintenance": "#E8A33D", Breakdown: "#C0392B",
-    Standby: "#8CA0BF", Disposed: "#B4B2A9", Unknown: "#D3D1C7",
+    Operating: "#3F7D65", "Under Maintenance": "#E8A33D", Breakdown: "#B85450",
+    Standby: "#8CA0BF", Disposed: "#B4B2A9", Unknown: "#E2E6E3",
   };
 
   // Each problem asset broken down by individual breakdown type
@@ -6613,10 +6616,10 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
 
   const alertRows = [
     ["Services overdue / due soon", filteredPlannedMaintenance.filter((p) => p.status !== "OK").length, AlertTriangle, "#E8A33D", "planned_maintenance"],
-    ["Repeat failures (2+ times)", repeatFailureCount, AlertTriangle, "#C0392B", "breakdowns"],
+    ["Repeat failures (2+ times)", repeatFailureCount, AlertTriangle, "#B85450", "breakdowns"],
     ["Components requiring action", filteredComponents.filter((c) => c.status !== "OK").length, CircleDot, "#E8A33D", "components"],
     ["Parts below reorder point", parts.filter((p) => p.reorder_status === "REORDER").length, Package, "#E8A33D", "parts"],
-    ["Failed inspections", filteredInspections.filter((i) => i.result === "Fail").length, ShieldCheck, "#C0392B", "inspections"],
+    ["Failed inspections", filteredInspections.filter((i) => i.result === "Fail").length, ShieldCheck, "#B85450", "inspections"],
   ];
 
   return (
@@ -6633,7 +6636,7 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
       </svg>
 
       <div style={{ position: "relative", zIndex: 1 }}>
-        <p style={{ fontSize: 13, fontStyle: "italic", color: "#5F5E5A", margin: "-12px 0 16px" }}>
+        <p style={{ fontSize: 13, fontStyle: "italic", color: "#4B5659", margin: "-12px 0 16px" }}>
           "If you can measure it, you can manage it."
         </p>
 
@@ -6641,43 +6644,43 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
           <select
             value={selectedFleet}
             onChange={(e) => setSelectedFleet(e.target.value)}
-            style={{ padding: "8px 12px", fontSize: 13, fontWeight: 600, border: "1px solid #D3D1C7", borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', background: "#fff", color: NAVY, minWidth: 180 }}
+            style={{ padding: "8px 12px", fontSize: 13, fontWeight: 600, border: "1px solid #E2E6E3", borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', background: "#fff", color: NAVY, minWidth: 180 }}
           >
             <option value="">All fleets</option>
             {fleets.map((f) => <option key={f} value={f}>{f}</option>)}
           </select>
-          {selectedFleet && <span style={{ fontSize: 12, color: "#898781", marginLeft: 10 }}>Everything below is filtered to {selectedFleet}</span>}
+          {selectedFleet && <span style={{ fontSize: 12, color: "#859195", marginLeft: 10 }}>Everything below is filtered to {selectedFleet}</span>}
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 14, marginBottom: 24 }}>
           <MetricCard label="Total assets" value={filteredAssets.length} icon={Truck} accentColor={NAVY} onClick={() => onNavigate?.("assets")} />
           <MetricCard label="Open work orders" value={filteredWorkOrders.filter((w) => w.status !== "Closed").length} icon={ClipboardList} accentColor="#8B5CF6" onClick={() => onNavigate?.("work_orders")} />
-          <MetricCard label="Open breakdowns" value={openBreakdownCount} icon={AlertTriangle} accentColor="#C0392B" onClick={() => onNavigate?.("breakdowns")} />
+          <MetricCard label="Open breakdowns" value={openBreakdownCount} icon={AlertTriangle} accentColor="#B85450" onClick={() => onNavigate?.("breakdowns")} />
           <MetricCard label="Services due soon / overdue" value={filteredPlannedMaintenance.filter((p) => p.status !== "OK").length} icon={CalendarClock} accentColor="#E8A33D" onClick={() => onNavigate?.("planned_maintenance")} />
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: NAVY }}>Currently in progress</h3>
-          <span style={{ fontSize: 11.5, color: "#898781" }}>Live as of {nowTick.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })} - updates automatically</span>
+          <span style={{ fontSize: 11.5, color: "#859195" }}>Live as of {nowTick.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })} - updates automatically</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
-          <div style={{ border: "1px solid #E4E2D8", borderRadius: 12, background: "#fff", overflow: "hidden" }}>
-            <div onClick={() => onNavigate?.("breakdowns")} style={{ padding: "10px 14px", background: "#FCEBEB", fontSize: 12.5, fontWeight: 700, color: "#791F1F", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ border: "1px solid #E2E6E3", borderRadius: 12, background: "#fff", overflow: "hidden" }}>
+            <div onClick={() => onNavigate?.("breakdowns")} style={{ padding: "10px 14px", background: "#F6E2E0", fontSize: 12.5, fontWeight: 700, color: "#7A3330", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span>Events - {inProgressBreakdowns.length} in progress</span>
               <ChevronRight size={14} />
             </div>
             {inProgressBreakdowns.length === 0 ? (
-              <p style={{ padding: 14, fontSize: 13, color: "#898781", margin: 0 }}>No open events right now.</p>
+              <p style={{ padding: 14, fontSize: 13, color: "#859195", margin: 0 }}>No open events right now.</p>
             ) : (
               inProgressBreakdowns.map((b, i) => {
-                const barColor = b.liveHours > 8 ? "#C0392B" : b.liveHours > 2 ? "#E8A33D" : "#5FBF8F";
+                const barColor = b.liveHours > 8 ? "#B85450" : b.liveHours > 2 ? "#E8A33D" : "#3F7D65";
                 const barPct = Math.min(100, ((b.liveHours || 0) / 24) * 100);
                 return (
                   <div key={b.id ?? i} onClick={() => onNavigate?.("breakdowns")} style={{ padding: "10px 14px", borderTop: i > 0 ? "1px solid #EFEEE7" : "none", cursor: "pointer" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                       <div style={{ minWidth: 0 }}>
-                        <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: "#2C2C2A" }}>{b.asset_id} - {b.component_affected || "-"}</p>
-                        <p style={{ fontSize: 11.5, color: "#898781", margin: "2px 0 0" }}>{b.cause_code || "No cause recorded"}</p>
+                        <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: "#183642" }}>{b.asset_id} - {b.component_affected || "-"}</p>
+                        <p style={{ fontSize: 11.5, color: "#859195", margin: "2px 0 0" }}>{b.cause_code || "No cause recorded"}</p>
                       </div>
                       <span style={{ fontSize: 13, fontWeight: 700, color: barColor, whiteSpace: "nowrap", marginLeft: 10 }}>{formatLiveHours(b.liveHours)}</span>
                     </div>
@@ -6690,13 +6693,13 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
             )}
           </div>
 
-          <div style={{ border: "1px solid #E4E2D8", borderRadius: 12, background: "#fff", overflow: "hidden" }}>
-            <div onClick={() => onNavigate?.("work_orders")} style={{ padding: "10px 14px", background: "#FAEEDA", fontSize: 12.5, fontWeight: 700, color: "#633806", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ border: "1px solid #E2E6E3", borderRadius: 12, background: "#fff", overflow: "hidden" }}>
+            <div onClick={() => onNavigate?.("work_orders")} style={{ padding: "10px 14px", background: "#F5E9D8", fontSize: 12.5, fontWeight: 700, color: "#7A5320", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span>Maintenance - {inProgressMaintenance.length} in progress</span>
               <ChevronRight size={14} />
             </div>
             {inProgressMaintenance.length === 0 ? (
-              <p style={{ padding: 14, fontSize: 13, color: "#898781", margin: 0 }}>No maintenance work in progress right now.</p>
+              <p style={{ padding: 14, fontSize: 13, color: "#859195", margin: 0 }}>No maintenance work in progress right now.</p>
             ) : (
               inProgressMaintenance.map((w, i) => {
                 const barPct = Math.min(100, ((w.liveHours || 0) / 24) * 100);
@@ -6704,10 +6707,10 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
                   <div key={w.id ?? i} onClick={() => onNavigate?.("work_orders")} style={{ padding: "10px 14px", borderTop: i > 0 ? "1px solid #EFEEE7" : "none", cursor: "pointer" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                       <div style={{ minWidth: 0 }}>
-                        <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: "#2C2C2A" }}>{w.asset_id} - {w.problem_scope || "-"}</p>
-                        <p style={{ fontSize: 11.5, color: "#898781", margin: "2px 0 0" }}>{w.technician_vendor || "Unassigned"} · {w.work_type}</p>
+                        <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: "#183642" }}>{w.asset_id} - {w.problem_scope || "-"}</p>
+                        <p style={{ fontSize: 11.5, color: "#859195", margin: "2px 0 0" }}>{w.technician_vendor || "Unassigned"} · {w.work_type}</p>
                       </div>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#633806", whiteSpace: "nowrap", marginLeft: 10 }}>{formatLiveHours(w.liveHours)}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#7A5320", whiteSpace: "nowrap", marginLeft: 10 }}>{formatLiveHours(w.liveHours)}</span>
                     </div>
                     <div style={{ background: "#F2F1EA", borderRadius: 6, height: 6 }}>
                       <div style={{ width: `${barPct}%`, background: "#E8A33D", height: 6, borderRadius: 6, transition: "width 0.4s" }} />
@@ -6762,9 +6765,9 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
           <div>
             <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 12px", color: NAVY }}>Availability by fleet, this month</h3>
             {monthKpiLoading ? (
-              <p style={{ fontSize: 13, color: "#898781" }}>Loading…</p>
+              <p style={{ fontSize: 13, color: "#859195" }}>Loading…</p>
             ) : fleetAvailability.length === 0 ? (
-              <p style={{ fontSize: 13, color: "#898781" }}>No hours logged yet this month.</p>
+              <p style={{ fontSize: 13, color: "#859195" }}>No hours logged yet this month.</p>
             ) : (
               <>
                 <KpiBarChart
@@ -6781,12 +6784,12 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
 
           <div>
             <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 12px", color: NAVY }}>Fleet status</h3>
-            <div onClick={() => onNavigate?.("assets")} style={{ height: 240, background: "#fff", border: "1px solid #E4E2D8", borderRadius: 12, padding: "8px 12px", cursor: "pointer" }}>
+            <div onClick={() => onNavigate?.("assets")} style={{ height: 240, background: "#fff", border: "1px solid #E2E6E3", borderRadius: 12, padding: "8px 12px", cursor: "pointer" }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={statusDistribution} dataKey="count" nameKey="status" cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={2}>
                     {statusDistribution.map((entry, i) => (
-                      <Cell key={entry.status} fill={STATUS_COLORS[entry.status] || "#D3D1C7"} />
+                      <Cell key={entry.status} fill={STATUS_COLORS[entry.status] || "#E2E6E3"} />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -6800,12 +6803,12 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 8 }}>
           <div>
             <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 12px", color: NAVY }}>Alerts</h3>
-            <div style={{ border: "1px solid #E4E2D8", borderRadius: 12, overflow: "hidden", background: "#fff" }}>
+            <div style={{ border: "1px solid #E2E6E3", borderRadius: 12, overflow: "hidden", background: "#fff" }}>
               {alertRows.map(([label, count, Icon, color, target], i) => (
                 <div key={label} onClick={() => onNavigate?.(target)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 14px", borderTop: i > 0 ? "1px solid #EFEEE7" : "none", cursor: "pointer" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <Icon size={15} style={{ color: count > 0 ? color : "#B4B2A9", flexShrink: 0 }} />
-                    <span style={{ fontSize: 13.5, color: "#2C2C2A" }}>{label}</span>
+                    <span style={{ fontSize: 13.5, color: "#183642" }}>{label}</span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <Badge value={count > 0 ? String(count) : "0"} />
@@ -6818,21 +6821,21 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
 
           <div>
             <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 12px", color: NAVY }}>Top problem equipment</h3>
-            <div style={{ border: "1px solid #E4E2D8", borderRadius: 12, background: "#fff", padding: "14px 16px" }}>
+            <div style={{ border: "1px solid #E2E6E3", borderRadius: 12, background: "#fff", padding: "14px 16px" }}>
               {topProblemEquipment.length === 0 ? (
-                <p style={{ fontSize: 13, color: "#898781", margin: 0 }}>No breakdowns logged yet.</p>
+                <p style={{ fontSize: 13, color: "#859195", margin: 0 }}>No breakdowns logged yet.</p>
               ) : (
                 topProblemEquipment.map((p, pi) => (
                   <div key={p.asset_id} onClick={() => onNavigate?.("breakdowns")} style={{ marginBottom: pi < topProblemEquipment.length - 1 ? 16 : 0, cursor: "pointer" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
-                      <span style={{ color: "#2C2C2A", fontWeight: 700 }}>{p.asset_id} - {p.name}</span>
-                      <span style={{ color: "#5F5E5A" }}>{p.totalCount} breakdown{p.totalCount === 1 ? "" : "s"} · {p.totalHours.toFixed(1)} hrs total</span>
+                      <span style={{ color: "#183642", fontWeight: 700 }}>{p.asset_id} - {p.name}</span>
+                      <span style={{ color: "#4B5659" }}>{p.totalCount} breakdown{p.totalCount === 1 ? "" : "s"} · {p.totalHours.toFixed(1)} hrs total</span>
                     </div>
                     <div style={{ background: "#F2F1EA", borderRadius: 6, height: 8, marginBottom: 8 }}>
-                      <div style={{ width: `${(p.totalCount / maxProblemCount) * 100}%`, background: "#C0392B", height: 8, borderRadius: 6 }} />
+                      <div style={{ width: `${(p.totalCount / maxProblemCount) * 100}%`, background: "#B85450", height: 8, borderRadius: 6 }} />
                     </div>
                     {p.entries.map((e) => (
-                      <div key={e.type} style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, color: "#5F5E5A", padding: "2px 0 2px 10px" }}>
+                      <div key={e.type} style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, color: "#4B5659", padding: "2px 0 2px 10px" }}>
                         <span>· {e.type} ({e.count}×)</span>
                         <span>{e.hours.toFixed(1)} hrs</span>
                       </div>
@@ -7075,7 +7078,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
       <style>{`
         html, body { overflow-x: hidden; max-width: 100%; }
         .nav-item:hover { background: rgba(255,255,255,0.08) !important; color: #fff !important; }
-        tbody tr:hover td { background: #F7F6F1; }
+        tbody tr:hover td { background: #F7F8F6; }
         button:not(:disabled):hover { filter: brightness(0.96); }
         button:disabled { cursor: default; }
         input:focus, select:focus, textarea:focus { outline: none; border-color: #3DA35D !important; box-shadow: 0 0 0 3px rgba(61,163,93,0.15); }
@@ -7104,7 +7107,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
       <div
         style={{
           width: sidebarWidth,
-          background: NAVY,
+          background: SIDEBAR,
           transition: "width 0.15s, transform 0.2s",
           display: "flex",
           flexDirection: "column",
@@ -7171,8 +7174,8 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
               title={label}
               style={{
                 display: "flex", alignItems: "center", gap: 10, padding: isMobile ? "12px 16px" : "9px 16px", margin: "1px 8px", borderRadius: 8,
-                background: active === key ? "rgba(255,255,255,0.12)" : "transparent",
-                border: "none", color: active === key ? "#fff" : "rgba(255,255,255,0.72)",
+                background: active === key ? ACCENT : "transparent",
+                border: "none", color: active === key ? "#fff" : "rgba(241,245,244,0.75)",
                 cursor: "pointer", fontSize: 14, textAlign: "left", justifyContent: sidebarOpen ? "flex-start" : "center",
                 width: sidebarOpen ? "calc(100% - 16px)" : "auto", minHeight: 40,
               }}
@@ -7189,7 +7192,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
               {sidebarOpen ? (
                 <button
                   onClick={() => setBacklogsExpanded((v) => !v)}
-                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, width: "calc(100% - 16px)", background: "transparent", border: "none", cursor: "pointer", padding: isMobile ? "12px 16px" : "9px 16px", margin: "1px 8px", borderRadius: 8, color: "rgba(255,255,255,0.72)" }}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, width: "calc(100% - 16px)", background: "transparent", border: "none", cursor: "pointer", padding: isMobile ? "12px 16px" : "9px 16px", margin: "1px 8px", borderRadius: 8, color: "rgba(241,245,244,0.75)" }}
                 >
                   <span style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14 }}>
                     <AlertTriangle size={16} style={{ flexShrink: 0 }} />
@@ -7211,8 +7214,8 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
                     padding: isMobile ? "12px 16px" : "9px 16px",
                     paddingLeft: sidebarOpen ? 30 : (isMobile ? 16 : 9),
                     margin: "1px 8px", borderRadius: 8,
-                    background: active === key ? "rgba(255,255,255,0.12)" : "transparent",
-                    border: "none", color: active === key ? "#fff" : "rgba(255,255,255,0.72)",
+                    background: active === key ? ACCENT : "transparent",
+                    border: "none", color: active === key ? "#fff" : "rgba(241,245,244,0.75)",
                     cursor: "pointer", fontSize: 13.5, textAlign: "left", justifyContent: sidebarOpen ? "flex-start" : "center",
                     width: sidebarOpen ? "calc(100% - 16px)" : "auto", minHeight: 38,
                   }}
@@ -7232,7 +7235,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
 
           <button
             onClick={() => supabase.auth.signOut()}
-            style={{ display: "flex", alignItems: "center", gap: 10, padding: isMobile ? "12px 16px" : "9px 16px", margin: "12px 8px 8px", borderRadius: 8, background: "transparent", border: "none", color: "rgba(255,255,255,0.72)", fontSize: 14, cursor: "pointer", minHeight: 40, justifyContent: sidebarOpen ? "flex-start" : "center" }}
+            style={{ display: "flex", alignItems: "center", gap: 10, padding: isMobile ? "12px 16px" : "9px 16px", margin: "12px 8px 8px", borderRadius: 8, background: "transparent", border: "none", color: "rgba(241,245,244,0.75)", fontSize: 14, cursor: "pointer", minHeight: 40, justifyContent: sidebarOpen ? "flex-start" : "center" }}
           >
             <LogOut size={16} style={{ flexShrink: 0 }} />
             {sidebarOpen && <span>Sign out</span>}
@@ -7243,7 +7246,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
         {/* Mobile top bar */}
         {isMobile && (
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: "1px solid #E4E2D8", position: "sticky", top: 0, background: "#fff", zIndex: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: "1px solid #E2E6E3", position: "sticky", top: 0, background: "#fff", zIndex: 10 }}>
             <button onClick={() => setSidebarOpen(true)} aria-label="Open menu" style={{ background: "none", border: "none", color: NAVY, cursor: "pointer", padding: 6, display: "flex" }}>
               <Menu size={20} />
             </button>
@@ -7261,7 +7264,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
           )}
 
           {(coreError || restError) && (
-            <div style={{ background: "#FCEBEB", border: "1px solid #E3A8A8", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#791F1F" }}>
+            <div style={{ background: "#F6E2E0", border: "1px solid #DDB6B2", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#7A3330" }}>
               Couldn't load live data from Supabase: {coreError || restError}. Check your .env values and that the SQL files ran successfully.
             </div>
           )}
@@ -7270,15 +7273,15 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
             {active === "about" ? (
               <AboutPage />
             ) : !selectedSiteId ? (
-              <div style={{ background: "#FAEEDA", border: "1px solid #EBCA95", borderRadius: 10, padding: 24, textAlign: "center" }}>
-                <p style={{ fontWeight: 700, fontSize: 14, color: "#633806", margin: "0 0 6px" }}>No site selected</p>
-                <p style={{ fontSize: 13, color: "#633806", margin: 0 }}>
+              <div style={{ background: "#F5E9D8", border: "1px solid #E3C79B", borderRadius: 10, padding: 24, textAlign: "center" }}>
+                <p style={{ fontWeight: 700, fontSize: 14, color: "#7A5320", margin: "0 0 6px" }}>No site selected</p>
+                <p style={{ fontSize: 13, color: "#7A5320", margin: 0 }}>
                   Either your account has no site access yet, or App.jsx and EngineeringApp.jsx are from different versions - make sure both files were updated together.
                 </p>
               </div>
             ) : (coreLoading && ["dashboard", "fleet_performance", "assets", "daily_hours", "breakdowns", "downtime_summary"].includes(active)) ||
              (restLoading && ["dashboard", "fuel_log", "oil_consumption", "work_orders", "downtime_summary", "planned_maintenance", "inspections", "components", "tyres", "parts", "warranty_docs", "audit", "backlog_report", "daily_service", "breakdowns"].includes(active)) ? (
-              <p style={{ fontSize: 13, color: "#898781" }}>Loading…</p>
+              <p style={{ fontSize: 13, color: "#859195" }}>Loading…</p>
             ) : active === "dashboard" ? (
               <Dashboard assets={assets} breakdowns={breakdowns} workOrders={workOrders} plannedMaintenance={plannedMaintenance} components={components} parts={parts} inspections={inspections} onNavigate={setActive} />
             ) : active === "fleet_performance" ? (

@@ -115,12 +115,12 @@ export default function App() {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: "-apple-system, sans-serif", padding: 24 }}>
         <div style={{ textAlign: "center", maxWidth: 380 }}>
-          <p style={{ fontSize: 16, fontWeight: 700, color: "#3DA35D", marginBottom: 8 }}>No site access yet</p>
-          <p style={{ fontSize: 14, color: "#5F5E5A", marginBottom: 4 }}>Your account isn't linked to any site yet. Ask your administrator to grant you access.</p>
-          <p style={{ fontSize: 12.5, color: "#898781", marginBottom: 20 }}>Signed in as {session.user.email}</p>
+          <p style={{ fontSize: 16, fontWeight: 700, color: "#1F6668", marginBottom: 8 }}>No site access yet</p>
+          <p style={{ fontSize: 14, color: "#4B5659", marginBottom: 4 }}>Your account isn't linked to any site yet. Ask your administrator to grant you access.</p>
+          <p style={{ fontSize: 12.5, color: "#859195", marginBottom: 20 }}>Signed in as {session.user.email}</p>
           <button
             onClick={() => supabase.auth.signOut()}
-            style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 18px", borderRadius: 8, fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}
+            style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 18px", borderRadius: 8, fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}
           >
             Sign out
           </button>
