@@ -3768,55 +3768,37 @@ function MtbfMttrReportPage({ assets }) {
       <DateRangePicker fromDateTime={fromDateTime} toDateTime={toDateTime} setFromDateTime={setFromDateTime} setToDateTime={setToDateTime} />
       <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
 
-      {!loading && rows.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16, marginBottom: 24 }}>
-          <div>
-            <h4 style={{ fontSize: 13.5, fontWeight: 700, margin: "0 0 8px", color: NAVY }}>MTBF by equipment (hrs)</h4>
-            <div style={{ height: 200, background: "#fff", border: "1px solid #E4E2D8", borderRadius: 10, padding: "10px 8px 0" }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={rows} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" vertical={false} />
-                  <XAxis dataKey="asset_id" tick={{ fontSize: 10.5, fill: "#5F5E5A" }} axisLine={{ stroke: "#E4E2D8" }} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: "#5F5E5A" }} axisLine={false} tickLine={false} />
-                  <Tooltip formatter={(v) => `${Number(v).toFixed(1)} hrs`} />
-                  <Bar dataKey="mtbf" fill="#5FBF8F" radius={[4, 4, 0, 0]} />
-                  <ReferenceLine y={40} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 40", position: "top", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+      {!loading && rows.length > 0 && (() => {
+        const mtbfTarget = 40, mttrTarget = 4, utilTarget = 85;
+        const mtbfMax = Math.max(mtbfTarget, ...rows.map((r) => r.mtbf || 0)) * 1.15;
+        const mttrMax = Math.max(mttrTarget, ...rows.map((r) => r.mttr || 0)) * 1.15;
+        const utilRows = rows.map((r) => ({ ...r, utilisationPct: r.utilisation != null ? Math.round(r.utilisation * 100) : null }));
+        return (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16, marginBottom: 8 }}>
+            <KpiBarChart
+              title="MTBF by equipment (hrs)" data={rows} xKey="asset_id" dataKey="mtbf"
+              target={mtbfTarget} domainMax={mtbfMax} unitSuffix="h"
+              valueFormatter={(v) => Number(v).toFixed(1)}
+              meetsTarget={(r) => (r.mtbf || 0) >= mtbfTarget}
+            />
+            <KpiBarChart
+              title="MTTR by equipment (hrs)" data={rows} xKey="asset_id" dataKey="mttr"
+              target={mttrTarget} domainMax={mttrMax} unitSuffix="h"
+              valueFormatter={(v) => Number(v).toFixed(1)}
+              meetsTarget={(r) => (r.mttr || 0) <= mttrTarget}
+            />
+            <KpiBarChart
+              title="Utilisation by equipment" data={utilRows} xKey="asset_id" dataKey="utilisationPct"
+              target={utilTarget} domainMax={100} unitSuffix="%"
+              valueFormatter={(v) => `${v}%`}
+              meetsTarget={(r) => (r.utilisationPct || 0) >= utilTarget}
+            />
           </div>
-          <div>
-            <h4 style={{ fontSize: 13.5, fontWeight: 700, margin: "0 0 8px", color: NAVY }}>MTTR by equipment (hrs)</h4>
-            <div style={{ height: 200, background: "#fff", border: "1px solid #E4E2D8", borderRadius: 10, padding: "10px 8px 0" }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={rows} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" vertical={false} />
-                  <XAxis dataKey="asset_id" tick={{ fontSize: 10.5, fill: "#5F5E5A" }} axisLine={{ stroke: "#E4E2D8" }} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: "#5F5E5A" }} axisLine={false} tickLine={false} />
-                  <Tooltip formatter={(v) => `${Number(v).toFixed(1)} hrs`} />
-                  <Bar dataKey="mttr" fill="#E8734A" radius={[4, 4, 0, 0]} />
-                  <ReferenceLine y={4} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 4", position: "top", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-          <div>
-            <h4 style={{ fontSize: 13.5, fontWeight: 700, margin: "0 0 8px", color: NAVY }}>Utilisation by equipment</h4>
-            <div style={{ height: 200, background: "#fff", border: "1px solid #E4E2D8", borderRadius: 10, padding: "10px 8px 0" }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={rows.map((r) => ({ ...r, utilisationPct: r.utilisation != null ? Math.round(r.utilisation * 100) : null }))} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" vertical={false} />
-                  <XAxis dataKey="asset_id" tick={{ fontSize: 10.5, fill: "#5F5E5A" }} axisLine={{ stroke: "#E4E2D8" }} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: "#5F5E5A" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
-                  <Tooltip formatter={(v) => `${v}%`} />
-                  <Bar dataKey="utilisationPct" fill="#2E86AB" radius={[4, 4, 0, 0]} />
-                  <ReferenceLine y={85} stroke="#791F1F" strokeDasharray="4 4" label={{ value: "Target: 85%", position: "top", fill: "#791F1F", fontSize: 10.5, fontWeight: 700 }} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+          <KpiLegend targetLabel="Target" />
         </div>
-      )}
+        );
+      })()}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <p style={{ fontSize: 13, color: "#5F5E5A", margin: 0 }}>
@@ -5468,7 +5450,7 @@ function PartsPage({ parts, selectedSiteId, onRefresh }) {
       </div>
 
       {subTab === "quotes" ? (
-        <QuotePriceListPage selectedSiteId={selectedSiteId} />
+        <QuotePriceListPage selectedSiteId={selectedSiteId} parts={parts} />
       ) : (
       <>
       {importMessage && (
@@ -5558,10 +5540,12 @@ function fileToBase64(file) {
   });
 }
 
-function QuotePriceListPage({ selectedSiteId }) {
+function QuotePriceListPage({ selectedSiteId, parts }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [partNoFilter, setPartNoFilter] = useState("");
+  const [supplierFilter, setSupplierFilter] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState("");
@@ -5582,11 +5566,36 @@ function QuotePriceListPage({ selectedSiteId }) {
 
   useEffect(() => { load(); }, [load]);
 
+  // Keyed by part number (case/space-insensitive) so a quote line can be
+  // matched against the site's current stock regardless of minor
+  // formatting differences in how each was typed/read.
+  const stockByPartNo = useMemo(() => {
+    const map = new Map();
+    parts.forEach((p) => {
+      if (p.part_no) map.set(String(p.part_no).trim().toLowerCase(), p);
+    });
+    return map;
+  }, [parts]);
+  const stockFor = (partNo) => (partNo ? stockByPartNo.get(String(partNo).trim().toLowerCase()) : null);
+
+  const supplierOptions = useMemo(
+    () => [...new Set(rows.map((r) => r.supplier).filter(Boolean))].sort(),
+    [rows]
+  );
+
   const filtered = useMemo(() => {
-    if (!query.trim()) return rows;
-    const q = query.toLowerCase();
-    return rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q)));
-  }, [rows, query]);
+    let out = rows;
+    if (partNoFilter.trim()) {
+      const p = partNoFilter.trim().toLowerCase();
+      out = out.filter((r) => String(r.part_no ?? "").toLowerCase().includes(p));
+    }
+    if (supplierFilter) out = out.filter((r) => r.supplier === supplierFilter);
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      out = out.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q)));
+    }
+    return out;
+  }, [rows, query, partNoFilter, supplierFilter]);
 
   const processFile = async (file) => {
     if (!file) return;
@@ -5713,18 +5722,20 @@ function QuotePriceListPage({ selectedSiteId }) {
       {review && (
         <div style={{ border: "1px solid #E4E2D8", borderRadius: 10, padding: 16, marginBottom: 20, background: "#fff" }}>
           <p style={{ fontSize: 13.5, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>Review before saving</p>
-          <p style={{ fontSize: 12, color: "#898781", margin: "0 0 14px" }}>Check what Claude read off the quote - fix anything that's wrong, remove lines that shouldn't be there, then save.</p>
+          <p style={{ fontSize: 12, color: "#898781", margin: "0 0 14px" }}>Check what Claude read off the quote - fix anything that's wrong, remove lines that shouldn't be there, then save. Lines flagged "In stock" already have some on hand - worth checking before ordering more.</p>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ background: "#F7F6F1" }}>
-                  {["Supplier", "Part", "Part number", "Price", ""].map((h) => (
+                  {["Supplier", "Part", "Part number", "Price", "Stock", ""].map((h) => (
                     <th key={h} style={{ textAlign: "left", padding: "7px 8px", fontWeight: 600, color: "#5F5E5A", fontSize: 12 }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {review.items.map((row, i) => (
+                {review.items.map((row, i) => {
+                  const stock = stockFor(row.part_no);
+                  return (
                   <tr key={i}>
                     {["supplier", "part_description", "part_no", "price"].map((field) => (
                       <td key={field} style={{ padding: "4px 8px" }}>
@@ -5736,13 +5747,23 @@ function QuotePriceListPage({ selectedSiteId }) {
                         />
                       </td>
                     ))}
+                    <td style={{ padding: "4px 8px", whiteSpace: "nowrap" }}>
+                      {stock ? (
+                        <span title={`Already have ${stock.qty_in_stock ?? 0} of ${stock.part_no} in stock`} style={{ fontSize: 10.5, fontWeight: 700, color: "#B87F1F", background: "#FCE9C8", padding: "3px 8px", borderRadius: 6 }}>
+                          In stock: {stock.qty_in_stock ?? 0}
+                        </span>
+                      ) : row.part_no ? (
+                        <span style={{ fontSize: 11, color: "#B4B2A9" }}>Not in inventory</span>
+                      ) : null}
+                    </td>
                     <td style={{ padding: "4px 8px" }}>
                       <button type="button" onClick={() => removeReviewRow(i)} style={{ background: "none", border: "none", color: "#C0392B", cursor: "pointer", padding: 4, display: "flex" }}>
                         <Trash2 size={14} />
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -5762,10 +5783,22 @@ function QuotePriceListPage({ selectedSiteId }) {
         </div>
       )}
 
-      <div style={{ position: "relative", maxWidth: 280, marginBottom: 12 }}>
-        <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#898781" }} />
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search price list"
-          style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, outline: "none", boxSizing: "border-box" }} />
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+        <div style={{ position: "relative", flex: 1, minWidth: 200, maxWidth: 280 }}>
+          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#898781" }} />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search price list"
+            style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, outline: "none", boxSizing: "border-box" }} />
+        </div>
+        <input
+          value={partNoFilter}
+          onChange={(e) => setPartNoFilter(e.target.value)}
+          placeholder="Filter by part number"
+          style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, outline: "none", minWidth: 180 }}
+        />
+        <select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)} style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8 }}>
+          <option value="">All suppliers</option>
+          {supplierOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
       </div>
 
       <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
@@ -5775,28 +5808,39 @@ function QuotePriceListPage({ selectedSiteId }) {
               {columns.map(([key, label]) => (
                 <th key={key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>{label}</th>
               ))}
+              <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>Current stock</th>
               <th style={{ borderBottom: "1px solid #E4E2D8" }}></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#898781" }}>Loading…</td></tr>
+              <tr><td colSpan={columns.length + 2} style={{ padding: 20, textAlign: "center", color: "#898781" }}>Loading…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#898781" }}>
-                {rows.length === 0 ? "No quotes added yet - drag one in above to get started." : "No entries match your search."}
+              <tr><td colSpan={columns.length + 2} style={{ padding: 20, textAlign: "center", color: "#898781" }}>
+                {rows.length === 0 ? "No quotes added yet - drag one in above to get started." : "No entries match your filters."}
               </td></tr>
-            ) : filtered.map((row, i) => (
+            ) : filtered.map((row, i) => {
+              const stock = stockFor(row.part_no);
+              return (
               <tr key={row.id ?? i} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none" }}>
                 <td style={{ padding: "9px 12px" }}>{row.supplier || <span style={{ color: "#B4B2A9" }}>-</span>}</td>
                 <td style={{ padding: "9px 12px" }}>{row.part_description || <span style={{ color: "#B4B2A9" }}>-</span>}</td>
                 <td style={{ padding: "9px 12px" }}>{row.part_no || <span style={{ color: "#B4B2A9" }}>-</span>}</td>
                 <td style={{ padding: "9px 12px" }}>{row.price != null ? Number(row.price).toFixed(2) : <span style={{ color: "#B4B2A9" }}>-</span>}</td>
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{row.price_date}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
+                  {stock ? (
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: "#B87F1F", background: "#FCE9C8", padding: "3px 8px", borderRadius: 6 }}>
+                      {stock.qty_in_stock ?? 0} in stock
+                    </span>
+                  ) : <span style={{ color: "#B4B2A9" }}>-</span>}
+                </td>
                 <td style={{ padding: "9px 12px" }}>
                   {row.quote_document_path && <QuoteDocLink path={row.quote_document_path} />}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
