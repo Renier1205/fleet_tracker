@@ -2688,7 +2688,6 @@ function BacklogForm({ assets, workOrders, existing, userEmail, onClose, onSaved
   const isEdit = !!existing;
   const [assetId, setAssetId] = useState(existing?.asset_id || assets[0]?.asset_id || "");
   const [sourceType, setSourceType] = useState(existing?.source_type || "daily_service");
-  const [workOrderId, setWorkOrderId] = useState(existing?.work_order_id || "");
   const [componentCode, setComponentCode] = useState(existing?.component_code || "");
   const [description, setDescription] = useState(existing?.description || "");
   const [priority, setPriority] = useState(existing?.priority || "Medium");
@@ -2719,18 +2718,41 @@ function BacklogForm({ assets, workOrders, existing, userEmail, onClose, onSaved
     setError("");
     if (!description.trim()) { setError("Enter a description."); return; }
     setSaving(true);
-    const payload = {
-      asset_id: assetId,
-      source_type: sourceType,
-      work_order_id: workOrderId || null,
-      component_code: componentCode || null,
-      description: description.trim(),
-      priority,
-      status,
-      date_notified: dateNotified,
-      closed_date: status === "Closed" ? (existing?.closed_date || todayForInput()) : null,
-    };
     try {
+      let woId = existing?.work_order_id || null;
+
+      // Every backlog item gets its own Work Order, auto-numbered the
+      // same way as everywhere else in the app - not linked to an
+      // existing one, so whoever's fixing it has a number to quote for
+      // parts regardless of where the backlog came from. Only created
+      // once, on first save - editing an existing item never creates a
+      // second one.
+      if (!isEdit) {
+        const { data: newWo, error: woErr } = await supabase.from("work_orders").insert({
+          asset_id: assetId,
+          work_type: "Corrective",
+          priority,
+          problem_scope: description.trim(),
+          component: componentCode || null,
+          status: "Open",
+          request_date: todayForInput(),
+        }).select().single();
+        if (woErr) throw woErr;
+        woId = newWo.id;
+      }
+
+      const payload = {
+        asset_id: assetId,
+        source_type: sourceType,
+        work_order_id: woId,
+        component_code: componentCode || null,
+        description: description.trim(),
+        priority,
+        status,
+        date_notified: dateNotified,
+        closed_date: status === "Closed" ? (existing?.closed_date || todayForInput()) : null,
+      };
+
       const { error: dbError } = isEdit
         ? await supabase.from("backlogs").update(payload).eq("id", existing.id)
         : await supabase.from("backlogs").insert(payload);
@@ -2753,7 +2775,7 @@ function BacklogForm({ assets, workOrders, existing, userEmail, onClose, onSaved
 
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Equipment</label>
-          <select value={assetId} onChange={(e) => { setAssetId(e.target.value); setWorkOrderId(""); }} required style={fieldStyle}>
+          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required style={fieldStyle}>
             {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
           </select>
         </div>
@@ -2771,15 +2793,10 @@ function BacklogForm({ assets, workOrders, existing, userEmail, onClose, onSaved
           </div>
         </div>
 
-        {sourceType === "service_card" && (
-          <div style={{ marginBottom: 12 }}>
-            <label style={labelStyle}>Work Order # (optional - the scanned card this came from)</label>
-            <select value={workOrderId} onChange={(e) => setWorkOrderId(e.target.value)} style={fieldStyle}>
-              <option value="">- None -</option>
-              {woOptionsForAsset.map((w) => <option key={w.id} value={w.id}>{w.wo_no}</option>)}
-            </select>
-          </div>
-        )}
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Work Order #</label>
+          <input type="text" value={existing?.work_order_id ? (woOptionsForAsset.find((w) => w.id === existing.work_order_id)?.wo_no || "Assigned") : "Generated automatically on save"} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#4B5659" }} />
+        </div>
 
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Component Code</label>
