@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
-const NAVY = "#02487D";
-const GREEN = "#5FBF8F";
+const NAVY = "#3DA35D";
+const GREEN = "#F4801F";
 
 export default function Login() {
   const [email, setEmail] = useState("");

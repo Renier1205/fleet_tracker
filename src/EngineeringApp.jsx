@@ -11,8 +11,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ReferenceLine, LabelList,
 } from "recharts";
 
-const NAVY = "#02487D";
-const GREEN = "#5FBF8F";
+const NAVY = "#3DA35D";
+const GREEN = "#F4801F";
 const MOBILE_BREAKPOINT = 720;
 
 function useIsMobile() {
@@ -7078,7 +7078,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
         tbody tr:hover td { background: #F7F6F1; }
         button:not(:disabled):hover { filter: brightness(0.96); }
         button:disabled { cursor: default; }
-        input:focus, select:focus, textarea:focus { outline: none; border-color: #02487D !important; box-shadow: 0 0 0 3px rgba(2,72,125,0.12); }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #3DA35D !important; box-shadow: 0 0 0 3px rgba(61,163,93,0.15); }
         /* Momentum scrolling for the horizontally-scrollable tables/grids
            throughout the app, so dragging a wide table sideways on an
            iPhone/iPad feels native rather than sluggish. */
