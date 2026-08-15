@@ -1090,12 +1090,12 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
 }
 
 
-function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrders, parts, onRefresh }) {
-  const [assetId, setAssetId] = useState(existing?.asset_id || assets[0]?.asset_id || "");
+function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved, userEmail, workOrders, parts, onRefresh }) {
+  const [assetId, setAssetId] = useState(existing?.asset_id || activatingWorkOrder?.asset_id || assets[0]?.asset_id || "");
   const [causeCode, setCauseCode] = useState(existing?.cause_code || CAUSE_CODES[0]);
   const [severity, setSeverity] = useState(existing?.severity || "Medium");
-  const [componentAffected, setComponentAffected] = useState(existing?.component_affected || "");
-  const [description, setDescription] = useState(existing?.description || "");
+  const [componentAffected, setComponentAffected] = useState(existing?.component_affected || activatingWorkOrder?.component || "");
+  const [description, setDescription] = useState(existing?.description || activatingWorkOrder?.problem_scope || "");
   const [status, setStatus] = useState(existing?.repair_status || "In Progress");
   const [downtimeStart, setDowntimeStart] = useState(
     existing?.downtime_start ? isoToInputValue(existing.downtime_start) : nowForInput()
@@ -1241,6 +1241,22 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
         // is what lets a Work Order (and parts against it) be added right
         // away, in the same session, instead of having to reopen it.
         setSavedRecord(data);
+
+        // This event was created by booking down a scheduled Planned
+        // Maintenance job, not logged from scratch - link that same Work
+        // Order to the new event and stamp its actual start, so what was
+        // a placeholder row in the Events list becomes this real one,
+        // with the Work Order now showing up under Linked Work Orders.
+        if (activatingWorkOrder) {
+          const { error: linkErr } = await supabase.from("work_orders")
+            .update({
+              event_id: data.id,
+              actual_start: startDate.toISOString(),
+              status: (activatingWorkOrder.status === "Open" || activatingWorkOrder.status === "Planned") ? "In Progress" : activatingWorkOrder.status,
+            })
+            .eq("id", activatingWorkOrder.id);
+          if (linkErr) throw linkErr;
+        }
       }
 
       // Opt-in - ticking this pulls the event straight through to the
@@ -1272,8 +1288,14 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
       <form onSubmit={handleSubmit} style={{ background: "#fff", borderRadius: 12, padding: 24, width: 560, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto" }}>
         <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 16px" }}>
-          {hasSavedRecord ? "Edit Event" : "Log Event"}
+          {hasSavedRecord ? "Edit Event" : activatingWorkOrder ? "Book Machine Down" : "Log Event"}
         </h3>
+
+        {activatingWorkOrder && !hasSavedRecord && (
+          <p style={{ fontSize: 12.5, color: "#633806", background: "#FCE9C8", border: "1px solid #E8A33D", borderRadius: 8, padding: "8px 10px", margin: "0 0 16px" }}>
+            This was scheduled as {activatingWorkOrder.wo_no}. Confirm the details below to book it down as a real event - the Work Order stays linked, now with its actual start time.
+          </p>
+        )}
 
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Equipment</label>
@@ -1361,7 +1383,7 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
             {hasSavedRecord ? "Close" : "Cancel"}
           </button>
           <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
-            {saving ? "Saving…" : hasSavedRecord ? "Save Changes" : "Log Event"}
+            {saving ? "Saving…" : hasSavedRecord ? "Save Changes" : activatingWorkOrder ? "Book Machine Down" : "Log Event"}
           </button>
         </div>
 
@@ -1382,6 +1404,7 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
 function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, parts }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [activating, setActivating] = useState(null); // scheduled Work Order being booked down
   const [query, setQuery] = useState("");
   const [deleting, setDeleting] = useState(null); // row pending delete confirmation
   const [selectedFleet, setSelectedFleet] = useState("");
@@ -1416,8 +1439,32 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
     else { setSortKey(key); setSortDir("asc"); }
   };
 
+  // Planned Maintenance Work Orders that have a planned date but haven't
+  // been booked down yet - shown as placeholder rows so they're visible
+  // in the Events list ahead of time, same idea as the Timeline markers.
+  // Shaped with the same field names as a real breakdown_log row so all
+  // the existing column/sort/render logic below just works unmodified.
+  const scheduledRows = useMemo(() => workOrders
+    .filter((w) => w.work_type === "Preventive" && !w.actual_start && w.planned_start && !w.event_id)
+    .map((w) => ({
+      id: `sched-${w.id}`,
+      isScheduledPlaceholder: true,
+      sourceWorkOrder: w,
+      asset_id: w.asset_id,
+      component_affected: w.component || "Planned Service",
+      cause_code: null,
+      description: w.problem_scope || "",
+      wo_reference: w.wo_no,
+      downtime_start: w.planned_start,
+      downtime_end: null,
+      downtime_hours: null,
+      repair_status: "Planned",
+    })), [workOrders]);
+
+  const allRows = useMemo(() => [...breakdowns, ...scheduledRows], [breakdowns, scheduledRows]);
+
   const filtered = useMemo(() => {
-    let rows = breakdowns;
+    let rows = allRows;
     if (selectedAsset) {
       rows = rows.filter((r) => r.asset_id === selectedAsset);
     } else if (selectedFleet) {
@@ -1436,11 +1483,12 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
       if (va > vb) return sortDir === "asc" ? 1 : -1;
       return 0;
     });
-  }, [breakdowns, assets, query, selectedFleet, selectedAsset, sortKey, sortDir]);
+  }, [allRows, assets, query, selectedFleet, selectedAsset, sortKey, sortDir]);
 
   const handleSaved = () => {
     setShowForm(false);
     setEditing(null);
+    setActivating(null);
     onRefresh();
   };
 
@@ -1455,8 +1503,8 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
     const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
     const headerRow = columns.map((c) => c.label);
     const dataRows = filtered.map((row) => columns.map((c) =>
-      c.key === "downtime_start" ? formatDateTime(row.downtime_start)
-      : c.key === "downtime_end" ? (formatDateTime(row.downtime_end) || "Still down")
+      c.key === "downtime_start" ? formatDateTime(row.downtime_start) + (row.isScheduledPlaceholder ? " (planned)" : "")
+      : c.key === "downtime_end" ? (formatDateTime(row.downtime_end) || (row.isScheduledPlaceholder ? "Not booked down" : "Still down"))
       : (row[c.key] ?? "")
     ));
     const aoa = [["Events"], [`Exported: ${timestamp}`], [], headerRow, ...dataRows];
@@ -1492,7 +1540,7 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
             <Download size={14} /> Export to Excel
           </button>
           <button
-            onClick={() => { setEditing(null); setShowForm(true); }}
+            onClick={() => { setEditing(null); setActivating(null); setShowForm(true); }}
             style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}
           >
             + Log Event
@@ -1523,16 +1571,20 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
           <tbody>
             {filtered.map((row, i) => {
               const isRepeat = (row.repeat_count ?? 0) >= 2;
+              const openRow = () => {
+                if (row.isScheduledPlaceholder) { setActivating(row.sourceWorkOrder); setShowForm(true); }
+                else { setEditing(row); setShowForm(true); }
+              };
               return (
                 <tr
                   key={row.id ?? i}
-                  style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none", background: isRepeat ? "#FAEEDA" : "transparent" }}
+                  style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none", background: row.isScheduledPlaceholder ? "#FFF8EB" : isRepeat ? "#FAEEDA" : "transparent" }}
                 >
                   {columns.map((c) => (
-                    <td key={c.key} onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>
+                    <td key={c.key} onClick={openRow} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>
                       {c.key === "repair_status" ? <Badge value={row[c.key]} />
-                        : c.key === "downtime_start" ? formatDateTime(row.downtime_start)
-                        : c.key === "downtime_end" ? (formatDateTime(row.downtime_end) || <span style={{ color: "#B4B2A9" }}>Still down</span>)
+                        : c.key === "downtime_start" ? (row.isScheduledPlaceholder ? `${formatDateTime(row.downtime_start)} (planned)` : formatDateTime(row.downtime_start))
+                        : c.key === "downtime_end" ? (formatDateTime(row.downtime_end) || <span style={{ color: "#B4B2A9" }}>{row.isScheduledPlaceholder ? "Not booked down" : "Still down"}</span>)
                         : c.key === "component_affected" && isRepeat ? (
                           <span title={`${row.repeat_count} breakdowns on this component for this machine`} style={{ display: "flex", alignItems: "center", gap: 5 }}>
                             {row[c.key] || <span style={{ color: "#B4B2A9" }}>-</span>}
@@ -1543,16 +1595,22 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
                     </td>
                   ))}
                   <td style={{ padding: "9px 12px" }}>
-                    <button onClick={() => setDeleting(row)} title="Delete this entry" style={{ background: "none", border: "none", color: "#C0392B", cursor: "pointer", padding: 4, display: "flex" }}>
-                      <Trash2 size={15} />
-                    </button>
+                    {row.isScheduledPlaceholder ? (
+                      <span title="Scheduled from Planned Maintenance - manage or remove it from that tab" style={{ fontSize: 10.5, fontWeight: 700, color: "#B87F1F", background: "#FCE9C8", padding: "3px 8px", borderRadius: 6, whiteSpace: "nowrap" }}>
+                        SCHEDULED
+                      </span>
+                    ) : (
+                      <button onClick={() => setDeleting(row)} title="Delete this entry" style={{ background: "none", border: "none", color: "#C0392B", cursor: "pointer", padding: 4, display: "flex" }}>
+                        <Trash2 size={15} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               );
             })}
             {filtered.length === 0 && (
               <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#898781" }}>
-                {breakdowns.length === 0 ? "No events logged yet." : "No events match your search."}
+                {allRows.length === 0 ? "No events logged yet." : "No events match your search."}
               </td></tr>
             )}
           </tbody>
@@ -1563,7 +1621,8 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
         <BreakdownForm
           assets={assets}
           existing={editing}
-          onClose={() => { setShowForm(false); setEditing(null); }}
+          activatingWorkOrder={activating}
+          onClose={() => { setShowForm(false); setEditing(null); setActivating(null); }}
           onSaved={handleSaved}
           userEmail={userEmail}
           workOrders={workOrders}
@@ -3818,11 +3877,16 @@ function GanttTooltip({ active, payload }) {
   const item = payload.find((p) => p.dataKey === "durationHrs")?.payload;
   if (!item) return null;
   const fmt = (d) => d ? d.toLocaleString("en-ZA", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" }) : "ongoing";
+  const statusLabel = item.kind === "scheduled" ? "Scheduled - not booked down yet" : item.completed ? "Closed" : "In progress";
   return (
     <div style={{ background: "#fff", border: "1px solid #E4E2D8", borderRadius: 8, padding: "9px 12px", fontSize: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
       <p style={{ fontWeight: 700, margin: "0 0 3px", color: "#2C2C2A" }}>{item.label}</p>
-      <p style={{ margin: 0, color: "#5F5E5A" }}>{item.type} · {item.completed ? "Closed" : "In progress"}</p>
-      <p style={{ margin: "4px 0 0", color: "#5F5E5A" }}>{fmt(item.start)} → {fmt(item.end)}</p>
+      <p style={{ margin: 0, color: "#5F5E5A" }}>{item.category} · {statusLabel}</p>
+      {item.kind === "scheduled" ? (
+        <p style={{ margin: "4px 0 0", color: "#5F5E5A" }}>Planned for {fmt(item.start)}</p>
+      ) : (
+        <p style={{ margin: "4px 0 0", color: "#5F5E5A" }}>{fmt(item.start)} → {fmt(item.end)}</p>
+      )}
       {!item.completed && item.expectedUp && (
         <p style={{ margin: "4px 0 0", color: "#1F3864", fontWeight: 600 }}>Expected up: {fmt(item.expectedUp)}</p>
       )}
@@ -3860,36 +3924,65 @@ function EventTimeline({ breakdowns, workOrders, fromDateTime, toDateTime }) {
       .map((b) => ({
         id: `b-${b.id}`, label: `${b.asset_id} - ${b.component_affected || b.cause_code || "Breakdown"}`,
         start: new Date(b.downtime_start), end: b.downtime_end ? new Date(b.downtime_end) : null,
-        completed: b.repair_status === "Closed", type: "Breakdown",
+        completed: b.repair_status === "Closed", kind: "actual", category: "Breakdown",
         expectedUp: b.expected_up_time ? new Date(b.expected_up_time) : null,
       }));
-    const wEvents = workOrders
+    const wStarted = workOrders
       .filter((w) => w.work_type === "Preventive" && w.actual_start)
       .map((w) => ({
         id: `w-${w.id}`, label: `${w.asset_id} - ${w.problem_scope || "Planned Maintenance"}`,
         start: new Date(w.actual_start), end: w.actual_finish ? new Date(w.actual_finish) : null,
-        completed: w.status === "Closed", type: "Planned",
+        completed: w.status === "Closed", kind: "actual", category: "Planned Maintenance",
+        expectedUp: null,
+      }));
+    // Not booked down yet - shown as a slim marker at its planned time so
+    // people on the ground can see a machine is coming up for service,
+    // before anyone has actually taken it out of service.
+    const wScheduled = workOrders
+      .filter((w) => w.work_type === "Preventive" && !w.actual_start && w.planned_start)
+      .map((w) => ({
+        id: `w-sched-${w.id}`, label: `${w.asset_id} - ${w.problem_scope || "Planned Maintenance"} (scheduled)`,
+        start: new Date(w.planned_start), end: null, completed: false, kind: "scheduled", category: "Scheduled",
         expectedUp: null,
       }));
 
-    return [...bEvents, ...wEvents]
+    const actual = [...bEvents, ...wStarted]
       .filter((e) => statusFilter === "all" || (statusFilter === "completed" ? e.completed : !e.completed))
       .filter((e) => e.start < windowEnd && (e.end || nowTick) > windowStart)
       .map((e) => {
+        // Solid bar = actual elapsed time so far (start to now, clipped to
+        // the window). Still-open events also get a thin projected line
+        // continuing on to the end of the window (or Expected Up Time,
+        // whichever is sooner) - "this is still down and will keep
+        // showing here" rather than just stopping dead at "now".
         const effectiveEnd = e.end || nowTick;
         const clippedStartMs = Math.max(e.start.getTime(), windowStart.getTime());
         const clippedEndMs = Math.min(effectiveEnd.getTime(), windowEnd.getTime());
         const offsetHrs = (clippedStartMs - windowStart.getTime()) / 3600000;
         const durationHrs = Math.max(windowHrs * 0.004, (clippedEndMs - clippedStartMs) / 3600000);
-        // Only meaningful for still-open events, and only if it actually
-        // falls within this bar's own visible span - otherwise the little
-        // marker line would render outside the bar it's meant to sit on.
-        const expectedUpHrs = (!e.completed && e.expectedUp)
-          ? (e.expectedUp.getTime() - windowStart.getTime()) / 3600000
-          : null;
-        return { ...e, offsetHrs, durationHrs, expectedUpHrs };
-      })
-      .sort((a, b) => a.offsetHrs - b.offsetHrs);
+
+        let continuationHrs = 0;
+        if (!e.completed && !e.end && nowTick < windowEnd) {
+          const continuationStartMs = Math.max(clippedEndMs, windowStart.getTime());
+          const projectedEndMs = e.expectedUp && e.expectedUp > nowTick
+            ? Math.min(e.expectedUp.getTime(), windowEnd.getTime())
+            : windowEnd.getTime();
+          continuationHrs = Math.max(0, (projectedEndMs - continuationStartMs) / 3600000);
+        }
+        return { ...e, offsetHrs, durationHrs, continuationHrs };
+      });
+
+    const scheduled = wScheduled
+      .filter((e) => statusFilter !== "completed")
+      .filter((e) => e.start >= windowStart && e.start <= windowEnd)
+      .map((e) => ({
+        ...e,
+        offsetHrs: (e.start.getTime() - windowStart.getTime()) / 3600000,
+        durationHrs: Math.max(windowHrs * 0.006, windowHrs * 0.006),
+        continuationHrs: 0,
+      }));
+
+    return [...actual, ...scheduled].sort((a, b) => a.offsetHrs - b.offsetHrs);
   }, [breakdowns, workOrders, statusFilter, nowTick, windowStart, windowEnd, windowHrs]);
 
   const nowOffsetHrs = (nowTick.getTime() - windowStart.getTime()) / 3600000;
@@ -3897,22 +3990,23 @@ function EventTimeline({ breakdowns, workOrders, fromDateTime, toDateTime }) {
   const tickCount = 6;
   const ticks = Array.from({ length: tickCount + 1 }, (_, i) => Math.round((windowHrs / tickCount) * i * 100) / 100);
 
-  // Draws the normal bar rect, plus - for a breakdown that's still open
-  // and has an Expected Up Time set - a thin dark line marking where in
-  // the bar that estimate falls. Custom shape rather than a chart-wide
-  // ReferenceLine, since every row's expected time is different.
+  // Draws the solid "actual so far" bar, and - for a still-open event -
+  // a thinner projected line continuing on from there. Scheduled (not
+  // yet booked down) jobs render as a small amber diamond marker instead
+  // of a bar, since there's no duration yet to show.
   const DurationBarShape = (props) => {
     const { x, y, width, height, payload, fill } = props;
-    let markerX = null;
-    if (payload.expectedUpHrs != null && payload.durationHrs > 0) {
-      const proportion = (payload.expectedUpHrs - payload.offsetHrs) / payload.durationHrs;
-      if (proportion >= 0 && proportion <= 1) markerX = x + proportion * width;
+    if (payload.kind === "scheduled") {
+      const cx = x + width / 2, cy = y + height / 2, r = Math.max(5, height / 2.4);
+      return <polygon points={`${cx},${cy - r} ${cx + r},${cy} ${cx},${cy + r} ${cx - r},${cy}`} fill="#E8A33D" stroke="#B87F1F" strokeWidth={1} />;
     }
+    const pxPerHour = payload.durationHrs > 0 ? width / payload.durationHrs : 0;
+    const continuationWidth = pxPerHour > 0 ? payload.continuationHrs * pxPerHour : 0;
     return (
       <g>
         <rect x={x} y={y} width={width} height={height} fill={fill} rx={4} ry={4} />
-        {markerX != null && (
-          <line x1={markerX} y1={y - 2} x2={markerX} y2={y + height + 2} stroke="#1F3864" strokeWidth={2} />
+        {continuationWidth > 0 && (
+          <rect x={x + width} y={y + height / 2 - 1.5} width={continuationWidth} height={3} fill="#5FBF8F" rx={1.5} ry={1.5} />
         )}
       </g>
     );
@@ -3933,7 +4027,7 @@ function EventTimeline({ breakdowns, workOrders, fromDateTime, toDateTime }) {
         </select>
       </div>
       <p style={{ fontSize: 12, color: "#898781", margin: "0 0 12px" }}>
-        {formatTick(0)} to {formatTick(windowHrs)}{fromDateTime && toDateTime ? " - matches the date range selected below." : " - 6 hours either side of now."} In-progress bars keep extending live as time passes.
+        {formatTick(0)} to {formatTick(windowHrs)}{fromDateTime && toDateTime ? " - matches the date range selected below." : " - 6 hours either side of now."} Includes upcoming scheduled jobs, not just what's already down.
       </p>
       {events.length === 0 ? (
         <div style={{ border: "1px solid #E4E2D8", borderRadius: 10, background: "#fff", padding: 24, textAlign: "center" }}>
@@ -3945,23 +4039,24 @@ function EventTimeline({ breakdowns, workOrders, fromDateTime, toDateTime }) {
             <BarChart data={events} layout="vertical" margin={{ left: 4, right: 12, top: 6, bottom: 6 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" horizontal={false} />
               <XAxis type="number" domain={[0, windowHrs]} ticks={ticks} tickFormatter={formatTick} tick={{ fontSize: 11, fill: "#5F5E5A" }} axisLine={{ stroke: "#E4E2D8" }} tickLine={false} />
-              <YAxis type="category" dataKey="label" width={200} tick={{ fontSize: 11, fill: "#2C2C2A" }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="label" width={220} tick={{ fontSize: 11, fill: "#2C2C2A" }} axisLine={false} tickLine={false} />
               <Tooltip content={<GanttTooltip />} />
               {nowInWindow && (
                 <ReferenceLine x={nowOffsetHrs} stroke="#C0392B" strokeWidth={1.5} strokeDasharray="4 4" label={{ value: "Now", position: "top", fill: "#C0392B", fontSize: 11, fontWeight: 700 }} />
               )}
               <Bar dataKey="offsetHrs" stackId="a" fill="transparent" isAnimationActive={false} />
               <Bar dataKey="durationHrs" stackId="a" radius={[4, 4, 4, 4]} isAnimationActive={false} shape={DurationBarShape}>
-                {events.map((e) => <Cell key={e.id} fill={e.completed ? "#5FBF8F" : "#C0392B"} />)}
+                {events.map((e) => <Cell key={e.id} fill={e.kind === "scheduled" ? "transparent" : e.completed ? "#5FBF8F" : "#C0392B"} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
       )}
-      <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 11.5, color: "#5F5E5A" }}>
+      <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 11.5, color: "#5F5E5A", flexWrap: "wrap" }}>
         <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#C0392B", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />In progress</span>
         <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#5FBF8F", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Completed</span>
-        <span><span style={{ display: "inline-block", width: 2, height: 10, background: "#1F3864", marginRight: 6, verticalAlign: "middle" }} />Expected up time</span>
+        <span><span style={{ display: "inline-block", width: 12, height: 3, background: "#5FBF8F", borderRadius: 2, marginRight: 6, verticalAlign: "middle" }} />Projected, still open</span>
+        <span><span style={{ display: "inline-block", width: 9, height: 9, background: "#E8A33D", transform: "rotate(45deg)", marginRight: 6, verticalAlign: "middle" }} />Scheduled, not booked down yet</span>
       </div>
     </div>
   );
@@ -3971,10 +4066,12 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
   // Lazy initializers so "now" is computed fresh at mount time, not once
   // at app load - since this page fully unmounts when you navigate away
   // (the sidebar swaps which page renders), coming back always resets to
-  // a fresh 24-hour window rather than remembering whatever was picked
-  // last time.
-  const [fromDateTime, setFromDateTime] = useState(() => toDatetimeLocalValue(new Date(Date.now() - 24 * 3600000)));
-  const [toDateTime, setToDateTime] = useState(() => toDatetimeLocalValue(new Date()));
+  // a fresh window rather than remembering whatever was picked last time.
+  // Centred on now (12h back, 12h ahead) rather than only trailing, so
+  // upcoming scheduled jobs are visible without having to change the
+  // range first.
+  const [fromDateTime, setFromDateTime] = useState(() => toDatetimeLocalValue(new Date(Date.now() - 12 * 3600000)));
+  const [toDateTime, setToDateTime] = useState(() => toDatetimeLocalValue(new Date(Date.now() + 12 * 3600000)));
   const [showPrint, setShowPrint] = useState(false);
   const [selectedFleet, setSelectedFleet] = useState("");
   const [selectedAsset, setSelectedAsset] = useState("");
