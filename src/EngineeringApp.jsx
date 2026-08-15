@@ -28,7 +28,7 @@ function useIsMobile() {
 }
 
 // ---------------------------------------------------------------
-// Mock data — mirrors the Supabase schema/views. Swap for real
+// Mock data - mirrors the Supabase schema/views. Swap for real
 // Supabase queries once connected (same shape, same field names).
 // ---------------------------------------------------------------
 const MOCK_ASSETS = [
@@ -43,7 +43,7 @@ const MOCK_ASSETS = [
 
 // Real per-equipment performance metrics now come from the
 // plant_performance_kpi() SQL function via RPC (see FleetPerformance),
-// not from a hardcoded object — this used to be a placeholder here,
+// not from a hardcoded object - this used to be a placeholder here,
 // which is why Fleet Performance showed nothing once real assets
 // replaced the mock EQ-001..EQ-007 IDs it was keyed on.
 
@@ -92,10 +92,10 @@ const MOCK_BREAKDOWNS = [
   { breakdown_date: "2026-08-11", asset_id: "EQ-004", wo_reference: "WO-00022", component_affected: "Blade Cylinder", cause_code: "Hydraulic Failure", severity: "Medium", repair_status: "Open", downtime_hours: 2.0 },
 ];
 
-// Reference "now" for time-frame filtering — matches the current mock data window
+// Reference "now" for time-frame filtering - matches the current mock data window
 // This used to be a hardcoded string from the mock-data phase of this
 // project ("2026-08-11T16:00:00") and never got updated when the app was
-// wired to real data — meaning Fleet Performance's default date range was
+// wired to real data - meaning Fleet Performance's default date range was
 // frozen at a fixed moment in the past, while Dashboard computed the
 // actual current time fresh. That's exactly why their Availability
 // numbers didn't match: two different date ranges, not two different
@@ -166,8 +166,8 @@ const MOCK_PARTS = [
 ];
 
 const MOCK_WARRANTY_DOCS = [
-  { asset_id: "EQ-001", type: "Warranty — Engine", reference: "ENG-2019-4471", expiry: "2026-08-15", status: "EXPIRING SOON" },
-  { asset_id: "EQ-001", type: "Document — Inspection Cert", reference: "COC-2026-0142", expiry: "2026-08-20", status: "EXPIRING SOON" },
+  { asset_id: "EQ-001", type: "Warranty - Engine", reference: "ENG-2019-4471", expiry: "2026-08-15", status: "EXPIRING SOON" },
+  { asset_id: "EQ-001", type: "Document - Inspection Cert", reference: "COC-2026-0142", expiry: "2026-08-20", status: "EXPIRING SOON" },
 ];
 
 const costLedger = [
@@ -216,7 +216,7 @@ const NAV = [
   { key: "tyres", label: "Tyres", icon: CircleDot },
   { key: "parts", label: "Parts Inventory", icon: Package },
   { key: "warranty_docs", label: "Warranty & Documents", icon: FileText },
-  // Cost Ledger hidden for now per request — data/config still here, just
+  // Cost Ledger hidden for now per request - data/config still here, just
   // not in the nav, so it's a one-line change to bring back.
   // { key: "cost_ledger", label: "Cost Ledger", icon: DollarSign },
   { key: "site_management", label: "Site Management", icon: MapPin },
@@ -235,7 +235,7 @@ function statusColor(status) {
 }
 
 function Badge({ value }) {
-  if (value === null || value === undefined || value === "") return <span style={{ color: "#B4B2A9" }}>—</span>;
+  if (value === null || value === undefined || value === "") return <span style={{ color: "#B4B2A9" }}>-</span>;
   const c = statusColor(value);
   return (
     <span style={{ background: c.bg, color: c.text, fontSize: 12, fontWeight: 600, padding: "2px 9px", borderRadius: 6, whiteSpace: "nowrap" }}>
@@ -294,7 +294,7 @@ function DataTable({ columns, rows, exportName }) {
     const dataRows = filtered.map((row) => columns.map((c) => row[c.key] ?? ""));
 
     // Title + export timestamp on top, then a blank spacer row, then the
-    // real header row using the same friendly labels shown on screen —
+    // real header row using the same friendly labels shown on screen -
     // not the raw database column names.
     const aoa = [
       [exportName],
@@ -358,7 +358,7 @@ function DataTable({ columns, rows, exportName }) {
                   const val = row[c.key];
                   const display = STATUS_FIELDS.has(c.key) ? <Badge value={val} />
                     : typeof val === "number" && !Number.isInteger(val) ? val.toFixed(2)
-                    : (val ?? <span style={{ color: "#B4B2A9" }}>—</span>);
+                    : (val ?? <span style={{ color: "#B4B2A9" }}>-</span>);
                   return (
                     <td key={c.key} style={{ padding: isMobile ? "9px 10px" : "9px 12px", color: "#2C2C2A", whiteSpace: "nowrap" }}>
                       {display}
@@ -423,11 +423,11 @@ function isoToInputValue(iso) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-// A datetime-local input plus a one-click "Now" button — the native
+// A datetime-local input plus a one-click "Now" button - the native
 // picker stays available for backdating, but the overwhelming majority
 // case (logging something as it happens) becomes a single click instead
 // of manually setting date and time by hand.
-// Mining equipment can only genuinely be in one state at a time — broken
+// Mining equipment can only genuinely be in one state at a time - broken
 // down, or being worked on, not both. If two open events exist for the
 // same asset simultaneously, their downtime windows overlap and get
 // double-counted in Availability, Utilisation, MTBF and MTTR. This checks
@@ -463,12 +463,12 @@ async function checkAssetOverlap(assetId, excludeTable, excludeId) {
 }
 
 // An hour meter can only ever increase, and can only increase by as many
-// hours as have actually elapsed in the real world — a machine running
+// hours as have actually elapsed in the real world - a machine running
 // two 12-hour shifts a day can rack up at most 24 engine-hours per
 // calendar day, never more. This compares a new Fuel Log / Oil
 // Consumption reading against the most recent known Daily Hours reading
 // for that asset and flags anything that breaks either rule. It's
-// advisory, not a hard block — a genuinely unusual but correct reading
+// advisory, not a hard block - a genuinely unusual but correct reading
 // shouldn't be impossible to save, just worth a second look.
 function checkHourMeterPlausibility(assetId, newHourMeter, newDateStr, dailyHours) {
   if (newHourMeter === "" || newHourMeter == null || !newDateStr) return null;
@@ -480,14 +480,14 @@ function checkHourMeterPlausibility(assetId, newHourMeter, newDateStr, dailyHour
   if (!baseline) return null; // nothing recorded yet for this asset to compare against
 
   const elapsedDays = Math.max(0, (new Date(newDateStr) - new Date(baseline.log_date)) / 86400000);
-  const maxPossibleHours = (elapsedDays + 1) * 24; // generous — full 24hrs allowed on both the baseline day and the new day, to avoid false positives from shift-timing ambiguity
+  const maxPossibleHours = (elapsedDays + 1) * 24; // generous - full 24hrs allowed on both the baseline day and the new day, to avoid false positives from shift-timing ambiguity
   const hoursGained = Number(newHourMeter) - Number(baseline.closing_hours);
 
   if (hoursGained < 0) {
-    return `This reading (${newHourMeter}) is lower than the last recorded hours for this machine (${baseline.closing_hours} on ${baseline.log_date}). Hour meters don't run backward — worth double-checking.`;
+    return `This reading (${newHourMeter}) is lower than the last recorded hours for this machine (${baseline.closing_hours} on ${baseline.log_date}). Hour meters don't run backward - worth double-checking.`;
   }
   if (hoursGained > maxPossibleHours) {
-    return `This is ${hoursGained.toFixed(1)} hours higher than the last recorded reading (${baseline.closing_hours} on ${baseline.log_date}), but only about ${Math.ceil(elapsedDays) || 1} day(s) have passed — more than the machine could physically run at 24 hrs/day across both shifts. Worth double-checking the reading or the date.`;
+    return `This is ${hoursGained.toFixed(1)} hours higher than the last recorded reading (${baseline.closing_hours} on ${baseline.log_date}), but only about ${Math.ceil(elapsedDays) || 1} day(s) have passed - more than the machine could physically run at 24 hrs/day across both shifts. Worth double-checking the reading or the date.`;
   }
   return null;
 }
@@ -499,7 +499,7 @@ function DateTimeField({ value, onChange, max, required, disabled }) {
   const [datePart, timePart] = value ? value.split("T") : ["", ""];
   const [maxDate, maxTimeRaw] = max ? max.split("T") : [undefined, undefined];
   // Only restrict the time picker's max when the selected date IS the max
-  // date — on any earlier date, any time of day is still valid.
+  // date - on any earlier date, any time of day is still valid.
   const maxTime = datePart && datePart === maxDate ? maxTimeRaw : undefined;
 
   const handleDateChange = (newDate) => onChange(newDate ? `${newDate}T${timePart || "00:00"}` : "");
@@ -538,7 +538,7 @@ function todayForInput() {
 
 // Finds what Opening Hours SHOULD be for a given asset/date/shift, by
 // looking at the closing hours of the immediately preceding shift already
-// on record. This is a live preview only — the database (via daily_hours_calc's
+// on record. This is a live preview only - the database (via daily_hours_calc's
 // LAG-based view) is the actual source of truth once saved.
 function findExpectedOpeningHours(dailyHours, assetId, logDate, shift) {
   const rows = dailyHours
@@ -633,7 +633,7 @@ function DailyHoursForm({ assets, dailyHours, existing, onClose, onSaved }) {
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Equipment</label>
           <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#5F5E5A" } : {}) }}>
-            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} — {a.asset_name}</option>)}
+            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
           </select>
         </div>
 
@@ -653,7 +653,7 @@ function DailyHoursForm({ assets, dailyHours, existing, onClose, onSaved }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 4 }}>
           <div>
             <label style={labelStyle}>Opening Hours</label>
-            <input type="text" value={openingHours != null ? openingHours : "—"} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#5F5E5A" }} />
+            <input type="text" value={openingHours != null ? openingHours : "-"} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#5F5E5A" }} />
           </div>
           <div>
             <label style={labelStyle}>Closing Hours</label>
@@ -661,7 +661,7 @@ function DailyHoursForm({ assets, dailyHours, existing, onClose, onSaved }) {
           </div>
         </div>
         <p style={{ fontSize: 11.5, color: "#898781", margin: "0 0 14px" }}>
-          Opening Hours fills in automatically from the previous shift — just enter Closing Hours.
+          Opening Hours fills in automatically from the previous shift - just enter Closing Hours.
         </p>
 
         {hoursRun != null && (
@@ -673,7 +673,7 @@ function DailyHoursForm({ assets, dailyHours, existing, onClose, onSaved }) {
             Hours run this shift: <b>{hoursRun.toFixed(1)}</b>
             {exceedsShiftLimit && (
               <div style={{ color: "#791F1F", marginTop: 4 }}>
-                ⚠ This exceeds 12 hours for a single shift — double check the reading before saving.
+                ⚠ This exceeds 12 hours for a single shift - double check the reading before saving.
               </div>
             )}
           </div>
@@ -841,8 +841,8 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
     const now = new Date();
     const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
     const aoa = [
-      [`Daily Hours Bulk Template — ${templateMonth}`],
-      [`Exported: ${timestamp}. Fill in Closing Hours only — Opening Hours and everything else is calculated automatically. Leave a row blank to skip it.`],
+      [`Daily Hours Bulk Template - ${templateMonth}`],
+      [`Exported: ${timestamp}. Fill in Closing Hours only - Opening Hours and everything else is calculated automatically. Leave a row blank to skip it.`],
       [],
       BULK_HEADERS, ...dataRows,
     ];
@@ -894,7 +894,7 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
         validRows.push(r);
       });
 
-      // Hours can only go up over time — check each asset's rows are
+      // Hours can only go up over time - check each asset's rows are
       // non-decreasing in chronological order, both against each other in
       // this upload and against whatever's already on record.
       const byAsset = {};
@@ -907,7 +907,7 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
         let lastKnown = priorExisting?.closing_hours ?? null;
         rows.forEach((r) => {
           if (lastKnown != null && r.closing_hours < lastKnown) {
-            errors.push(`Row ${r.rowNum}: ${assetId} on ${r.log_date} (${r.shift}) — ${r.closing_hours} is less than the previous reading of ${lastKnown}. Hours can't go backward.`);
+            errors.push(`Row ${r.rowNum}: ${assetId} on ${r.log_date} (${r.shift}) - ${r.closing_hours} is less than the previous reading of ${lastKnown}. Hours can't go backward.`);
           } else {
             lastKnown = r.closing_hours;
           }
@@ -966,7 +966,7 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
           {budget.map((row, i) => (
             <div key={row.fleet} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderTop: i > 0 ? "1px solid #EFEEE7" : "none" }}>
               <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600 }}>{row.fleet}</span>
-              <span style={{ fontSize: 13 }}>{Number(row.actual_hours).toFixed(1)} / {row.scheduled_hours != null ? Number(row.scheduled_hours).toFixed(0) : "—"} hrs</span>
+              <span style={{ fontSize: 13 }}>{Number(row.actual_hours).toFixed(1)} / {row.scheduled_hours != null ? Number(row.scheduled_hours).toFixed(0) : "-"} hrs</span>
               <Badge value={row.status} />
             </div>
           ))}
@@ -980,9 +980,9 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
       </div>
 
       <div style={{ border: "1px solid #E4E2D8", borderRadius: 10, background: "#F7F6F1", padding: "14px 16px", marginBottom: 24 }}>
-        <h4 style={{ fontSize: 13.5, fontWeight: 700, margin: "0 0 4px", color: NAVY }}>Bulk Upload — a faster way to load a month of hours</h4>
+        <h4 style={{ fontSize: 13.5, fontWeight: 700, margin: "0 0 4px", color: NAVY }}>Bulk Upload - a faster way to load a month of hours</h4>
         <p style={{ fontSize: 12, color: "#5F5E5A", margin: "0 0 12px" }}>
-          Download the template for a month, type in Closing Hours in Excel, then upload it back. Opening Hours and running totals are calculated automatically — you only ever need to fill in the reading at the end of each shift. Existing entries are pre-filled in the template so you can see gaps at a glance.
+          Download the template for a month, type in Closing Hours in Excel, then upload it back. Opening Hours and running totals are calculated automatically - you only ever need to fill in the reading at the end of each shift. Existing entries are pre-filled in the template so you can see gaps at a glance.
         </p>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <input
@@ -1050,7 +1050,7 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
                   )}
                   <tr style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none", background: row.exceeds_shift_limit ? "#FCEBEB" : "transparent" }}>
                     {columns.map((c) => (
-                      <td key={c.key} onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>{row[c.key] ?? <span style={{ color: "#B4B2A9" }}>—</span>}</td>
+                      <td key={c.key} onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>{row[c.key] ?? <span style={{ color: "#B4B2A9" }}>-</span>}</td>
                     ))}
                     <td style={{ padding: "9px 12px" }}>
                       <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#C0392B", cursor: "pointer", padding: 4, display: "inline-flex" }}>
@@ -1076,7 +1076,7 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
       )}
       {deleting && (
         <DeleteConfirmModal
-          itemLabel={`${deleting.asset_id} — ${deleting.shift} shift on ${deleting.log_date}`}
+          itemLabel={`${deleting.asset_id} - ${deleting.shift} shift on ${deleting.log_date}`}
           userEmail={userEmail}
           onCancel={() => setDeleting(null)}
           onConfirm={handleDelete}
@@ -1112,7 +1112,7 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
   const [error, setError] = useState("");
 
   // Once a brand-new event has been saved once, we keep the modal open
-  // (rather than closing it) so a Work Order — and parts against it —
+  // (rather than closing it) so a Work Order - and parts against it -
   // can be added immediately, without having to close and reopen. From
   // that point on this form behaves like it's editing savedRecord.
   const [savedRecord, setSavedRecord] = useState(existing || null);
@@ -1120,7 +1120,7 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
   const hasSavedRecord = !!savedRecord;
   const breakdownDateLabel = downtimeStart ? new Date(downtimeStart).toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" }) : "this date";
 
-  // Downtime End only makes sense once the breakdown is actually Closed —
+  // Downtime End only makes sense once the breakdown is actually Closed -
   // an "in progress" event by definition doesn't have an end yet. Auto-fills
   // when closing, and auto-clears if status is changed back to active,
   // rather than leaving a stale end time sitting alongside an open status.
@@ -1157,7 +1157,7 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
     setError("");
 
     if (new Date(downtimeStart) > new Date()) {
-      setError("Downtime Start can't be in the future — only past or present times are allowed.");
+      setError("Downtime Start can't be in the future - only past or present times are allowed.");
       return;
     }
     if (downtimeEnd && new Date(downtimeEnd) > new Date()) {
@@ -1169,7 +1169,7 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
       return;
     }
 
-    // Only relevant when this breakdown will be active after saving — a
+    // Only relevant when this breakdown will be active after saving - a
     // breakdown being closed out isn't creating a new overlap.
     if (status !== "Closed") {
       const { conflict, error: checkError } = await checkAssetOverlap(assetId, "breakdown_log", currentId);
@@ -1178,7 +1178,26 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
         return;
       }
       if (conflict) {
-        setError(`${assetId} already has ${conflict}. Close that out first — overlapping active events on the same machine would double-count downtime in Availability, MTBF and MTTR.`);
+        setError(`${assetId} already has ${conflict}. Close that out first - overlapping active events on the same machine would double-count downtime in Availability, MTBF and MTTR.`);
+        return;
+      }
+    }
+
+    // The event can't be Closed while any Work Order linked to it is
+    // still open - every linked Work Order has to be Closed first.
+    if (status === "Closed" && currentId) {
+      const { data: openWos, error: woCheckError } = await supabase
+        .from("work_orders")
+        .select("wo_no, status")
+        .eq("event_id", currentId)
+        .neq("status", "Closed");
+      if (woCheckError) {
+        setError(`Couldn't verify linked Work Orders: ${woCheckError.message}`);
+        return;
+      }
+      if (openWos && openWos.length > 0) {
+        const list = openWos.map((w) => `${w.wo_no} (${w.status})`).join(", ");
+        setError(`This event can't be Closed while linked Work Orders are still open: ${list}. Close those first.`);
         return;
       }
     }
@@ -1200,7 +1219,7 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
       downtime_start: startDate.toISOString(),
       downtime_end: downtimeEnd ? new Date(downtimeEnd).toISOString() : null,
       expected_up_time: expectedUpTime ? new Date(expectedUpTime).toISOString() : null,
-      // wo_reference is intentionally omitted on new entries — the database
+      // wo_reference is intentionally omitted on new entries - the database
       // auto-generates it (format FT-MM-NNNNN) via a trigger. On edits, we
       // simply don't touch it, so the original number is preserved.
       reported_by: reportedBy || null,
@@ -1214,13 +1233,13 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
       } else {
         const { data, error: dbError } = await supabase.from("breakdown_log").insert(payload).select().single();
         if (dbError) throw dbError;
-        // Stay open on the just-created record instead of closing — this
+        // Stay open on the just-created record instead of closing - this
         // is what lets a Work Order (and parts against it) be added right
         // away, in the same session, instead of having to reopen it.
         setSavedRecord(data);
       }
 
-      // Opt-in — ticking this pulls the event straight through to the
+      // Opt-in - ticking this pulls the event straight through to the
       // Daily Service report for that asset+date, same as logging it
       // directly there. Upsert is idempotent, so saving again (e.g.
       // editing the event later) doesn't create a duplicate day.
@@ -1255,7 +1274,7 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Equipment</label>
           <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required style={fieldStyle}>
-            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} — {a.asset_name}</option>)}
+            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
           </select>
         </div>
 
@@ -1272,7 +1291,7 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
           <DateTimeField value={expectedUpTime} onChange={setExpectedUpTime} disabled={status === "Closed"} />
         </div>
         <p style={{ fontSize: 11.5, color: "#898781", margin: "-6px 0 14px" }}>
-          Downtime Start defaults to right now, but you can set it earlier if you're logging something that happened previously (e.g. catching up after time away from the system) — future dates and times aren't allowed. Downtime End only opens up once Status is Closed — an event that's still active doesn't have an end yet, and having both set at once would throw off MTBF, MTTR, Availability and Utilisation. Expected Up Time is your best estimate of when the machine will be back — unlike the other two, future dates are fine here, since that's the whole point of it.
+          Downtime Start defaults to right now, but you can set it earlier if you're logging something that happened previously (e.g. catching up after time away from the system) - future dates and times aren't allowed. Downtime End only opens up once Status is Closed - an event that's still active doesn't have an end yet, and having both set at once would throw off MTBF, MTTR, Availability and Utilisation. Expected Up Time is your best estimate of when the machine will be back - unlike the other two, future dates are fine here, since that's the whole point of it.
         </p>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
@@ -1318,7 +1337,7 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
           <span>
             This event was the Daily Service
             <span style={{ display: "block", fontSize: 11.5, color: "#898781", fontWeight: 400 }}>
-              Marks {breakdownDateLabel} as serviced for {assetId} on the Daily Service report — same as logging it there directly.
+              Marks {breakdownDateLabel} as serviced for {assetId} on the Daily Service report - same as logging it there directly.
             </span>
           </span>
         </label>
@@ -1327,7 +1346,7 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
           <label style={labelStyle}>Reported By</label>
           <input type="text" value={reportedBy} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#5F5E5A" }} />
           <p style={{ fontSize: 11.5, color: "#898781", margin: "4px 0 0" }}>
-            {existing ? "Original reporter — kept as-is when editing." : "Automatically captured from your signed-in account."}
+            {existing ? "Original reporter - kept as-is when editing." : "Automatically captured from your signed-in account."}
           </p>
         </div>
 
@@ -1344,7 +1363,7 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
 
         {!hasSavedRecord && (
           <p style={{ fontSize: 11.5, color: "#898781", margin: "10px 0 0", textAlign: "center" }}>
-            Save the event first — Work Orders and parts can be added right here once it's saved.
+            Save the event first - Work Orders and parts can be added right here once it's saved.
           </p>
         )}
 
@@ -1365,10 +1384,15 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
   const [selectedAsset, setSelectedAsset] = useState("");
 
   const columns = [
-    ["breakdown_date", "Date"], ["asset_id", "Equipment #"], ["wo_reference", "Work order #"],
+    ["breakdown_date", "Booked Off"], ["asset_id", "Equipment #"], ["wo_reference", "Work order #"],
     ["component_affected", "Component"], ["cause_code", "Cause"], ["severity", "Severity"],
-    ["repair_status", "Status"], ["downtime_hours", "Downtime (hrs)"],
+    ["repair_status", "Status"], ["downtime_end", "Back Up"], ["downtime_hours", "Downtime (hrs)"],
   ].map(([key, label]) => ({ key, label }));
+
+  const formatBookedOff = (row) => row.breakdown_date ? `${row.breakdown_date}${row.time_reported ? ` ${row.time_reported}` : ""}` : "";
+  const formatBackUp = (row) => row.downtime_end
+    ? new Date(row.downtime_end).toLocaleString("en-ZA", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "")
+    : "";
 
   const filtered = useMemo(() => {
     let rows = breakdowns;
@@ -1403,7 +1427,11 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
     const now = new Date();
     const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
     const headerRow = columns.map((c) => c.label);
-    const dataRows = filtered.map((row) => columns.map((c) => row[c.key] ?? ""));
+    const dataRows = filtered.map((row) => columns.map((c) =>
+      c.key === "breakdown_date" ? formatBookedOff(row)
+      : c.key === "downtime_end" ? (formatBackUp(row) || "Still down")
+      : (row[c.key] ?? "")
+    ));
     const aoa = [["Events"], [`Exported: ${timestamp}`], [], headerRow, ...dataRows];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     ws["!merges"] = [
@@ -1466,13 +1494,15 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
                   {columns.map((c) => (
                     <td key={c.key} onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>
                       {c.key === "repair_status" || c.key === "severity" ? <Badge value={row[c.key]} />
+                        : c.key === "breakdown_date" ? formatBookedOff(row)
+                        : c.key === "downtime_end" ? (formatBackUp(row) || <span style={{ color: "#B4B2A9" }}>Still down</span>)
                         : c.key === "component_affected" && isRepeat ? (
                           <span title={`${row.repeat_count} breakdowns on this component for this machine`} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                            {row[c.key] || <span style={{ color: "#B4B2A9" }}>—</span>}
+                            {row[c.key] || <span style={{ color: "#B4B2A9" }}>-</span>}
                             <span style={{ fontSize: 10.5, fontWeight: 700, color: "#633806", background: "#FCE2B8", padding: "1px 6px", borderRadius: 6 }}>REPEAT ×{row.repeat_count}</span>
                           </span>
                         ) : typeof row[c.key] === "number" && !Number.isInteger(row[c.key]) ? row[c.key].toFixed(2)
-                        : (row[c.key] ?? <span style={{ color: "#B4B2A9" }}>—</span>)}
+                        : (row[c.key] ?? <span style={{ color: "#B4B2A9" }}>-</span>)}
                     </td>
                   ))}
                   <td style={{ padding: "9px 12px" }}>
@@ -1538,7 +1568,7 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
   const [error, setError] = useState("");
 
   // Same principle as Downtime End on breakdowns: Actual Finish only makes
-  // sense once the work order is Closed — auto-clears if status moves back
+  // sense once the work order is Closed - auto-clears if status moves back
   // to active, so it can't sit alongside an "in progress" status.
   useEffect(() => {
     if (status !== "Closed" && actualFinish) {
@@ -1563,7 +1593,7 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
     setError("");
 
     if (actualStart && new Date(actualStart) > new Date()) {
-      setError("Actual Start can't be in the future — only Planned Start can be scheduled ahead.");
+      setError("Actual Start can't be in the future - only Planned Start can be scheduled ahead.");
       return;
     }
     if (actualFinish && new Date(actualFinish) > new Date()) {
@@ -1576,7 +1606,7 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
     }
 
     // Only relevant when this work order will be actively "in progress"
-    // after saving — actual_start set, no actual_finish yet, and not
+    // after saving - actual_start set, no actual_finish yet, and not
     // already closed.
     if (actualStart && !actualFinish && status !== "Closed") {
       const { conflict, error: checkError } = await checkAssetOverlap(assetId, "work_orders", existing?.id);
@@ -1585,7 +1615,7 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
         return;
       }
       if (conflict) {
-        setError(`${assetId} already has ${conflict}. Close that out first — overlapping active events on the same machine would double-count downtime in Availability, MTBF and MTTR.`);
+        setError(`${assetId} already has ${conflict}. Close that out first - overlapping active events on the same machine would double-count downtime in Availability, MTBF and MTTR.`);
         return;
       }
     }
@@ -1632,7 +1662,7 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Equipment</label>
           <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit || !!eventId} style={{ ...fieldStyle, ...((isEdit || eventId) ? { background: "#F2F1EA", color: "#5F5E5A" } : {}) }}>
-            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} — {a.asset_name}</option>)}
+            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
           </select>
         </div>
 
@@ -1675,14 +1705,14 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
         </div>
 
         <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>Planned Start <span style={{ fontWeight: 400, color: "#898781" }}>(this is where you schedule ahead — future dates are fine here)</span></label>
+          <label style={labelStyle}>Planned Start <span style={{ fontWeight: 400, color: "#898781" }}>(this is where you schedule ahead - future dates are fine here)</span></label>
           <input type="date" value={plannedStart} onChange={(e) => setPlannedStart(e.target.value)} style={fieldStyle} />
         </div>
 
         {isEdit && (
           <>
             <p style={{ fontSize: 11.5, color: "#898781", margin: "0 0 8px" }}>
-              The two fields below are for logging when the work actually happened — leave them blank until it's done. They only accept past or present times, not future ones. Actual Finish only opens up once Status is Closed.
+              The two fields below are for logging when the work actually happened - leave them blank until it's done. They only accept past or present times, not future ones. Actual Finish only opens up once Status is Closed.
             </p>
             <div style={{ marginBottom: 12 }}>
               <label style={labelStyle}>Actual Start</label>
@@ -1753,7 +1783,7 @@ function PartUsedForm({ parts, workOrder, onClose, onSaved }) {
       });
       if (insertErr) throw insertErr;
 
-      // Stock is reduced immediately (automatic) — a future Stores module
+      // Stock is reduced immediately (automatic) - a future Stores module
       // is what will let a store manager confirm/adjust the final count;
       // for now "Confirmed" is just a status flag on the parts_used row.
       const { error: stockErr } = await supabase.from("parts_inventory")
@@ -1781,7 +1811,7 @@ function PartUsedForm({ parts, workOrder, onClose, onSaved }) {
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Part</label>
           <select value={partId} onChange={(e) => setPartId(e.target.value)} required style={fieldStyle}>
-            {parts.map((p) => <option key={p.id} value={p.id}>{p.part_no} — {p.description} ({p.qty_in_stock ?? 0} in stock)</option>)}
+            {parts.map((p) => <option key={p.id} value={p.id}>{p.part_no} - {p.description} ({p.qty_in_stock ?? 0} in stock)</option>)}
           </select>
         </div>
 
@@ -1847,7 +1877,7 @@ function PartsUsedList({ workOrder, parts }) {
             const p = partById[r.part_id];
             return (
               <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, background: "#fff", border: "1px solid #E4E2D8", borderRadius: 6, padding: "5px 9px" }}>
-                <span>{p ? `${p.part_no} — ${p.description}` : "Part"} × {r.qty_used}</span>
+                <span>{p ? `${p.part_no} - ${p.description}` : "Part"} × {r.qty_used}</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Badge value={r.status} />
                   {r.status === "Pending" && (
@@ -1874,7 +1904,7 @@ function EventWorkOrdersPanel({ event, assets, parts, onRefresh }) {
   const [expanded, setExpanded] = useState(null); // wo.id currently showing its Parts Used
 
   // Queried directly against work_orders (not the work_orders_calc view
-  // used elsewhere) — event_id is a brand-new column and the calc view
+  // used elsewhere) - event_id is a brand-new column and the calc view
   // predates it, so this is the one place guaranteed to have it without
   // needing that view's definition touched.
   const load = useCallback(async () => {
@@ -1905,7 +1935,7 @@ function EventWorkOrdersPanel({ event, assets, parts, onRefresh }) {
       {loading ? (
         <p style={{ fontSize: 12.5, color: "#898781", margin: 0 }}>Loading…</p>
       ) : linked.length === 0 ? (
-        <p style={{ fontSize: 12.5, color: "#898781", margin: 0 }}>No Work Orders linked to this event yet — each one gets its own work order number, and you can log parts used against it once it's created.</p>
+        <p style={{ fontSize: 12.5, color: "#898781", margin: 0 }}>No Work Orders linked to this event yet - each one gets its own work order number, and you can log parts used against it once it's created.</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {linked.map((w) => (
@@ -1944,7 +1974,7 @@ function EventWorkOrdersPanel({ event, assets, parts, onRefresh }) {
 }
 
 // Print isolation: only .job-card-print and its children stay visible when
-// printing — everything else on the page (sidebar, other content) is
+// printing - everything else on the page (sidebar, other content) is
 // hidden. window.print() also covers "export" since every browser's print
 // dialog offers Save as PDF, so this one button serves both print and export.
 function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
@@ -1989,7 +2019,7 @@ function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
     setUploading(true);
     setUploadError("");
     try {
-      // Timestamp-prefixed path — every upload gets its own file, nothing
+      // Timestamp-prefixed path - every upload gets its own file, nothing
       // is overwritten, so the full history stays available in Storage too.
       const path = `${workOrder.wo_no || workOrder.id}/${Date.now()}-${file.name}`;
       const { error: uploadErr } = await supabase.storage.from("job-card-scans").upload(path, file);
@@ -2002,7 +2032,7 @@ function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
         uploaded_at: uploadedAt,
       });
       if (historyErr) throw historyErr;
-      // Kept in sync purely for convenience — anything elsewhere that reads
+      // Kept in sync purely for convenience - anything elsewhere that reads
       // "the latest scan" straight off work_orders still works; the
       // work_order_scans table above is the source of truth for history.
       await supabase.from("work_orders")
@@ -2021,7 +2051,7 @@ function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
   const row = (label, value) => (
     <tr>
       <td style={{ padding: "6px 10px", fontWeight: 700, fontSize: 12.5, color: "#2C2C2A", width: 160, border: "1px solid #ccc" }}>{label}</td>
-      <td style={{ padding: "6px 10px", fontSize: 12.5, color: "#2C2C2A", border: "1px solid #ccc" }}>{value || "—"}</td>
+      <td style={{ padding: "6px 10px", fontSize: 12.5, color: "#2C2C2A", border: "1px solid #ccc" }}>{value || "-"}</td>
     </tr>
   );
 
@@ -2102,7 +2132,7 @@ function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
           {scansLoading ? (
             <p style={{ fontSize: 12.5, color: "#898781", margin: "0 0 10px" }}>Loading history…</p>
           ) : scans.length === 0 ? (
-            <p style={{ fontSize: 12.5, color: "#898781", margin: "0 0 10px" }}>Once the technician has completed and signed this document, scan it and upload it here. Every service done against this Work Order can be scanned and kept here — nothing gets overwritten.</p>
+            <p style={{ fontSize: 12.5, color: "#898781", margin: "0 0 10px" }}>Once the technician has completed and signed this document, scan it and upload it here. Every service done against this Work Order can be scanned and kept here - nothing gets overwritten.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 4 }}>
               {scans.map((s) => (
@@ -2149,7 +2179,7 @@ function buildDowntimeRows(breakdowns, workOrders, fromDateTime, toDateTime) {
   const overlaps = (start, end) => {
     if (!start) return false;
     const s = new Date(start);
-    // Still open/ongoing — always show it regardless of the selected "to"
+    // Still open/ongoing - always show it regardless of the selected "to"
     // cutoff. The date picker's "to" is a snapshot from whenever the page
     // loaded and doesn't auto-extend as time passes, but a currently
     // active breakdown or planned job is operationally relevant right
@@ -2244,7 +2274,7 @@ function FuelLogForm({ assets, existing, userEmail, dailyHours, onClose, onSaved
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Equipment</label>
           <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#5F5E5A" } : {}) }}>
-            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} — {a.asset_name}</option>)}
+            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
           </select>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
@@ -2355,7 +2385,7 @@ function InspectionForm({ assets, existing, userEmail, onClose, onSaved }) {
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Equipment</label>
           <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#5F5E5A" } : {}) }}>
-            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} — {a.asset_name}</option>)}
+            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
           </select>
         </div>
 
@@ -2506,7 +2536,7 @@ function InspectionsPage({ assets, inspections, userEmail, onRefresh }) {
               <tr key={row.id ?? i} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none" }}>
                 {columns.map((c) => (
                   <td key={c.key} onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>
-                    {c.key === "result" ? <Badge value={row[c.key]} /> : (row[c.key] ?? <span style={{ color: "#B4B2A9" }}>—</span>)}
+                    {c.key === "result" ? <Badge value={row[c.key]} /> : (row[c.key] ?? <span style={{ color: "#B4B2A9" }}>-</span>)}
                   </td>
                 ))}
                 <td style={{ padding: "9px 12px" }}>
@@ -2625,7 +2655,7 @@ function BacklogForm({ assets, workOrders, existing, userEmail, onClose, onSaved
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Equipment</label>
           <select value={assetId} onChange={(e) => { setAssetId(e.target.value); setWorkOrderId(""); }} required style={fieldStyle}>
-            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} — {a.asset_name}</option>)}
+            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
           </select>
         </div>
 
@@ -2644,9 +2674,9 @@ function BacklogForm({ assets, workOrders, existing, userEmail, onClose, onSaved
 
         {sourceType === "service_card" && (
           <div style={{ marginBottom: 12 }}>
-            <label style={labelStyle}>Work Order # (optional — the scanned card this came from)</label>
+            <label style={labelStyle}>Work Order # (optional - the scanned card this came from)</label>
             <select value={workOrderId} onChange={(e) => setWorkOrderId(e.target.value)} style={fieldStyle}>
-              <option value="">— None —</option>
+              <option value="">- None -</option>
               {woOptionsForAsset.map((w) => <option key={w.id} value={w.id}>{w.wo_no}</option>)}
             </select>
           </div>
@@ -2788,8 +2818,8 @@ function BacklogsPage({ assets, backlogs, workOrders, userEmail, onRefresh }) {
               <tr key={row.id ?? i} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none" }}>
                 <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>{row.asset_id}</td>
                 <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>{backlogSourceLabel(row.source_type)}</td>
-                <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>{row.work_order_id ? (woNoById[row.work_order_id] || "—") : <span style={{ color: "#B4B2A9" }}>—</span>}</td>
-                <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", cursor: "pointer" }}>{row.component_code || <span style={{ color: "#B4B2A9" }}>—</span>}</td>
+                <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>{row.work_order_id ? (woNoById[row.work_order_id] || "-") : <span style={{ color: "#B4B2A9" }}>-</span>}</td>
+                <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", cursor: "pointer" }}>{row.component_code || <span style={{ color: "#B4B2A9" }}>-</span>}</td>
                 <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", cursor: "pointer", maxWidth: 320 }}>{row.description}</td>
                 <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", cursor: "pointer" }}><Badge value={row.priority} /></td>
                 <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>{row.date_notified}</td>
@@ -2832,12 +2862,12 @@ function BacklogsPage({ assets, backlogs, workOrders, userEmail, onRefresh }) {
   );
 }
 
-// Runs entirely in the browser — no server call, no API key, no cost.
+// Runs entirely in the browser - no server call, no API key, no cost.
 // Downscales the image, converts to grayscale, then flags it as 'dark'
 // if the average brightness is low, or 'blurry' using the variance of
-// a Laplacian edge filter (a standard, cheap sharpness metric — sharp
+// a Laplacian edge filter (a standard, cheap sharpness metric - sharp
 // photos have high-variance edges, blurry ones don't). Thresholds are
-// a reasonable starting point, not a guarantee — the raw numbers are
+// a reasonable starting point, not a guarantee - the raw numbers are
 // kept in the notes so they can be tuned later against real photos.
 function analyzeImageQuality(file) {
   return new Promise((resolve) => {
@@ -2974,7 +3004,7 @@ function DailyServiceForm({ assets, defaultAssetId, defaultDate, existing, userE
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Equipment</label>
           <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required style={fieldStyle}>
-            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} — {a.asset_name}</option>)}
+            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
           </select>
         </div>
 
@@ -3032,7 +3062,7 @@ function DailyServiceForm({ assets, defaultAssetId, defaultDate, existing, userE
               background: flagged ? "#FCEBEB" : "#EAF3DE", color: flagged ? "#791F1F" : "#27500A",
             }}>
               {flagged
-                ? `${PHOTO_QUALITY_LABEL[qualityResult.status]} — consider retaking this photo before saving. (${qualityResult.notes})`
+                ? `${PHOTO_QUALITY_LABEL[qualityResult.status]} - consider retaking this photo before saving. (${qualityResult.notes})`
                 : `${PHOTO_QUALITY_LABEL[qualityResult.status]}.`}
             </div>
           )}
@@ -3053,11 +3083,11 @@ function DailyServiceForm({ assets, defaultAssetId, defaultDate, existing, userE
 
 // DS = a daily_service_checklist entry exists for that asset+day.
 // BD = no DS entry, but a breakdown fully covers the day (down at the
-//      start of day through at least the end of day) — no penalty.
+//      start of day through at least the end of day) - no penalty.
 // NU = no DS entry, not a full-day breakdown, but Daily Hours shows the
-//      asset logged with zero hours run that day — not utilised, no
+//      asset logged with zero hours run that day - not utilised, no
 //      penalty.
-// gap = none of the above — the cell needing attention, highlighted.
+// gap = none of the above - the cell needing attention, highlighted.
 function dailyServiceStatus(assetId, dateStr, checklistByKey, breakdowns, dailyHours) {
   if (checklistByKey.has(`${assetId}|${dateStr}`)) return "DS";
 
@@ -3107,7 +3137,7 @@ function DailyServicePage({ assets, dailyServiceChecklist, breakdowns, dailyHour
     if (label === "DS") return { background: "#EAF3DE", color: "#27500A" };
     if (label === "BD") return { background: "#FCEBEB", color: "#791F1F" };
     if (label === "NU") return { background: "#F1EFE8", color: "#5F5E5A" };
-    return { background: "#F9D8D8", color: "#791F1F" }; // gap — needs attention
+    return { background: "#F9D8D8", color: "#791F1F" }; // gap - needs attention
   };
 
   const openLogForm = (assetId, dateStr) => {
@@ -3122,9 +3152,9 @@ function DailyServicePage({ assets, dailyServiceChecklist, breakdowns, dailyHour
         <input type="month" value={monthValue} onChange={(e) => setMonthValue(e.target.value)} style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8 }} />
         <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ display: "flex", gap: 10, fontSize: 12, color: "#5F5E5A" }}>
-            <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#EAF3DE", borderRadius: 2, marginRight: 4 }} />DS — serviced</span>
-            <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#FCEBEB", borderRadius: 2, marginRight: 4 }} />BD — breakdown</span>
-            <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#F1EFE8", borderRadius: 2, marginRight: 4 }} />NU — not utilised</span>
+            <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#EAF3DE", borderRadius: 2, marginRight: 4 }} />DS - serviced</span>
+            <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#FCEBEB", borderRadius: 2, marginRight: 4 }} />BD - breakdown</span>
+            <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#F1EFE8", borderRadius: 2, marginRight: 4 }} />NU - not utilised</span>
             <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#F9D8D8", borderRadius: 2, marginRight: 4 }} />missing</span>
           </div>
           <button onClick={() => openLogForm(filteredAssets[0]?.asset_id || "", todayStr)} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
@@ -3156,7 +3186,7 @@ function DailyServicePage({ assets, dailyServiceChecklist, breakdowns, dailyHour
                       <button
                         onClick={() => !isFuture && openLogForm(a.asset_id, dateStr)}
                         disabled={isFuture}
-                        title={isFuture ? "" : `${a.asset_id} — ${dateStr}${label ? `: ${label}` : ": no daily service logged"}`}
+                        title={isFuture ? "" : `${a.asset_id} - ${dateStr}${label ? `: ${label}` : ": no daily service logged"}`}
                         style={{
                           width: "100%", minHeight: 26, border: "none", cursor: isFuture ? "default" : "pointer",
                           fontSize: 10.5, fontWeight: 700, ...(isFuture ? { background: "transparent" } : cellStyle(label)),
@@ -3273,7 +3303,7 @@ function FuelLogPage({ assets, fuelLog, userEmail, dailyHours, onRefresh }) {
                   <tr style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none" }}>
                     {columns.map((c) => (
                       <td key={c.key} onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>
-                        {row[c.key] ?? <span style={{ color: "#B4B2A9" }}>—</span>}
+                        {row[c.key] ?? <span style={{ color: "#B4B2A9" }}>-</span>}
                       </td>
                     ))}
                     <td style={{ padding: "9px 12px" }}>
@@ -3375,7 +3405,7 @@ function OilConsumptionForm({ assets, existing, userEmail, dailyHours, onClose, 
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Equipment</label>
           <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#5F5E5A" } : {}) }}>
-            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} — {a.asset_name}</option>)}
+            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
           </select>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
@@ -3513,7 +3543,7 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, dailyHours, onR
                   <tr style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none" }}>
                     {columns.map((c) => (
                       <td key={c.key} onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>
-                        {row[c.key] ?? <span style={{ color: "#B4B2A9" }}>—</span>}
+                        {row[c.key] ?? <span style={{ color: "#B4B2A9" }}>-</span>}
                       </td>
                     ))}
                     <td style={{ padding: "9px 12px" }}>
@@ -3606,7 +3636,7 @@ function MtbfMttrReportPage({ assets }) {
   };
 
   const fmt = (key, val) => {
-    if (val == null) return "—";
+    if (val == null) return "-";
     if (key === "availability") return `${Math.round(val * 100)}%`;
     if (key === "availability_index") return `${Number(val).toFixed(1)}%`;
     if (key === "mtbf" || key === "mttr") return Number(val).toFixed(1);
@@ -3767,7 +3797,7 @@ function GanttTooltip({ active, payload }) {
 // spirit of a project-plan Gantt chart: each event as a horizontal bar
 // positioned along a time axis, with a "now" marker. Built on Recharts'
 // BarChart using the standard technique for faking a Gantt with a
-// generic bar library — a transparent "offset" segment positions each
+// generic bar library - a transparent "offset" segment positions each
 // bar's start, stacked with a visible "duration" segment for its length.
 function EventTimeline({ breakdowns, workOrders }) {
   const [statusFilter, setStatusFilter] = useState("all");
@@ -3785,7 +3815,7 @@ function EventTimeline({ breakdowns, workOrders }) {
     const bEvents = breakdowns
       .filter((b) => b.downtime_start)
       .map((b) => ({
-        id: `b-${b.id}`, label: `${b.asset_id} — ${b.component_affected || b.cause_code || "Breakdown"}`,
+        id: `b-${b.id}`, label: `${b.asset_id} - ${b.component_affected || b.cause_code || "Breakdown"}`,
         start: new Date(b.downtime_start), end: b.downtime_end ? new Date(b.downtime_end) : null,
         completed: b.repair_status === "Closed", type: "Breakdown",
         expectedUp: b.expected_up_time ? new Date(b.expected_up_time) : null,
@@ -3793,7 +3823,7 @@ function EventTimeline({ breakdowns, workOrders }) {
     const wEvents = workOrders
       .filter((w) => w.work_type === "Preventive" && w.actual_start)
       .map((w) => ({
-        id: `w-${w.id}`, label: `${w.asset_id} — ${w.problem_scope || "Planned Maintenance"}`,
+        id: `w-${w.id}`, label: `${w.asset_id} - ${w.problem_scope || "Planned Maintenance"}`,
         start: new Date(w.actual_start), end: w.actual_finish ? new Date(w.actual_finish) : null,
         completed: w.status === "Closed", type: "Planned",
         expectedUp: null,
@@ -3809,7 +3839,7 @@ function EventTimeline({ breakdowns, workOrders }) {
         const offsetHrs = (clippedStartMs - windowStart.getTime()) / 3600000;
         const durationHrs = Math.max(0.05, (clippedEndMs - clippedStartMs) / 3600000);
         // Only meaningful for still-open events, and only if it actually
-        // falls within this bar's own visible span — otherwise the little
+        // falls within this bar's own visible span - otherwise the little
         // marker line would render outside the bar it's meant to sit on.
         const expectedUpHrs = (!e.completed && e.expectedUp)
           ? (e.expectedUp.getTime() - windowStart.getTime()) / 3600000
@@ -3822,8 +3852,8 @@ function EventTimeline({ breakdowns, workOrders }) {
   const nowOffsetHrs = (nowTick.getTime() - windowStart.getTime()) / 3600000;
   const formatHourTick = (h) => new Date(windowStart.getTime() + h * 3600000).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" });
 
-  // Draws the normal bar rect, plus — for a breakdown that's still open
-  // and has an Expected Up Time set — a thin dark line marking where in
+  // Draws the normal bar rect, plus - for a breakdown that's still open
+  // and has an Expected Up Time set - a thin dark line marking where in
   // the bar that estimate falls. Custom shape rather than a chart-wide
   // ReferenceLine, since every row's expected time is different.
   const DurationBarShape = (props) => {
@@ -3858,7 +3888,7 @@ function EventTimeline({ breakdowns, workOrders }) {
         </select>
       </div>
       <p style={{ fontSize: 12, color: "#898781", margin: "0 0 12px" }}>
-        {formatHourTick(0)} to {formatHourTick(12)} — 6 hours either side of now. In-progress bars keep extending live as time passes.
+        {formatHourTick(0)} to {formatHourTick(12)} - 6 hours either side of now. In-progress bars keep extending live as time passes.
       </p>
       {events.length === 0 ? (
         <div style={{ border: "1px solid #E4E2D8", borderRadius: 10, background: "#fff", padding: 24, textAlign: "center" }}>
@@ -3909,7 +3939,7 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
     });
   }, [breakdowns, workOrders, fromDateTime, toDateTime, assets, selectedFleet, selectedAsset]);
 
-  const formatDT = (v) => v ? new Date(v).toLocaleString("en-ZA", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+  const formatDT = (v) => v ? new Date(v).toLocaleString("en-ZA", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-";
 
   const exportToExcel = () => {
     const now = new Date();
@@ -3969,8 +3999,8 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
                   <td key={key} style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
                     {key === "event" || key === "status" ? <Badge value={r[key]} />
                       : key === "downtime_start" || key === "downtime_end" ? formatDT(r[key])
-                      : key === "downtime_hours" ? (r[key] != null ? Number(r[key]).toFixed(2) : "—")
-                      : (r[key] ?? <span style={{ color: "#B4B2A9" }}>—</span>)}
+                      : key === "downtime_hours" ? (r[key] != null ? Number(r[key]).toFixed(2) : "-")
+                      : (r[key] ?? <span style={{ color: "#B4B2A9" }}>-</span>)}
                   </td>
                 ))}
               </tr>
@@ -4022,8 +4052,8 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
                       {DOWNTIME_SUMMARY_COLUMNS.map(([key]) => (
                         <td key={key} style={{ padding: "5px 8px", border: "1px solid #ccc" }}>
                           {key === "downtime_start" || key === "downtime_end" ? formatDT(r[key])
-                            : key === "downtime_hours" ? (r[key] != null ? Number(r[key]).toFixed(2) : "—")
-                            : (r[key] ?? "—")}
+                            : key === "downtime_hours" ? (r[key] != null ? Number(r[key]).toFixed(2) : "-")
+                            : (r[key] ?? "-")}
                         </td>
                       ))}
                     </tr>
@@ -4127,7 +4157,7 @@ function WorkOrdersPage({ assets, workOrders, userEmail, onRefresh }) {
               <tr key={row.id ?? i} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none" }}>
                 {columns.map((c) => (
                   <td key={c.key} onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>
-                    {c.key === "status" || c.key === "priority" ? <Badge value={row[c.key]} /> : (row[c.key] ?? <span style={{ color: "#B4B2A9" }}>—</span>)}
+                    {c.key === "status" || c.key === "priority" ? <Badge value={row[c.key]} /> : (row[c.key] ?? <span style={{ color: "#B4B2A9" }}>-</span>)}
                   </td>
                 ))}
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
@@ -4216,7 +4246,7 @@ function ServiceScheduleForm({ assets, existing, onClose, onSaved }) {
     setError("");
 
     if (!useHours && !useCalendar && !useCounter) {
-      setError("Turn on at least one trigger — Hours, Calendar, or Usage Counter.");
+      setError("Turn on at least one trigger - Hours, Calendar, or Usage Counter.");
       return;
     }
 
@@ -4266,13 +4296,13 @@ function ServiceScheduleForm({ assets, existing, onClose, onSaved }) {
           {isEdit ? "Edit Service Schedule" : "Add Service Schedule"}
         </h3>
         <p style={{ fontSize: 12, color: "#898781", margin: "0 0 16px" }}>
-          Turn on any combination of triggers below — whichever one is reached first generates the work order.
+          Turn on any combination of triggers below - whichever one is reached first generates the work order.
         </p>
 
         <div style={{ marginBottom: 14 }}>
           <label style={labelStyle}>Equipment</label>
           <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#5F5E5A" } : {}) }}>
-            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} — {a.asset_name}</option>)}
+            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
           </select>
         </div>
 
@@ -4413,7 +4443,7 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
     }
   }, [onRefresh]);
 
-  // Check automatically whenever this page loads — this is what makes PM
+  // Check automatically whenever this page loads - this is what makes PM
   // generation feel automatic rather than something someone has to
   // remember to trigger. The manual button below covers checking again
   // without leaving and re-entering the page.
@@ -4422,7 +4452,7 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
   const handleMarkServiced = async (row) => {
     const asset = assets.find((a) => a.asset_id === row.asset_id);
     if (row.service_interval != null && (!asset || asset.current_hours == null)) {
-      alert("Can't mark this serviced — no current hours on record for this asset yet.");
+      alert("Can't mark this serviced - no current hours on record for this asset yet.");
       return;
     }
     const update = {};
@@ -4464,7 +4494,7 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
         </button>
       </div>
       <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 16px" }}>
-        Overdue hours keep counting even when past due — nothing is capped or hidden. Due maintenance is checked automatically every time this page loads, and generates a work order under Planned Maintenance Jobs below. Use "Mark Serviced" once work is done to reset the interval and start the next count from now.
+        Overdue hours keep counting even when past due - nothing is capped or hidden. Due maintenance is checked automatically every time this page loads, and generates a work order under Planned Maintenance Jobs below. Use "Mark Serviced" once work is done to reset the interval and start the next count from now.
       </p>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
         <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
@@ -4486,19 +4516,19 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
               <tr key={row.id ?? i} style={{ borderBottom: i < plannedMaintenance.length - 1 ? "1px solid #EFEEE7" : "none" }}>
                 <td style={{ padding: "9px 12px", cursor: "pointer" }} onClick={() => { setEditing(row); setShowForm(true); }}>{row.asset_id}</td>
                 <td style={{ padding: "9px 12px" }}>{row.asset_name}</td>
-                <td style={{ padding: "9px 12px" }}>{row.current_hours ?? "—"}</td>
+                <td style={{ padding: "9px 12px" }}>{row.current_hours ?? "-"}</td>
                 <td style={{ padding: "9px 12px", fontSize: 12 }}>
                   {[
                     row.service_interval != null ? `Hours: every ${row.service_interval}` : null,
                     row.calendar_interval_days != null ? `Calendar: every ${row.calendar_interval_days}d` : null,
                     row.counter_interval != null ? `${row.counter_label || "Counter"}: every ${row.counter_interval}` : null,
-                  ].filter(Boolean).join(" · ") || <span style={{ color: "#B4B2A9" }}>—</span>}
+                  ].filter(Boolean).join(" · ") || <span style={{ color: "#B4B2A9" }}>-</span>}
                 </td>
                 <td style={{ padding: "9px 12px", color: row.remaining != null && row.remaining < 0 ? "#C0392B" : "#2C2C2A", fontWeight: row.remaining != null && row.remaining < 0 ? 700 : 400 }}>
-                  {row.remaining != null ? row.remaining.toFixed(1) : "—"}
+                  {row.remaining != null ? row.remaining.toFixed(1) : "-"}
                 </td>
                 <td style={{ padding: "9px 12px" }}><Badge value={row.status} /></td>
-                <td style={{ padding: "9px 12px" }}>{row.assigned_technician ?? "—"}</td>
+                <td style={{ padding: "9px 12px" }}>{row.assigned_technician ?? "-"}</td>
                 <td style={{ padding: "9px 12px" }}>
                   <button onClick={() => setServicing(row)} style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 6, cursor: "pointer", whiteSpace: "nowrap" }}>
                     Mark Serviced
@@ -4540,7 +4570,7 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
                 <td style={{ padding: "9px 12px", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.problem_scope}</td>
                 <td style={{ padding: "9px 12px" }}><Badge value={row.priority} /></td>
                 <td style={{ padding: "9px 12px" }}><Badge value={row.status} /></td>
-                <td style={{ padding: "9px 12px" }}>{row.planned_start ?? "—"}</td>
+                <td style={{ padding: "9px 12px" }}>{row.planned_start ?? "-"}</td>
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
                   <button onClick={() => setPrintingJob(row)} title="Print Job Card" style={{ background: "none", border: "none", color: NAVY, cursor: "pointer", padding: 4, display: "inline-flex", marginRight: 4 }}>
                     <Printer size={15} />
@@ -4593,7 +4623,7 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
           <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 380, maxWidth: "100%" }}>
             <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>Mark {servicing.asset_id} as serviced?</p>
             <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 18px" }}>
-              This resets the interval — Last Service Hours becomes the asset's current hours ({assets.find((a) => a.asset_id === servicing.asset_id)?.current_hours ?? "—"}), and the next due point starts counting from here.
+              This resets the interval - Last Service Hours becomes the asset's current hours ({assets.find((a) => a.asset_id === servicing.asset_id)?.current_hours ?? "-"}), and the next due point starts counting from here.
             </p>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button onClick={() => setServicing(null)} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
@@ -4707,7 +4737,7 @@ function AssetForm({ existing, selectedSiteId, onClose, onSaved }) {
           <label style={labelStyle}>Current Hours (at intake)</label>
           <input type="number" step="0.1" value={openingHours} onChange={(e) => setOpeningHours(e.target.value)} placeholder="e.g. 12450" style={fieldStyle} />
           <p style={{ fontSize: 11.5, color: "#898781", margin: "4px 0 0" }}>
-            The hour-meter reading when this machine was loaded into the system. Shows as Current Hours immediately — once Daily Hours entries start coming in for this asset, those take over automatically.
+            The hour-meter reading when this machine was loaded into the system. Shows as Current Hours immediately - once Daily Hours entries start coming in for this asset, those take over automatically.
           </p>
         </div>
 
@@ -4877,7 +4907,7 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
     } else {
       setNewSiteName("");
       setNewSiteLocation("");
-      setMessage({ type: "success", text: `Site "${newSiteName.trim()}" created. Grant users access to it below — it starts with no data and no one able to see it until you do.` });
+      setMessage({ type: "success", text: `Site "${newSiteName.trim()}" created. Grant users access to it below - it starts with no data and no one able to see it until you do.` });
       loadAll();
       onSitesChanged?.();
     }
@@ -4949,12 +4979,12 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
             {sites.map((s, i) => (
               <tr key={s.id} style={{ borderBottom: i < sites.length - 1 ? "1px solid #EFEEE7" : "none" }}>
                 <td style={{ padding: "9px 12px", fontWeight: 600 }}>{s.site_name}</td>
-                <td style={{ padding: "9px 12px" }}>{s.location || <span style={{ color: "#B4B2A9" }}>—</span>}</td>
+                <td style={{ padding: "9px 12px" }}>{s.location || <span style={{ color: "#B4B2A9" }}>-</span>}</td>
                 <td style={{ padding: "9px 12px" }}><Badge value={s.active ? "Active" : "Inactive"} /></td>
               </tr>
             ))}
             {sites.length === 0 && !loading && (
-              <tr><td colSpan={3} style={{ padding: 20, textAlign: "center", color: "#898781" }}>No sites yet — add one above.</td></tr>
+              <tr><td colSpan={3} style={{ padding: 20, textAlign: "center", color: "#898781" }}>No sites yet - add one above.</td></tr>
             )}
           </tbody>
         </table>
@@ -4962,7 +4992,7 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
 
       <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 6px", color: NAVY }}>User Access</h3>
       <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 12px" }}>
-        Tick a box to grant a user access to that site. A user with only one site never sees a site switcher — it only appears once someone has more than one, which is what makes them a manager in practice. A newly granted site starts completely blank for that user until data gets logged against it. Role controls which tabs they see at all: Manager sees everything, Operator sees only the data-entry tabs (Daily Hours, Fuel Log, Oil Consumption, Breakdowns, Work Orders, Inspections) — no dashboards or reports. Admin is granted separately via SQL, not from here, to avoid accidentally locking yourself out.
+        Tick a box to grant a user access to that site. A user with only one site never sees a site switcher - it only appears once someone has more than one, which is what makes them a manager in practice. A newly granted site starts completely blank for that user until data gets logged against it. Role controls which tabs they see at all: Manager sees everything, Operator sees only the data-entry tabs (Daily Hours, Fuel Log, Oil Consumption, Breakdowns, Work Orders, Inspections) - no dashboards or reports. Admin is granted separately via SQL, not from here, to avoid accidentally locking yourself out.
       </p>
       {loading ? (
         <p style={{ fontSize: 13, color: "#898781" }}>Loading…</p>
@@ -5048,7 +5078,7 @@ function AuditTrailPage({ auditLog, isAdmin }) {
     });
   }, [auditLog, tableFilter, actionFilter, userFilter, fromDate, toDate]);
 
-  const formatDT = (v) => v ? new Date(v).toLocaleString("en-ZA", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+  const formatDT = (v) => v ? new Date(v).toLocaleString("en-ZA", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-";
   const tableLabel = (name) => TABLE_NAME_LABELS[name] || name;
 
   const exportToExcel = () => {
@@ -5118,11 +5148,11 @@ function AuditTrailPage({ auditLog, isAdmin }) {
             {filtered.map((r, i) => (
               <tr key={r.id ?? i} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none" }}>
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{formatDT(r.changed_at)}</td>
-                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.changed_by_email || "—"}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.changed_by_email || "-"}</td>
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{tableLabel(r.table_name)}</td>
                 <td style={{ padding: "9px 12px" }}><Badge value={r.action} /></td>
-                <td style={{ padding: "9px 12px" }}>{r.record_id ?? "—"}</td>
-                <td style={{ padding: "9px 12px" }}>{r.deletion_reason || <span style={{ color: "#B4B2A9" }}>—</span>}</td>
+                <td style={{ padding: "9px 12px" }}>{r.record_id ?? "-"}</td>
+                <td style={{ padding: "9px 12px" }}>{r.deletion_reason || <span style={{ color: "#B4B2A9" }}>-</span>}</td>
               </tr>
             ))}
             {filtered.length === 0 && (
@@ -5172,11 +5202,11 @@ function AuditTrailPage({ auditLog, isAdmin }) {
                   {filtered.map((r, i) => (
                     <tr key={r.id ?? i}>
                       <td style={{ padding: "5px 8px", border: "1px solid #ccc" }}>{formatDT(r.changed_at)}</td>
-                      <td style={{ padding: "5px 8px", border: "1px solid #ccc" }}>{r.changed_by_email || "—"}</td>
+                      <td style={{ padding: "5px 8px", border: "1px solid #ccc" }}>{r.changed_by_email || "-"}</td>
                       <td style={{ padding: "5px 8px", border: "1px solid #ccc" }}>{tableLabel(r.table_name)}</td>
                       <td style={{ padding: "5px 8px", border: "1px solid #ccc" }}>{r.action}</td>
-                      <td style={{ padding: "5px 8px", border: "1px solid #ccc" }}>{r.record_id ?? "—"}</td>
-                      <td style={{ padding: "5px 8px", border: "1px solid #ccc" }}>{r.deletion_reason || "—"}</td>
+                      <td style={{ padding: "5px 8px", border: "1px solid #ccc" }}>{r.record_id ?? "-"}</td>
+                      <td style={{ padding: "5px 8px", border: "1px solid #ccc" }}>{r.deletion_reason || "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -5230,7 +5260,7 @@ function PartsPage({ parts, selectedSiteId, onRefresh }) {
       const wb = XLSX.read(buffer, { type: "array" });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       // The exported file has a title + timestamp + blank row before the
-      // real header row — find it by matching on the known header text
+      // real header row - find it by matching on the known header text
       // rather than assuming a fixed row number, so a plain simple sheet
       // (just headers + data from row 1) also works.
       const raw = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
@@ -5252,7 +5282,7 @@ function PartsPage({ parts, selectedSiteId, onRefresh }) {
         .filter((row) => row.part_no);
 
       if (rows.length === 0) {
-        setImportMessage({ type: "error", text: "No valid rows found — make sure the file has a 'Part No' column with data underneath it." });
+        setImportMessage({ type: "error", text: "No valid rows found - make sure the file has a 'Part No' column with data underneath it." });
         setImporting(false);
         return;
       }
@@ -5260,7 +5290,7 @@ function PartsPage({ parts, selectedSiteId, onRefresh }) {
       const { error } = await supabase.from("parts_inventory").upsert(rows, { onConflict: "site_id,part_no" });
       if (error) throw error;
 
-      setImportMessage({ type: "success", text: `Imported ${rows.length} part${rows.length === 1 ? "" : "s"} — existing part numbers were updated, new ones were added.` });
+      setImportMessage({ type: "success", text: `Imported ${rows.length} part${rows.length === 1 ? "" : "s"} - existing part numbers were updated, new ones were added.` });
       onRefresh();
     } catch (err) {
       setImportMessage({ type: "error", text: err.message || String(err) });
@@ -5303,7 +5333,7 @@ function PartsPage({ parts, selectedSiteId, onRefresh }) {
         </div>
       </div>
       <p style={{ fontSize: 11.5, color: "#898781", margin: "-6px 0 16px" }}>
-        Export the current list, edit it in Excel (add rows, change quantities), then Upload the same file — existing Part Nos get updated, new ones get added. Nothing gets deleted by an upload.
+        Export the current list, edit it in Excel (add rows, change quantities), then Upload the same file - existing Part Nos get updated, new ones get added. Nothing gets deleted by an upload.
       </p>
 
       <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
@@ -5428,7 +5458,7 @@ function AssetsPage({ assets, selectedSiteId, onRefresh }) {
               >
                 {columns.map((c) => (
                   <td key={c.key} style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
-                    {c.key === "status" ? <Badge value={row[c.key]} /> : (row[c.key] ?? <span style={{ color: "#B4B2A9" }}>—</span>)}
+                    {c.key === "status" ? <Badge value={row[c.key]} /> : (row[c.key] ?? <span style={{ color: "#B4B2A9" }}>-</span>)}
                   </td>
                 ))}
               </tr>
@@ -5459,7 +5489,7 @@ function KpiRow({ metrics }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 12, marginBottom: 20 }}>
       {METRIC_DEFS.map((m) => (
-        <MetricCard key={m.key} label={m.label} value={metrics[m.key] != null ? m.fmt(metrics[m.key]) : "—"} />
+        <MetricCard key={m.key} label={m.label} value={metrics[m.key] != null ? m.fmt(metrics[m.key]) : "-"} />
       ))}
     </div>
   );
@@ -5493,7 +5523,7 @@ function aggregateMetrics(kpiRows, assetIds) {
 
 // Every delete goes through here: logs the reason to deletion_log, then
 // performs the actual delete. The existing audit trigger already captures
-// what was deleted automatically — this captures why, as a required step
+// what was deleted automatically - this captures why, as a required step
 // rather than an afterthought.
 async function deleteWithReason(tableName, recordId, idColumn, reason, userEmail) {
   const { error: logError } = await supabase.from("deletion_log").insert({
@@ -5569,7 +5599,7 @@ function FleetEquipmentFilter({ assets, selectedFleet, setSelectedFleet, selecte
         style={selectStyle}
       >
         <option value="">All equipment</option>
-        {filteredAssets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} — {a.asset_name}</option>)}
+        {filteredAssets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
       </select>
     </div>
   );
@@ -5618,7 +5648,7 @@ function FleetPerformance({ assets, breakdowns }) {
   const [kpiError, setKpiError] = useState(null);
 
   // Note: the date range is intentionally NOT reset by any of the
-  // drill-down navigation below — it's set once and stays applied at
+  // drill-down navigation below - it's set once and stays applied at
   // every level (fleet list, fleet detail, equipment detail, compare)
   // until the user changes it themselves.
 
@@ -5700,7 +5730,7 @@ function FleetPerformance({ assets, breakdowns }) {
   }
 
   // ---------------------------------------------------------------
-  // Build the content for whichever level is active — one render tree,
+  // Build the content for whichever level is active - one render tree,
   // with the time frame selector rendered exactly once, above it, so it
   // never disappears or resets while drilling down or backing out.
   // ---------------------------------------------------------------
@@ -5721,9 +5751,9 @@ function FleetPerformance({ assets, breakdowns }) {
               <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>{f.fleet}</p>
               <p style={{ fontSize: 12, color: "#5F5E5A", margin: "0 0 10px" }}>{f.count} equipment</p>
               <div style={{ display: "flex", gap: 14 }}>
-                <span style={{ fontSize: 13 }}><b>{f.metrics.availability != null ? Math.round(f.metrics.availability * 100) : "—"}%</b> avail.</span>
-                <span style={{ fontSize: 13 }}><b>{f.metrics.utilisation != null ? Math.round(f.metrics.utilisation * 100) : "—"}%</b> util.</span>
-                <span style={{ fontSize: 13 }}><b>{f.metrics.breakdown_count ?? "—"}</b> breakdowns</span>
+                <span style={{ fontSize: 13 }}><b>{f.metrics.availability != null ? Math.round(f.metrics.availability * 100) : "-"}%</b> avail.</span>
+                <span style={{ fontSize: 13 }}><b>{f.metrics.utilisation != null ? Math.round(f.metrics.utilisation * 100) : "-"}%</b> util.</span>
+                <span style={{ fontSize: 13 }}><b>{f.metrics.breakdown_count ?? "-"}</b> breakdowns</span>
               </div>
             </button>
           ))}
@@ -5741,7 +5771,7 @@ function FleetPerformance({ assets, breakdowns }) {
         <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 4px", color: NAVY }}>{asset.asset_name}</h3>
         <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 16px" }}>{asset.make} {asset.model} · Serial {asset.serial_number} · <Badge value={asset.status} /></p>
         <KpiRow metrics={{ ...metrics, hours_worked: metrics.worked_hours, breakdown_count: metrics.num_unplanned_events }} />
-        <h4 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 10px", color: NAVY }}>Events — {rangeLabel}</h4>
+        <h4 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 10px", color: NAVY }}>Events - {rangeLabel}</h4>
         {eqBreakdowns.length === 0 ? (
           <p style={{ fontSize: 13, color: "#898781" }}>No events for this machine in the selected date range.</p>
         ) : (
@@ -5784,12 +5814,12 @@ function FleetPerformance({ assets, breakdowns }) {
                   <input type="checkbox" checked={compareIds.includes(a.asset_id)} onChange={() => toggleCompare(a.asset_id)} onClick={(e) => e.stopPropagation()} style={{ width: 16, height: 16 }} />
                 )}
                 <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 13.5, fontWeight: 600, margin: 0, color: "#2C2C2A" }}>{a.asset_id} — {a.asset_name}</p>
+                  <p style={{ fontSize: 13.5, fontWeight: 600, margin: 0, color: "#2C2C2A" }}>{a.asset_id} - {a.asset_name}</p>
                   <p style={{ fontSize: 12, color: "#898781", margin: "2px 0 0" }}>{a.serial_number}</p>
                 </div>
-                <span style={{ fontSize: 13 }}>{m.availability != null ? Math.round(m.availability * 100) : "—"}% avail.</span>
-                <span style={{ fontSize: 13 }}>{m.utilisation != null ? Math.round(m.utilisation * 100) : "—"}% util.</span>
-                <span style={{ fontSize: 13 }}>{m.num_unplanned_events ?? "—"} breakdowns</span>
+                <span style={{ fontSize: 13 }}>{m.availability != null ? Math.round(m.availability * 100) : "-"}% avail.</span>
+                <span style={{ fontSize: 13 }}>{m.utilisation != null ? Math.round(m.utilisation * 100) : "-"}% util.</span>
+                <span style={{ fontSize: 13 }}>{m.num_unplanned_events ?? "-"} breakdowns</span>
                 <Badge value={a.status} />
                 {!compareMode && <ChevronRight size={15} style={{ color: "#B4B2A9" }} />}
               </div>
@@ -5799,7 +5829,7 @@ function FleetPerformance({ assets, breakdowns }) {
 
         {compareMode && compareIds.length >= 2 && (
           <div>
-            <h4 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 10px", color: NAVY }}>Comparison — {rangeLabel}</h4>
+            <h4 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 10px", color: NAVY }}>Comparison - {rangeLabel}</h4>
             <div style={{ overflowX: "auto", border: "1px solid #E4E2D8", borderRadius: 10 }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
@@ -5818,7 +5848,7 @@ function FleetPerformance({ assets, breakdowns }) {
                         const row = kpiByAsset[id];
                         const fieldKey = met.key === "hours_worked" ? "worked_hours" : met.key === "breakdown_count" ? "num_unplanned_events" : met.key;
                         const val = row ? row[fieldKey] : null;
-                        return <td key={id} style={{ padding: "9px 12px" }}>{val != null ? met.fmt(val) : "—"}</td>;
+                        return <td key={id} style={{ padding: "9px 12px" }}>{val != null ? met.fmt(val) : "-"}</td>;
                       })}
                     </tr>
                   ))}
@@ -5864,11 +5894,11 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
   const filteredComponents = useMemo(() => components.filter((c) => filteredAssetIds.has(c.asset_id)), [components, filteredAssetIds]);
   const filteredInspections = useMemo(() => inspections.filter((i) => filteredAssetIds.has(i.asset_id)), [inspections, filteredAssetIds]);
   const filteredMonthKpi = useMemo(() => monthKpi.filter((r) => filteredAssetIds.has(r.asset_id)), [monthKpi, filteredAssetIds]);
-  // Parts Inventory isn't tied to a specific asset/fleet in this schema —
+  // Parts Inventory isn't tied to a specific asset/fleet in this schema -
   // stays unfiltered regardless of fleet selection.
 
   // Ticks forward every 60 seconds so any downtime shown for an in-progress
-  // breakdown or work order stays accurate to the actual current moment —
+  // breakdown or work order stays accurate to the actual current moment -
   // not frozen at whichever instant the page data happened to load. A full
   // page refresh also naturally re-syncs this (nowTick re-initializes to
   // the real current time on mount).
@@ -5900,7 +5930,7 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
   );
 
   const formatLiveHours = (hrs) => {
-    if (hrs == null) return "—";
+    if (hrs == null) return "-";
     if (hrs < 1) return `${Math.round(hrs * 60)} min`;
     return `${hrs.toFixed(1)} hrs`;
   };
@@ -5981,7 +6011,7 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
 
   // Each problem asset broken down by individual breakdown type
   // (component/cause), showing how many times and total hours lost to
-  // each one — not just a single combined count.
+  // each one - not just a single combined count.
   const topProblemEquipment = useMemo(() => {
     const byAsset = {};
     filteredBreakdowns.forEach((b) => {
@@ -6054,12 +6084,12 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: NAVY }}>Currently in progress</h3>
-          <span style={{ fontSize: 11.5, color: "#898781" }}>Live as of {nowTick.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })} — updates automatically</span>
+          <span style={{ fontSize: 11.5, color: "#898781" }}>Live as of {nowTick.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })} - updates automatically</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
           <div style={{ border: "1px solid #E4E2D8", borderRadius: 12, background: "#fff", overflow: "hidden" }}>
             <div onClick={() => onNavigate?.("breakdowns")} style={{ padding: "10px 14px", background: "#FCEBEB", fontSize: 12.5, fontWeight: 700, color: "#791F1F", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span>Events — {inProgressBreakdowns.length} in progress</span>
+              <span>Events - {inProgressBreakdowns.length} in progress</span>
               <ChevronRight size={14} />
             </div>
             {inProgressBreakdowns.length === 0 ? (
@@ -6072,7 +6102,7 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
                   <div key={b.id ?? i} onClick={() => onNavigate?.("breakdowns")} style={{ padding: "10px 14px", borderTop: i > 0 ? "1px solid #EFEEE7" : "none", cursor: "pointer" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                       <div style={{ minWidth: 0 }}>
-                        <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: "#2C2C2A" }}>{b.asset_id} — {b.component_affected || "—"}</p>
+                        <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: "#2C2C2A" }}>{b.asset_id} - {b.component_affected || "-"}</p>
                         <p style={{ fontSize: 11.5, color: "#898781", margin: "2px 0 0" }}>{b.cause_code || "No cause recorded"}</p>
                       </div>
                       <span style={{ fontSize: 13, fontWeight: 700, color: barColor, whiteSpace: "nowrap", marginLeft: 10 }}>{formatLiveHours(b.liveHours)}</span>
@@ -6088,7 +6118,7 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
 
           <div style={{ border: "1px solid #E4E2D8", borderRadius: 12, background: "#fff", overflow: "hidden" }}>
             <div onClick={() => onNavigate?.("work_orders")} style={{ padding: "10px 14px", background: "#FAEEDA", fontSize: 12.5, fontWeight: 700, color: "#633806", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span>Maintenance — {inProgressMaintenance.length} in progress</span>
+              <span>Maintenance - {inProgressMaintenance.length} in progress</span>
               <ChevronRight size={14} />
             </div>
             {inProgressMaintenance.length === 0 ? (
@@ -6100,7 +6130,7 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
                   <div key={w.id ?? i} onClick={() => onNavigate?.("work_orders")} style={{ padding: "10px 14px", borderTop: i > 0 ? "1px solid #EFEEE7" : "none", cursor: "pointer" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                       <div style={{ minWidth: 0 }}>
-                        <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: "#2C2C2A" }}>{w.asset_id} — {w.problem_scope || "—"}</p>
+                        <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: "#2C2C2A" }}>{w.asset_id} - {w.problem_scope || "-"}</p>
                         <p style={{ fontSize: 11.5, color: "#898781", margin: "2px 0 0" }}>{w.technician_vendor || "Unassigned"} · {w.work_type}</p>
                       </div>
                       <span style={{ fontSize: 13, fontWeight: 700, color: "#633806", whiteSpace: "nowrap", marginLeft: 10 }}>{formatLiveHours(w.liveHours)}</span>
@@ -6239,7 +6269,7 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
                 topProblemEquipment.map((p, pi) => (
                   <div key={p.asset_id} onClick={() => onNavigate?.("breakdowns")} style={{ marginBottom: pi < topProblemEquipment.length - 1 ? 16 : 0, cursor: "pointer" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
-                      <span style={{ color: "#2C2C2A", fontWeight: 700 }}>{p.asset_id} — {p.name}</span>
+                      <span style={{ color: "#2C2C2A", fontWeight: 700 }}>{p.asset_id} - {p.name}</span>
                       <span style={{ color: "#5F5E5A" }}>{p.totalCount} breakdown{p.totalCount === 1 ? "" : "s"} · {p.totalHours.toFixed(1)} hrs total</span>
                     </div>
                     <div style={{ background: "#F2F1EA", borderRadius: 6, height: 8, marginBottom: 8 }}>
@@ -6276,7 +6306,7 @@ function buildTableConfig(assets, dailyHours, breakdowns, fuelLog, oilConsumptio
     tyres: { title: "Tyres", cols: [["asset_id","Equipment #"],["position","Position"],["remaining_life","Remaining life (hrs)"],["replacement_due","Status"]], data: tyres },
     parts: { title: "Parts Inventory", cols: [["part_no","Part #"],["description","Description"],["qty_in_stock","Qty in stock"],["minimum_qty","Minimum qty"],["reorder_status","Status"]], data: parts },
     warranty_docs: { title: "Warranty & Documents", cols: [["asset_id","Equipment #"],["type","Type"],["reference","Reference"],["expiry","Expiry"],["status","Status"]], data: warrantyDocs },
-    // Cost Ledger stays on mock data — hidden from the nav per standing request, no point wiring it live yet
+    // Cost Ledger stays on mock data - hidden from the nav per standing request, no point wiring it live yet
     cost_ledger: { title: "Cost Ledger", cols: [["cost_date","Date"],["asset_id","Equipment #"],["cost_type","Cost type"],["description","Description"],["total_cost","Total cost"]], data: costLedger.map(c => ({...c, total_cost: `R${c.total_cost.toLocaleString()}`})) },
     audit: { title: "Audit Trail", cols: [["changed_at","Timestamp"],["changed_by_email","User"],["action","Action"],["table_name","Table"],["record_id","Record #"]], data: auditLog },
   };
@@ -6290,7 +6320,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
   const isMobile = useIsMobile();
   const [selectedSiteId, setSelectedSiteId] = useState(mySites[0]?.id);
 
-  // Live data from Supabase — Assets, Daily Hours, Breakdowns (the
+  // Live data from Supabase - Assets, Daily Hours, Breakdowns (the
   // foundation Dashboard and Fleet Performance are built on).
   const [assets, setAssets] = useState([]);
   const [dailyHours, setDailyHours] = useState([]);
@@ -6331,7 +6361,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
       if (breakdownsRes.error) throw breakdownsRes.error;
       if (currentHoursRes.error) throw currentHoursRes.error;
 
-      // assets table has no current_hours column of its own — it comes
+      // assets table has no current_hours column of its own - it comes
       // from the current_hours view, merged in here by asset_id
       const currentHoursByAsset = Object.fromEntries(
         (currentHoursRes.data || []).map((r) => [r.asset_id, r.current_hours])
@@ -6343,7 +6373,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
 
       // daily_hours_calc / breakdown_log_calc aren't filtered by site at
       // the query level (RLS only guarantees "some site this user can
-      // access", which could be several for a multi-site manager) — so
+      // access", which could be several for a multi-site manager) - so
       // narrow to just the currently selected site's assets here.
       const siteAssetIds = new Set(mergedAssets.map((a) => a.asset_id));
 
@@ -6386,7 +6416,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
       }
 
       // Fetched fresh here (rather than reused from the assets state set
-      // by loadCoreData) to avoid any race between the two loads — this
+      // by loadCoreData) to avoid any race between the two loads - this
       // is the same site-membership filter, just self-contained.
       const siteAssetIds = new Set((siteAssetsRes.data || []).map((a) => a.asset_id));
       const bySite = (rows) => (rows || []).filter((r) => siteAssetIds.has(r.asset_id));
@@ -6407,13 +6437,13 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
         component_type: r.component_name,
         life_used_pct: r.expected_life_hours
           ? `${Math.round((r.current_comp_hrs / r.expected_life_hours) * 100)}%`
-          : "—",
+          : "-",
       })));
       setTyres(bySite(tyreRes.data));
       setParts(partsRes.data || []);
 
       const warrantyRows = bySite(warrRes.data).map((r) => ({
-        asset_id: r.asset_id, type: `Warranty — ${r.component || ""}`.trim(),
+        asset_id: r.asset_id, type: `Warranty - ${r.component || ""}`.trim(),
         reference: r.serial_number, expiry: r.warranty_end, status: r.status,
       }));
       const docRows = bySite(docRes.data).map((r) => ({
@@ -6430,10 +6460,10 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
     }
 
     // Fetched separately and deliberately not allowed to affect the rest
-    // of the app — a non-admin is correctly denied this by RLS, and that
+    // of the app - a non-admin is correctly denied this by RLS, and that
     // denial should be silent from their point of view, not an error
     // banner blocking every other tab's data. Audit Trail intentionally
-    // stays un-scoped by site — as the admin, seeing everything across
+    // stays un-scoped by site - as the admin, seeing everything across
     // every site is the point of it.
     const { data: auditData, error: auditError } = await supabase.from("audit_report").select("*").limit(200);
     if (!auditError) setAuditLog(auditData || []);
@@ -6455,7 +6485,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
     [assets, dailyHours, breakdowns, fuelLog, oilConsumption, workOrders, plannedMaintenance, inspections, components, tyres, parts, warrantyDocs, auditLog]
   );
   const activeConfig = tableConfig[active];
-  // Single source of truth for the page title — NAV already has a label
+  // Single source of truth for the page title - NAV already has a label
   // for every key, so deriving it from there means any new standalone
   // page (like Downtime Summary or MTBF/MTTR) automatically gets a
   // correct title without needing a matching entry in a separate
@@ -6575,7 +6605,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
             </button>
           ))}
 
-          {/* Backlogs — its own collapsible group inside Engineering, same
+          {/* Backlogs - its own collapsible group inside Engineering, same
               expand/collapse pattern as the Engineering heading itself. */}
           {(engineeringExpanded || !sidebarOpen) && (
             <>
@@ -6664,7 +6694,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
               <div style={{ background: "#FAEEDA", border: "1px solid #EBCA95", borderRadius: 10, padding: 24, textAlign: "center" }}>
                 <p style={{ fontWeight: 700, fontSize: 14, color: "#633806", margin: "0 0 6px" }}>No site selected</p>
                 <p style={{ fontSize: 13, color: "#633806", margin: 0 }}>
-                  Either your account has no site access yet, or App.jsx and EngineeringApp.jsx are from different versions — make sure both files were updated together.
+                  Either your account has no site access yet, or App.jsx and EngineeringApp.jsx are from different versions - make sure both files were updated together.
                 </p>
               </div>
             ) : (coreLoading && ["dashboard", "fleet_performance", "assets", "daily_hours", "breakdowns", "downtime_summary"].includes(active)) ||
