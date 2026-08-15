@@ -1,7 +1,7 @@
 import React from "react";
 import { supabase } from "../lib/supabaseClient";
 
-const NAVY = "#1F3864";
+const NAVY = "#02487D";
 
 export default function AccessSuspended() {
   return (

@@ -11,7 +11,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ReferenceLine, LabelList,
 } from "recharts";
 
-const NAVY = "#1F3864";
+const NAVY = "#02487D";
 const GREEN = "#5FBF8F";
 const MOBILE_BREAKPOINT = 720;
 
@@ -3870,7 +3870,7 @@ function GanttTooltip({ active, payload }) {
         <p style={{ margin: "4px 0 0", color: "#5F5E5A" }}>{fmt(item.start)} → {fmt(item.end)}</p>
       )}
       {!item.completed && item.expectedUp && (
-        <p style={{ margin: "4px 0 0", color: "#1F3864", fontWeight: 600 }}>Expected up: {fmt(item.expectedUp)}</p>
+        <p style={{ margin: "4px 0 0", color: NAVY, fontWeight: 600 }}>Expected up: {fmt(item.expectedUp)}</p>
       )}
     </div>
   );
@@ -5491,7 +5491,7 @@ function PartsPage({ parts, selectedSiteId, onRefresh }) {
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
             <tr style={{ background: "#F7F6F1" }}>
-              {["Part #", "Description", "Qty in stock", "Minimum qty", "Status"].map((h) => (
+              {["Part Number", "Part", "Qty in Stock", "Minimum Qty", "Status"].map((h) => (
                 <th key={h} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>{h}</th>
               ))}
             </tr>
@@ -5681,7 +5681,7 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
   };
 
   const columns = [
-    ["supplier", "Supplier"], ["part_description", "Part"], ["part_no", "Part number"],
+    ["supplier", "Supplier"], ["part_description", "Part"], ["part_no", "Part Number"],
     ["price", "Price"], ["price_date", "Last updated"],
   ];
 
@@ -5727,7 +5727,7 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ background: "#F7F6F1" }}>
-                  {["Supplier", "Part", "Part number", "Price", "Stock", ""].map((h) => (
+                  {["Supplier", "Part", "Part Number", "Price", "Stock", ""].map((h) => (
                     <th key={h} style={{ textAlign: "left", padding: "7px 8px", fontWeight: 600, color: "#5F5E5A", fontSize: 12 }}>{h}</th>
                   ))}
                 </tr>
@@ -6414,6 +6414,42 @@ function KpiLegend({ targetLabel }) {
   );
 }
 
+function AboutPage() {
+  const capabilities = [
+    ["Equipment & Events", "A live register of every machine, with breakdowns and planned jobs tracked as Events - each with its own linked Work Orders, parts used, and full downtime history."],
+    ["Daily Operations", "Daily Hours, Fuel Log, Oil Consumption and Daily Service compliance, all tied back to the equipment they belong to."],
+    ["Maintenance & Backlogs", "Work Orders, Planned Maintenance schedules, and a Backlog Report that tracks outstanding items back to where they came from - a daily service, a monthly inspection, or a scanned service card."],
+    ["Parts & Pricing", "Parts Inventory with reorder alerts, and a Quote Price List that reads scanned supplier quotes and keeps a running history of what's been quoted, by whom, and when."],
+    ["Reporting", "Availability, MTBF, MTTR and Utilisation, calculated from the same underlying data as everything else in the system - no separate spreadsheet to keep in sync."],
+    ["Accountability", "Every insert, update and deletion is captured in an Audit Trail, with required reasons for anything removed."],
+  ];
+
+  return (
+    <div style={{ maxWidth: 760 }}>
+      <div style={{ background: NAVY, borderRadius: 12, padding: "32px 28px", marginBottom: 28, color: "#fff" }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 8px" }}>Fleet Tracker</h1>
+        <p style={{ fontSize: 14.5, lineHeight: 1.6, margin: 0, color: "rgba(255,255,255,0.88)" }}>
+          A single system for tracking mining fleet equipment from the moment it's mobilised on site: maintenance, availability, parts, and the reporting that ties it all together - replacing a spreadsheet workbook with one live, multi-site application.
+        </p>
+      </div>
+
+      <h2 style={{ fontSize: 15, fontWeight: 700, color: NAVY, margin: "0 0 14px" }}>What it does</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 14, marginBottom: 28 }}>
+        {capabilities.map(([title, desc]) => (
+          <div key={title} style={{ border: "1px solid #E4E2D8", borderRadius: 10, padding: "14px 16px", background: "#fff" }}>
+            <p style={{ fontSize: 13.5, fontWeight: 700, color: NAVY, margin: "0 0 6px" }}>{title}</p>
+            <p style={{ fontSize: 13, color: "#5F5E5A", margin: 0, lineHeight: 1.5 }}>{desc}</p>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ borderTop: "1px solid #E4E2D8", paddingTop: 16 }}>
+        <p style={{ fontSize: 12.5, color: "#898781", margin: 0 }}>Built by Datavera Analytics.</p>
+      </div>
+    </div>
+  );
+}
+
 function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, components, parts, inspections, onNavigate }) {
   const [monthKpi, setMonthKpi] = useState([]);
   const [monthKpiLoading, setMonthKpiLoading] = useState(true);
@@ -7012,7 +7048,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
   // hardcoded ternary chain. That mismatch is exactly what caused
   // activeConfig to be undefined for those two pages and crash the
   // whole view with no error boundary to catch it.
-  const pageTitle = NAV.find((n) => n.key === active)?.label || activeConfig?.title || "";
+  const pageTitle = active === "about" ? "About" : NAV.find((n) => n.key === active)?.label || activeConfig?.title || "";
 
   // Defense in depth: if an operator's active tab is ever something
   // they're not supposed to see (role changed mid-session, a stale
@@ -7042,7 +7078,20 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
         tbody tr:hover td { background: #F7F6F1; }
         button:not(:disabled):hover { filter: brightness(0.96); }
         button:disabled { cursor: default; }
-        input:focus, select:focus, textarea:focus { outline: none; border-color: #1F3864 !important; box-shadow: 0 0 0 3px rgba(31,56,100,0.12); }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #02487D !important; box-shadow: 0 0 0 3px rgba(2,72,125,0.12); }
+        /* Momentum scrolling for the horizontally-scrollable tables/grids
+           throughout the app, so dragging a wide table sideways on an
+           iPhone/iPad feels native rather than sluggish. */
+        div[style*="overflow-x:auto"], div[style*="overflow-x: auto"] { -webkit-overflow-scrolling: touch; }
+        /* iOS Safari auto-zooms the whole page when a focused input's
+           font-size is under 16px - this is the single most common
+           "why does this feel broken on my phone" complaint on forms.
+           Bumping every text input/select/textarea to 16px on phone-sized
+           screens avoids that without changing how anything looks on a
+           laptop. */
+        @media (max-width: 480px) {
+          input, select, textarea { font-size: 16px !important; }
+        }
       `}</style>
       {/* Backdrop, mobile only, shown when drawer is open */}
       {isMobile && sidebarOpen && (
@@ -7066,7 +7115,15 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
         }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: sidebarOpen ? "space-between" : "center", padding: "16px 14px", borderBottom: "1px solid rgba(255,255,255,0.12)" }}>
-          {sidebarOpen && <span style={{ color: GREEN, fontWeight: 700, fontSize: 15 }}>Fleet Tracker</span>}
+          {sidebarOpen && (
+            <button
+              onClick={() => handleNavClick("about")}
+              title="About Fleet Tracker"
+              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: GREEN, fontWeight: 700, fontSize: 15, textAlign: "left" }}
+            >
+              Fleet Tracker
+            </button>
+          )}
           {!isMobile && (
             <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", padding: 4 }}>
               {sidebarOpen ? <X size={16} /> : <Menu size={16} />}
@@ -7210,7 +7267,9 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
           )}
 
           <PageErrorBoundary key={active}>
-            {!selectedSiteId ? (
+            {active === "about" ? (
+              <AboutPage />
+            ) : !selectedSiteId ? (
               <div style={{ background: "#FAEEDA", border: "1px solid #EBCA95", borderRadius: 10, padding: 24, textAlign: "center" }}>
                 <p style={{ fontWeight: 700, fontSize: 14, color: "#633806", margin: "0 0 6px" }}>No site selected</p>
                 <p style={{ fontSize: 13, color: "#633806", margin: 0 }}>
