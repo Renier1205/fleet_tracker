@@ -1657,19 +1657,38 @@ function WorkOrderForm({ assets, existing, defaultWorkType, onClose, onSaved }) 
 function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
-  const [scanUrl, setScanUrl] = useState(null);
+  const [scans, setScans] = useState([]); // full history, newest first, each with a signed view URL
+  const [scansLoading, setScansLoading] = useState(true);
   const fileInputRef = React.useRef(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadScanUrl() {
-      if (!workOrder.job_card_scan_path) { setScanUrl(null); return; }
-      const { data } = await supabase.storage.from("job-card-scans").createSignedUrl(workOrder.job_card_scan_path, 3600);
-      if (!cancelled) setScanUrl(data?.signedUrl || null);
+  const loadScans = useCallback(async () => {
+    setScansLoading(true);
+    const { data, error } = await supabase
+      .from("work_order_scans")
+      .select("*")
+      .eq("work_order_id", workOrder.id)
+      .order("uploaded_at", { ascending: false });
+    if (error) {
+      console.error("Failed to load scan history:", error.message);
+      setScans([]);
+      setScansLoading(false);
+      return;
     }
-    loadScanUrl();
-    return () => { cancelled = true; };
-  }, [workOrder.job_card_scan_path]);
+    const withUrls = await Promise.all(
+      (data || []).map(async (row) => {
+        const { data: signed } = await supabase.storage
+          .from("job-card-scans")
+          .createSignedUrl(row.storage_path, 3600);
+        return { ...row, url: signed?.signedUrl || null };
+      })
+    );
+    setScans(withUrls);
+    setScansLoading(false);
+  }, [workOrder.id]);
+
+  useEffect(() => {
+    loadScans();
+  }, [loadScans]);
 
   const handleUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -1677,13 +1696,26 @@ function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
     setUploading(true);
     setUploadError("");
     try {
+      // Timestamp-prefixed path — every upload gets its own file, nothing
+      // is overwritten, so the full history stays available in Storage too.
       const path = `${workOrder.wo_no || workOrder.id}/${Date.now()}-${file.name}`;
-      const { error: uploadErr } = await supabase.storage.from("job-card-scans").upload(path, file, { upsert: true });
+      const { error: uploadErr } = await supabase.storage.from("job-card-scans").upload(path, file);
       if (uploadErr) throw uploadErr;
-      const { error: dbErr } = await supabase.from("work_orders")
-        .update({ job_card_scan_path: path, job_card_scan_uploaded_at: new Date().toISOString() })
+      const uploadedAt = new Date().toISOString();
+      const { error: historyErr } = await supabase.from("work_order_scans").insert({
+        work_order_id: workOrder.id,
+        storage_path: path,
+        file_name: file.name,
+        uploaded_at: uploadedAt,
+      });
+      if (historyErr) throw historyErr;
+      // Kept in sync purely for convenience — anything elsewhere that reads
+      // "the latest scan" straight off work_orders still works; the
+      // work_order_scans table above is the source of truth for history.
+      await supabase.from("work_orders")
+        .update({ job_card_scan_path: path, job_card_scan_uploaded_at: uploadedAt })
         .eq("id", workOrder.id);
-      if (dbErr) throw dbErr;
+      await loadScans();
       onUploaded();
     } catch (err) {
       setUploadError(err.message || String(err));
@@ -1772,17 +1804,42 @@ function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
         </div>
 
         <div className="job-card-no-print" style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid #E4E2D8" }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>Completed job card</p>
-          {scanUrl ? (
-            <a href={scanUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: NAVY }}>
-              View uploaded scan {workOrder.job_card_scan_uploaded_at ? `(uploaded ${new Date(workOrder.job_card_scan_uploaded_at).toLocaleDateString("en-ZA")})` : ""}
-            </a>
+          <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>Completed document scans</p>
+
+          {scansLoading ? (
+            <p style={{ fontSize: 12.5, color: "#898781", margin: "0 0 10px" }}>Loading history…</p>
+          ) : scans.length === 0 ? (
+            <p style={{ fontSize: 12.5, color: "#898781", margin: "0 0 10px" }}>Once the technician has completed and signed this document, scan it and upload it here. Every service done against this Work Order can be scanned and kept here — nothing gets overwritten.</p>
           ) : (
-            <p style={{ fontSize: 12.5, color: "#898781", margin: "0 0 10px" }}>Once the technician has completed and signed this job card, scan it and upload it here.</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 4 }}>
+              {scans.map((s) => (
+                <a
+                  key={s.id}
+                  href={s.url || undefined}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+                    fontSize: 13, color: s.url ? NAVY : "#B0AEA6",
+                    background: "#F7F6F2", border: "1px solid #E4E2D8", borderRadius: 8,
+                    padding: "8px 12px", textDecoration: "none",
+                    pointerEvents: s.url ? "auto" : "none",
+                  }}
+                >
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {s.file_name || "Scanned document"}
+                  </span>
+                  <span style={{ fontSize: 11.5, color: "#898781", flexShrink: 0 }}>
+                    {new Date(s.uploaded_at).toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" })}
+                  </span>
+                </a>
+              ))}
+            </div>
           )}
+
           <div style={{ marginTop: 10 }}>
             <button onClick={() => fileInputRef.current?.click()} disabled={uploading} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "7px 14px", borderRadius: 8, cursor: uploading ? "default" : "pointer", opacity: uploading ? 0.6 : 1 }}>
-              <Upload size={14} /> {uploading ? "Uploading…" : scanUrl ? "Replace scan" : "Upload completed job card"}
+              <Upload size={14} /> {uploading ? "Uploading…" : "Upload completed document"}
             </button>
             <input ref={fileInputRef} type="file" accept="image/*,.pdf" onChange={handleUpload} style={{ display: "none" }} />
           </div>
