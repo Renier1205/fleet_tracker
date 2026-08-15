@@ -1091,7 +1091,6 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
 
 
 function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrders, parts, onRefresh }) {
-  const isEdit = !!existing;
   const [assetId, setAssetId] = useState(existing?.asset_id || assets[0]?.asset_id || "");
   const [causeCode, setCauseCode] = useState(existing?.cause_code || CAUSE_CODES[0]);
   const [severity, setSeverity] = useState(existing?.severity || "Medium");
@@ -1108,8 +1107,18 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
     existing?.expected_up_time ? isoToInputValue(existing.expected_up_time) : ""
   );
   const [reportedBy] = useState(existing?.reported_by || userEmail || "");
+  const [isDailyService, setIsDailyService] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // Once a brand-new event has been saved once, we keep the modal open
+  // (rather than closing it) so a Work Order — and parts against it —
+  // can be added immediately, without having to close and reopen. From
+  // that point on this form behaves like it's editing savedRecord.
+  const [savedRecord, setSavedRecord] = useState(existing || null);
+  const currentId = savedRecord?.id;
+  const hasSavedRecord = !!savedRecord;
+  const breakdownDateLabel = downtimeStart ? new Date(downtimeStart).toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" }) : "this date";
 
   // Downtime End only makes sense once the breakdown is actually Closed —
   // an "in progress" event by definition doesn't have an end yet. Auto-fills
@@ -1163,7 +1172,7 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
     // Only relevant when this breakdown will be active after saving — a
     // breakdown being closed out isn't creating a new overlap.
     if (status !== "Closed") {
-      const { conflict, error: checkError } = await checkAssetOverlap(assetId, "breakdown_log", existing?.id);
+      const { conflict, error: checkError } = await checkAssetOverlap(assetId, "breakdown_log", currentId);
       if (checkError) {
         setError(`Couldn't verify this asset is free: ${checkError}`);
         return;
@@ -1177,10 +1186,11 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
     setSaving(true);
     const startDate = new Date(downtimeStart);
     const pad = (n) => String(n).padStart(2, "0");
+    const breakdownDate = `${startDate.getFullYear()}-${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())}`;
 
     const payload = {
       asset_id: assetId,
-      breakdown_date: `${startDate.getFullYear()}-${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())}`,
+      breakdown_date: breakdownDate,
       time_reported: `${pad(startDate.getHours())}:${pad(startDate.getMinutes())}`,
       description,
       cause_code: causeCode,
@@ -1197,11 +1207,34 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
     };
 
     try {
-      const { error: dbError } = isEdit
-        ? await supabase.from("breakdown_log").update(payload).eq("id", existing.id)
-        : await supabase.from("breakdown_log").insert(payload);
-      if (dbError) throw dbError;
-      onSaved();
+      if (hasSavedRecord) {
+        const { error: dbError } = await supabase.from("breakdown_log").update(payload).eq("id", currentId);
+        if (dbError) throw dbError;
+        setSavedRecord({ ...savedRecord, ...payload });
+      } else {
+        const { data, error: dbError } = await supabase.from("breakdown_log").insert(payload).select().single();
+        if (dbError) throw dbError;
+        // Stay open on the just-created record instead of closing — this
+        // is what lets a Work Order (and parts against it) be added right
+        // away, in the same session, instead of having to reopen it.
+        setSavedRecord(data);
+      }
+
+      // Opt-in — ticking this pulls the event straight through to the
+      // Daily Service report for that asset+date, same as logging it
+      // directly there. Upsert is idempotent, so saving again (e.g.
+      // editing the event later) doesn't create a duplicate day.
+      if (isDailyService) {
+        const { error: dsError } = await supabase.from("daily_service_checklist").upsert({
+          asset_id: assetId,
+          service_date: breakdownDate,
+          completed_by: reportedBy || null,
+          notes: `Logged via Event${savedRecord?.wo_reference ? ` ${savedRecord.wo_reference}` : ""}`,
+        }, { onConflict: "asset_id,service_date" });
+        if (dsError) throw dsError;
+      }
+
+      onRefresh?.();
     } catch (err) {
       setError(err.message || String(err));
     } finally {
@@ -1216,7 +1249,7 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
       <form onSubmit={handleSubmit} style={{ background: "#fff", borderRadius: 12, padding: 24, width: 560, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto" }}>
         <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 16px" }}>
-          {isEdit ? "Edit Event" : "Log Event"}
+          {hasSavedRecord ? "Edit Event" : "Log Event"}
         </h3>
 
         <div style={{ marginBottom: 12 }}>
@@ -1276,9 +1309,19 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
           </div>
           <div>
             <label style={labelStyle}>Work Order #</label>
-            <input type="text" value={existing?.wo_reference || "Generated automatically on save"} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#5F5E5A" }} />
+            <input type="text" value={savedRecord?.wo_reference || "Generated automatically on save"} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#5F5E5A" }} />
           </div>
         </div>
+
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, color: "#2C2C2A", margin: "0 0 18px", cursor: "pointer" }}>
+          <input type="checkbox" checked={isDailyService} onChange={(e) => setIsDailyService(e.target.checked)} style={{ width: 16, height: 16, marginTop: 2 }} />
+          <span>
+            This event was the Daily Service
+            <span style={{ display: "block", fontSize: 11.5, color: "#898781", fontWeight: 400 }}>
+              Marks {breakdownDateLabel} as serviced for {assetId} on the Daily Service report — same as logging it there directly.
+            </span>
+          </span>
+        </label>
 
         <div style={{ marginBottom: 18 }}>
           <label style={labelStyle}>Reported By</label>
@@ -1291,16 +1334,22 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
         {error && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>
-            Cancel
+          <button type="button" onClick={() => { if (hasSavedRecord) onSaved(); else onClose(); }} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>
+            {hasSavedRecord ? "Close" : "Cancel"}
           </button>
           <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
-            {saving ? "Saving…" : isEdit ? "Save Changes" : "Log Event"}
+            {saving ? "Saving…" : hasSavedRecord ? "Save Changes" : "Log Event"}
           </button>
         </div>
 
-        {isEdit && (
-          <EventWorkOrdersPanel event={existing} assets={assets} parts={parts} onRefresh={onRefresh} />
+        {!hasSavedRecord && (
+          <p style={{ fontSize: 11.5, color: "#898781", margin: "10px 0 0", textAlign: "center" }}>
+            Save the event first — Work Orders and parts can be added right here once it's saved.
+          </p>
+        )}
+
+        {hasSavedRecord && (
+          <EventWorkOrdersPanel event={savedRecord} assets={assets} parts={parts} onRefresh={onRefresh} />
         )}
       </form>
     </div>
@@ -2783,20 +2832,126 @@ function BacklogsPage({ assets, backlogs, workOrders, userEmail, onRefresh }) {
   );
 }
 
-function DailyServiceForm({ assets, defaultAssetId, defaultDate, userEmail, onClose, onSaved }) {
-  const [assetId, setAssetId] = useState(defaultAssetId || assets[0]?.asset_id || "");
-  const [serviceDate, setServiceDate] = useState(defaultDate || todayForInput());
-  const [completedBy, setCompletedBy] = useState(userEmail || "");
-  const [notes, setNotes] = useState("");
+// Runs entirely in the browser — no server call, no API key, no cost.
+// Downscales the image, converts to grayscale, then flags it as 'dark'
+// if the average brightness is low, or 'blurry' using the variance of
+// a Laplacian edge filter (a standard, cheap sharpness metric — sharp
+// photos have high-variance edges, blurry ones don't). Thresholds are
+// a reasonable starting point, not a guarantee — the raw numbers are
+// kept in the notes so they can be tuned later against real photos.
+function analyzeImageQuality(file) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      try {
+        const maxDim = 400;
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        const { data } = ctx.getImageData(0, 0, w, h);
+
+        const gray = new Float32Array(w * h);
+        let sum = 0;
+        for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+          const g = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          gray[p] = g;
+          sum += g;
+        }
+        const brightness = sum / gray.length;
+
+        let lapSum = 0, lapSumSq = 0, count = 0;
+        for (let y = 1; y < h - 1; y++) {
+          for (let x = 1; x < w - 1; x++) {
+            const idx = y * w + x;
+            const lap = 4 * gray[idx] - gray[idx - 1] - gray[idx + 1] - gray[idx - w] - gray[idx + w];
+            lapSum += lap;
+            lapSumSq += lap * lap;
+            count++;
+          }
+        }
+        const lapMean = lapSum / count;
+        const lapVariance = lapSumSq / count - lapMean * lapMean;
+
+        URL.revokeObjectURL(url);
+
+        const detail = `brightness ${brightness.toFixed(0)}/255, sharpness ${lapVariance.toFixed(0)}`;
+        if (brightness < 55) resolve({ status: "dark", notes: `Looks too dark to read clearly (${detail})` });
+        else if (lapVariance < 120) resolve({ status: "blurry", notes: `Looks blurry or out of focus (${detail})` });
+        else resolve({ status: "ok", notes: detail });
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        resolve({ status: "unchecked", notes: "Quality check couldn't run on this file" });
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve({ status: "unchecked", notes: "Couldn't load this file as an image" });
+    };
+    img.src = url;
+  });
+}
+
+const PHOTO_QUALITY_LABEL = { ok: "Looks clear", blurry: "May be blurry", dark: "May be too dark", unchecked: "Not checked" };
+
+function DailyServiceForm({ assets, defaultAssetId, defaultDate, existing, userEmail, onClose, onSaved }) {
+  const [assetId, setAssetId] = useState(existing?.asset_id || defaultAssetId || assets[0]?.asset_id || "");
+  const [serviceDate, setServiceDate] = useState(existing?.service_date || defaultDate || todayForInput());
+  const [completedBy, setCompletedBy] = useState(existing?.completed_by || userEmail || "");
+  const [notes, setNotes] = useState(existing?.notes || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const [existingPhotoUrl, setExistingPhotoUrl] = useState(null);
+  const [newFile, setNewFile] = useState(null);
+  const [checkingQuality, setCheckingQuality] = useState(false);
+  const [qualityResult, setQualityResult] = useState(null); // { status, notes } for newFile
+  const fileInputRef = React.useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadExistingPhoto() {
+      if (!existing?.photo_path) { setExistingPhotoUrl(null); return; }
+      const { data } = await supabase.storage.from("job-card-scans").createSignedUrl(existing.photo_path, 3600);
+      if (!cancelled) setExistingPhotoUrl(data?.signedUrl || null);
+    }
+    loadExistingPhoto();
+    return () => { cancelled = true; };
+  }, [existing?.photo_path]);
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setNewFile(file);
+    setQualityResult(null);
+    setCheckingQuality(true);
+    const result = await analyzeImageQuality(file);
+    setQualityResult(result);
+    setCheckingQuality(false);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSaving(true);
-    const payload = { asset_id: assetId, service_date: serviceDate, completed_by: completedBy || null, notes: notes || null };
     try {
+      const payload = { asset_id: assetId, service_date: serviceDate, completed_by: completedBy || null, notes: notes || null };
+
+      if (newFile) {
+        const path = `daily-service/${assetId}/${serviceDate}-${Date.now()}-${newFile.name}`;
+        const { error: uploadErr } = await supabase.storage.from("job-card-scans").upload(path, newFile);
+        if (uploadErr) throw uploadErr;
+        payload.photo_path = path;
+        payload.photo_uploaded_at = new Date().toISOString();
+        payload.photo_quality_status = qualityResult?.status || "unchecked";
+        payload.photo_quality_notes = qualityResult?.notes || null;
+      }
+
       const { error: dbError } = await supabase.from("daily_service_checklist").upsert(payload, { onConflict: "asset_id,service_date" });
       if (dbError) throw dbError;
       onSaved();
@@ -2809,10 +2964,11 @@ function DailyServiceForm({ assets, defaultAssetId, defaultDate, userEmail, onCl
 
   const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, boxSizing: "border-box", fontFamily: "inherit" };
   const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" };
+  const flagged = qualityResult && qualityResult.status !== "ok" && qualityResult.status !== "unchecked";
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
-      <form onSubmit={handleSubmit} style={{ background: "#fff", borderRadius: 12, padding: 24, width: 400, maxWidth: "100%" }}>
+      <form onSubmit={handleSubmit} style={{ background: "#fff", borderRadius: 12, padding: 24, width: 420, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto" }}>
         <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 16px" }}>Log Daily Service</h3>
 
         <div style={{ marginBottom: 12 }}>
@@ -2832,9 +2988,54 @@ function DailyServiceForm({ assets, defaultAssetId, defaultDate, userEmail, onCl
           <input type="text" value={completedBy} onChange={(e) => setCompletedBy(e.target.value)} style={fieldStyle} />
         </div>
 
-        <div style={{ marginBottom: 18 }}>
+        <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Notes</label>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} style={{ ...fieldStyle, resize: "vertical" }} />
+        </div>
+
+        <div style={{ marginBottom: 18 }}>
+          <label style={labelStyle}>Photo of Completed Service</label>
+
+          {existingPhotoUrl && !newFile && (
+            <a href={existingPhotoUrl} target="_blank" rel="noreferrer" style={{ display: "block", fontSize: 12.5, color: NAVY, marginBottom: 8 }}>
+              View attached photo {existing?.photo_quality_status && existing.photo_quality_status !== "unchecked" && (
+                <span style={{ marginLeft: 6 }}><Badge value={existing.photo_quality_status === "ok" ? "OK" : existing.photo_quality_status.toUpperCase()} /></span>
+              )}
+            </a>
+          )}
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "7px 14px", borderRadius: 8, cursor: "pointer" }}
+          >
+            <Upload size={14} /> {existingPhotoUrl ? "Replace Photo" : "Take / Attach Photo"}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileChange}
+            style={{ display: "none" }}
+          />
+
+          {newFile && (
+            <p style={{ fontSize: 12, color: "#5F5E5A", margin: "8px 0 0" }}>{newFile.name}</p>
+          )}
+          {checkingQuality && (
+            <p style={{ fontSize: 12, color: "#898781", margin: "6px 0 0" }}>Checking photo quality…</p>
+          )}
+          {qualityResult && !checkingQuality && (
+            <div style={{
+              marginTop: 8, padding: "8px 10px", borderRadius: 8, fontSize: 12,
+              background: flagged ? "#FCEBEB" : "#EAF3DE", color: flagged ? "#791F1F" : "#27500A",
+            }}>
+              {flagged
+                ? `${PHOTO_QUALITY_LABEL[qualityResult.status]} — consider retaking this photo before saving. (${qualityResult.notes})`
+                : `${PHOTO_QUALITY_LABEL[qualityResult.status]}.`}
+            </div>
+          )}
         </div>
 
         {error && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
@@ -2980,6 +3181,7 @@ function DailyServicePage({ assets, dailyServiceChecklist, breakdowns, dailyHour
           assets={assets}
           defaultAssetId={formDefaults.assetId}
           defaultDate={formDefaults.date}
+          existing={checklistByKey.get(`${formDefaults.assetId}|${formDefaults.date}`) || null}
           userEmail={userEmail}
           onClose={() => setShowForm(false)}
           onSaved={() => { setShowForm(false); onRefresh(); }}
