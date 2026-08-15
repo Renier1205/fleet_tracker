@@ -51,7 +51,7 @@ const METRIC_DEFS = [
   { key: "hours_worked", label: "Hours worked", fmt: (v) => Number(v).toLocaleString(undefined, { maximumFractionDigits: 1 }) },
   { key: "availability", label: "Availability", fmt: (v) => `${Math.round(v * 100)}%` },
   { key: "utilisation", label: "Utilisation", fmt: (v) => `${Math.round(v * 100)}%` },
-  { key: "breakdown_count", label: "Breakdowns", fmt: (v) => String(v) },
+  { key: "breakdown_count", label: "Events", fmt: (v) => String(v) },
   { key: "mtbf", label: "MTBF (hrs)", fmt: (v) => Number(v).toLocaleString(undefined, { maximumFractionDigits: 1 }) },
   { key: "mttr", label: "MTTR (hrs)", fmt: (v) => Number(v).toLocaleString(undefined, { maximumFractionDigits: 1 }) },
   { key: "availability_index", label: "Availability Index", fmt: (v) => `${Number(v).toFixed(1)}%` },
@@ -199,7 +199,7 @@ const NAV = [
   { key: "daily_hours", label: "Daily Hours", icon: Clock, operatorVisible: true },
   { key: "fuel_log", label: "Fuel Log", icon: Fuel, operatorVisible: true },
   { key: "oil_consumption", label: "Oil Consumption", icon: Droplet, operatorVisible: true },
-  { key: "breakdowns", label: "Breakdowns", icon: AlertTriangle, operatorVisible: true },
+  { key: "breakdowns", label: "Events", icon: AlertTriangle, operatorVisible: true },
   { key: "work_orders", label: "Work Orders", icon: ClipboardList, operatorVisible: true },
   { key: "downtime_summary", label: "Downtime Summary", icon: FileBarChart },
   { key: "mtbf_mttr", label: "MTBF / MTTR Report", icon: Activity },
@@ -1090,7 +1090,7 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
 }
 
 
-function BreakdownForm({ assets, existing, onClose, onSaved, userEmail }) {
+function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrders, parts, onRefresh }) {
   const isEdit = !!existing;
   const [assetId, setAssetId] = useState(existing?.asset_id || assets[0]?.asset_id || "");
   const [causeCode, setCauseCode] = useState(existing?.cause_code || CAUSE_CODES[0]);
@@ -1214,9 +1214,9 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
-      <form onSubmit={handleSubmit} style={{ background: "#fff", borderRadius: 12, padding: 24, width: 480, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto" }}>
+      <form onSubmit={handleSubmit} style={{ background: "#fff", borderRadius: 12, padding: 24, width: 560, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto" }}>
         <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 16px" }}>
-          {isEdit ? "Edit Breakdown" : "Log Breakdown"}
+          {isEdit ? "Edit Event" : "Log Event"}
         </h3>
 
         <div style={{ marginBottom: 12 }}>
@@ -1295,15 +1295,19 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail }) {
             Cancel
           </button>
           <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
-            {saving ? "Saving…" : isEdit ? "Save Changes" : "Log Breakdown"}
+            {saving ? "Saving…" : isEdit ? "Save Changes" : "Log Event"}
           </button>
         </div>
+
+        {isEdit && (
+          <EventWorkOrdersPanel event={existing} assets={assets} parts={parts} onRefresh={onRefresh} />
+        )}
       </form>
     </div>
   );
 }
 
-function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail }) {
+function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, parts }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState("");
@@ -1351,7 +1355,7 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail }) {
     const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
     const headerRow = columns.map((c) => c.label);
     const dataRows = filtered.map((row) => columns.map((c) => row[c.key] ?? ""));
-    const aoa = [["Breakdowns"], [`Exported: ${timestamp}`], [], headerRow, ...dataRows];
+    const aoa = [["Events"], [`Exported: ${timestamp}`], [], headerRow, ...dataRows];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     ws["!merges"] = [
       { s: { r: 0, c: 0 }, e: { r: 0, c: columns.length - 1 } },
@@ -1359,8 +1363,8 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail }) {
     ];
     ws["!cols"] = columns.map((c) => ({ wch: Math.max(c.label.length + 2, 14) }));
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Breakdowns");
-    XLSX.writeFile(wb, `Breakdowns_${now.toISOString().slice(0, 10)}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "Events");
+    XLSX.writeFile(wb, `Events_${now.toISOString().slice(0, 10)}.xlsx`);
   };
 
   return (
@@ -1372,7 +1376,7 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail }) {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search breakdowns"
+            placeholder="Search events"
             style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #D3D1C7", borderRadius: 8, outline: "none" }}
           />
         </div>
@@ -1387,7 +1391,7 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail }) {
             onClick={() => { setEditing(null); setShowForm(true); }}
             style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}
           >
-            + Log Breakdown
+            + Log Event
           </button>
         </div>
       </div>
@@ -1432,7 +1436,7 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail }) {
             })}
             {filtered.length === 0 && (
               <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#898781" }}>
-                {breakdowns.length === 0 ? "No breakdowns logged yet." : "No breakdowns match your search."}
+                {breakdowns.length === 0 ? "No events logged yet." : "No events match your search."}
               </td></tr>
             )}
           </tbody>
@@ -1446,12 +1450,15 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail }) {
           onClose={() => { setShowForm(false); setEditing(null); }}
           onSaved={handleSaved}
           userEmail={userEmail}
+          workOrders={workOrders}
+          parts={parts}
+          onRefresh={onRefresh}
         />
       )}
 
       {deleting && (
         <DeleteConfirmModal
-          itemLabel={`breakdown on ${deleting.asset_id} (${deleting.component_affected || "no component set"}, ${deleting.breakdown_date})`}
+          itemLabel={`event on ${deleting.asset_id} (${deleting.component_affected || "no component set"}, ${deleting.breakdown_date})`}
           userEmail={userEmail}
           onCancel={() => setDeleting(null)}
           onConfirm={handleDelete}
@@ -1465,9 +1472,9 @@ const WORK_ORDER_TYPES = ["Corrective", "Preventive"];
 const WORK_ORDER_PRIORITIES = ["Low", "Medium", "High", "Critical"];
 const WORK_ORDER_STATUSES = ["Open", "Planned", "In Progress", "Awaiting Parts", "Closed"];
 
-function WorkOrderForm({ assets, existing, defaultWorkType, onClose, onSaved }) {
+function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, eventId, onClose, onSaved }) {
   const isEdit = !!existing;
-  const [assetId, setAssetId] = useState(existing?.asset_id || assets[0]?.asset_id || "");
+  const [assetId, setAssetId] = useState(existing?.asset_id || defaultAssetId || assets[0]?.asset_id || "");
   const [workType, setWorkType] = useState(existing?.work_type || defaultWorkType || "Corrective");
   const [priority, setPriority] = useState(existing?.priority || "Medium");
   const [problemScope, setProblemScope] = useState(existing?.problem_scope || "");
@@ -1543,7 +1550,7 @@ function WorkOrderForm({ assets, existing, defaultWorkType, onClose, onSaved }) 
       actual_finish: actualFinish ? new Date(actualFinish).toISOString() : null,
       technician_vendor: technicianVendor || null,
       closeout_notes: closeoutNotes || null,
-      ...(isEdit ? {} : { request_date: todayForInput() }),
+      ...(isEdit ? {} : { request_date: todayForInput(), event_id: eventId || null }),
     };
 
     try {
@@ -1575,7 +1582,7 @@ function WorkOrderForm({ assets, existing, defaultWorkType, onClose, onSaved }) 
 
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Equipment</label>
-          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required style={fieldStyle}>
+          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit || !!eventId} style={{ ...fieldStyle, ...((isEdit || eventId) ? { background: "#F2F1EA", color: "#5F5E5A" } : {}) }}>
             {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} — {a.asset_name}</option>)}
           </select>
         </div>
@@ -1653,6 +1660,236 @@ function WorkOrderForm({ assets, existing, defaultWorkType, onClose, onSaved }) 
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function PartUsedForm({ parts, workOrder, onClose, onSaved }) {
+  const [partId, setPartId] = useState(parts[0]?.id || "");
+  const [qty, setQty] = useState(1);
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const selectedPart = parts.find((p) => String(p.id) === String(partId));
+
+  if (parts.length === 0) {
+    return (
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 70, padding: 16 }}>
+        <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No parts in inventory yet</p>
+          <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 18px" }}>Add parts on the Parts Inventory tab first.</p>
+          <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
+        </div>
+      </div>
+    );
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    const qtyNum = Number(qty);
+    if (!qtyNum || qtyNum <= 0) { setError("Enter a quantity greater than 0."); return; }
+    if (selectedPart && qtyNum > (selectedPart.qty_in_stock ?? 0)) {
+      setError(`Only ${selectedPart.qty_in_stock ?? 0} in stock for ${selectedPart.part_no}.`);
+      return;
+    }
+    setSaving(true);
+    try {
+      const { error: insertErr } = await supabase.from("parts_used").insert({
+        work_order_id: workOrder.id,
+        part_id: Number(partId),
+        qty_used: qtyNum,
+        notes: notes || null,
+      });
+      if (insertErr) throw insertErr;
+
+      // Stock is reduced immediately (automatic) — a future Stores module
+      // is what will let a store manager confirm/adjust the final count;
+      // for now "Confirmed" is just a status flag on the parts_used row.
+      const { error: stockErr } = await supabase.from("parts_inventory")
+        .update({ qty_in_stock: (selectedPart?.qty_in_stock ?? 0) - qtyNum })
+        .eq("id", partId);
+      if (stockErr) throw stockErr;
+
+      onSaved();
+    } catch (err) {
+      setError(err.message || String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #D3D1C7", borderRadius: 8, boxSizing: "border-box", fontFamily: "inherit" };
+  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#2C2C2A", margin: "0 0 4px" };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 70, padding: 16 }}>
+      <form onSubmit={handleSubmit} style={{ background: "#fff", borderRadius: 12, padding: 24, width: 400, maxWidth: "100%" }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>Add Part Used</h3>
+        <p style={{ fontSize: 12, color: "#898781", margin: "0 0 16px" }}>Against Work Order {workOrder.wo_no}</p>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Part</label>
+          <select value={partId} onChange={(e) => setPartId(e.target.value)} required style={fieldStyle}>
+            {parts.map((p) => <option key={p.id} value={p.id}>{p.part_no} — {p.description} ({p.qty_in_stock ?? 0} in stock)</option>)}
+          </select>
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Quantity</label>
+          <input type="number" min="1" step="1" value={qty} onChange={(e) => setQty(e.target.value)} required style={fieldStyle} />
+        </div>
+
+        <div style={{ marginBottom: 18 }}>
+          <label style={labelStyle}>Notes</label>
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} style={{ ...fieldStyle, resize: "vertical" }} />
+        </div>
+
+        {error && <p style={{ color: "#C0392B", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #D3D1C7", color: "#2C2C2A", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
+            {saving ? "Saving…" : "Add Part"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function PartsUsedList({ workOrder, parts }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+
+  const partById = useMemo(() => Object.fromEntries(parts.map((p) => [p.id, p])), [parts]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from("parts_used").select("*").eq("work_order_id", workOrder.id).order("created_at", { ascending: false });
+    if (!error) setRows(data || []);
+    setLoading(false);
+  }, [workOrder.id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const confirmRow = async (row) => {
+    await supabase.from("parts_used").update({ status: "Confirmed", confirmed_at: new Date().toISOString() }).eq("id", row.id);
+    load();
+  };
+
+  return (
+    <div style={{ background: "#F9F8F4", borderRadius: 8, padding: "10px 12px", marginTop: 6 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: "#5F5E5A", textTransform: "uppercase", letterSpacing: 0.3 }}>Parts Used</span>
+        <button onClick={() => setShowAdd(true)} style={{ background: "none", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 11.5, fontWeight: 600, padding: "3px 10px", borderRadius: 6, cursor: "pointer" }}>
+          + Add Part
+        </button>
+      </div>
+      {loading ? (
+        <p style={{ fontSize: 12, color: "#898781", margin: 0 }}>Loading…</p>
+      ) : rows.length === 0 ? (
+        <p style={{ fontSize: 12, color: "#898781", margin: 0 }}>No parts logged against this Work Order yet.</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {rows.map((r) => {
+            const p = partById[r.part_id];
+            return (
+              <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, background: "#fff", border: "1px solid #E4E2D8", borderRadius: 6, padding: "5px 9px" }}>
+                <span>{p ? `${p.part_no} — ${p.description}` : "Part"} × {r.qty_used}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Badge value={r.status} />
+                  {r.status === "Pending" && (
+                    <button onClick={() => confirmRow(r)} style={{ background: "none", border: "none", color: "#27500A", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>Confirm</button>
+                  )}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {showAdd && (
+        <PartUsedForm parts={parts} workOrder={workOrder} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); load(); }} />
+      )}
+    </div>
+  );
+}
+
+function EventWorkOrdersPanel({ event, assets, parts, onRefresh }) {
+  const [linked, setLinked] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showWoForm, setShowWoForm] = useState(false);
+  const [editingWo, setEditingWo] = useState(null);
+  const [expanded, setExpanded] = useState(null); // wo.id currently showing its Parts Used
+
+  // Queried directly against work_orders (not the work_orders_calc view
+  // used elsewhere) — event_id is a brand-new column and the calc view
+  // predates it, so this is the one place guaranteed to have it without
+  // needing that view's definition touched.
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from("work_orders").select("*").eq("event_id", event.id).order("id", { ascending: false });
+    if (!error) setLinked(data || []);
+    setLoading(false);
+  }, [event.id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleWoSaved = () => {
+    setShowWoForm(false);
+    setEditingWo(null);
+    load();
+    onRefresh?.();
+  };
+
+  return (
+    <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid #E4E2D8" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: 0 }}>Linked Work Orders</p>
+        <button type="button" onClick={() => { setEditingWo(null); setShowWoForm(true); }} style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12.5, fontWeight: 600, padding: "6px 12px", borderRadius: 8, cursor: "pointer" }}>
+          + Add Work Order
+        </button>
+      </div>
+
+      {loading ? (
+        <p style={{ fontSize: 12.5, color: "#898781", margin: 0 }}>Loading…</p>
+      ) : linked.length === 0 ? (
+        <p style={{ fontSize: 12.5, color: "#898781", margin: 0 }}>No Work Orders linked to this event yet — each one gets its own work order number, and you can log parts used against it once it's created.</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {linked.map((w) => (
+            <div key={w.id} style={{ border: "1px solid #E4E2D8", borderRadius: 8, padding: "10px 12px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => { setEditingWo(w); setShowWoForm(true); }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: NAVY }}>{w.wo_no}</span>
+                  <span style={{ fontSize: 12.5, color: "#5F5E5A" }}>{w.component || "No component set"}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Badge value={w.priority} />
+                  <Badge value={w.status} />
+                  <button onClick={() => setExpanded(expanded === w.id ? null : w.id)} style={{ background: "none", border: "none", color: NAVY, cursor: "pointer", padding: 2, display: "inline-flex" }}>
+                    <ChevronDown size={15} style={{ transform: expanded === w.id ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
+                  </button>
+                </div>
+              </div>
+              {expanded === w.id && <PartsUsedList workOrder={w} parts={parts} />}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showWoForm && (
+        <WorkOrderForm
+          assets={assets}
+          existing={editingWo}
+          defaultAssetId={event.asset_id}
+          eventId={event.id}
+          onClose={() => { setShowWoForm(false); setEditingWo(null); }}
+          onSaved={handleWoSaved}
+        />
+      )}
     </div>
   );
 }
@@ -5302,9 +5539,9 @@ function FleetPerformance({ assets, breakdowns }) {
         <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 4px", color: NAVY }}>{asset.asset_name}</h3>
         <p style={{ fontSize: 13, color: "#5F5E5A", margin: "0 0 16px" }}>{asset.make} {asset.model} · Serial {asset.serial_number} · <Badge value={asset.status} /></p>
         <KpiRow metrics={{ ...metrics, hours_worked: metrics.worked_hours, breakdown_count: metrics.num_unplanned_events }} />
-        <h4 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 10px", color: NAVY }}>Breakdowns — {rangeLabel}</h4>
+        <h4 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 10px", color: NAVY }}>Events — {rangeLabel}</h4>
         {eqBreakdowns.length === 0 ? (
-          <p style={{ fontSize: 13, color: "#898781" }}>No breakdowns for this machine in the selected date range.</p>
+          <p style={{ fontSize: 13, color: "#898781" }}>No events for this machine in the selected date range.</p>
         ) : (
           <DataTable
             columns={[["breakdown_date","Date"],["wo_reference","Work order #"],["component_affected","Component"],["severity","Severity"],["repair_status","Status"],["downtime_hours","Downtime (hrs)"]].map(([key,label])=>({key,label}))}
@@ -5620,11 +5857,11 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
           <div style={{ border: "1px solid #E4E2D8", borderRadius: 12, background: "#fff", overflow: "hidden" }}>
             <div onClick={() => onNavigate?.("breakdowns")} style={{ padding: "10px 14px", background: "#FCEBEB", fontSize: 12.5, fontWeight: 700, color: "#791F1F", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span>Breakdowns — {inProgressBreakdowns.length} in progress</span>
+              <span>Events — {inProgressBreakdowns.length} in progress</span>
               <ChevronRight size={14} />
             </div>
             {inProgressBreakdowns.length === 0 ? (
-              <p style={{ padding: 14, fontSize: 13, color: "#898781", margin: 0 }}>No open breakdowns right now.</p>
+              <p style={{ padding: 14, fontSize: 13, color: "#898781", margin: 0 }}>No open events right now.</p>
             ) : (
               inProgressBreakdowns.map((b, i) => {
                 const barColor = b.liveHours > 8 ? "#C0392B" : b.liveHours > 2 ? "#E8A33D" : "#5FBF8F";
@@ -6229,14 +6466,14 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
                 </p>
               </div>
             ) : (coreLoading && ["dashboard", "fleet_performance", "assets", "daily_hours", "breakdowns", "downtime_summary"].includes(active)) ||
-             (restLoading && ["dashboard", "fuel_log", "oil_consumption", "work_orders", "downtime_summary", "planned_maintenance", "inspections", "components", "tyres", "parts", "warranty_docs", "audit", "backlog_report", "daily_service"].includes(active)) ? (
+             (restLoading && ["dashboard", "fuel_log", "oil_consumption", "work_orders", "downtime_summary", "planned_maintenance", "inspections", "components", "tyres", "parts", "warranty_docs", "audit", "backlog_report", "daily_service", "breakdowns"].includes(active)) ? (
               <p style={{ fontSize: 13, color: "#898781" }}>Loading…</p>
             ) : active === "dashboard" ? (
               <Dashboard assets={assets} breakdowns={breakdowns} workOrders={workOrders} plannedMaintenance={plannedMaintenance} components={components} parts={parts} inspections={inspections} onNavigate={setActive} />
             ) : active === "fleet_performance" ? (
               <FleetPerformance assets={assets} breakdowns={breakdowns} />
             ) : active === "breakdowns" ? (
-              <BreakdownsPage assets={assets} breakdowns={breakdowns} onRefresh={loadCoreData} userEmail={userEmail} />
+              <BreakdownsPage assets={assets} breakdowns={breakdowns} workOrders={workOrders} parts={parts} onRefresh={() => { loadCoreData(); loadRestOfData(); }} userEmail={userEmail} />
             ) : active === "assets" ? (
               <AssetsPage assets={assets} selectedSiteId={selectedSiteId} onRefresh={loadCoreData} />
             ) : active === "daily_hours" ? (
