@@ -1156,6 +1156,10 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
     e.preventDefault();
     setError("");
 
+    if (!description.trim()) {
+      setError("Description is required.");
+      return;
+    }
     if (new Date(downtimeStart) > new Date()) {
       setError("Downtime Start can't be in the future - only past or present times are allowed.");
       return;
@@ -1315,8 +1319,8 @@ function BreakdownForm({ assets, existing, onClose, onSaved, userEmail, workOrde
         </div>
 
         <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>Description</label>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} style={{ ...fieldStyle, resize: "vertical" }} />
+          <label style={labelStyle}>Description *</label>
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} required style={{ ...fieldStyle, resize: "vertical" }} />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
@@ -1382,17 +1386,35 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
   const [deleting, setDeleting] = useState(null); // row pending delete confirmation
   const [selectedFleet, setSelectedFleet] = useState("");
   const [selectedAsset, setSelectedAsset] = useState("");
+  const [sortKey, setSortKey] = useState("downtime_start");
+  const [sortDir, setSortDir] = useState("desc");
 
   const columns = [
-    ["breakdown_date", "Booked Off"], ["asset_id", "Equipment #"], ["wo_reference", "Work order #"],
-    ["component_affected", "Component"], ["cause_code", "Cause"], ["severity", "Severity"],
-    ["repair_status", "Status"], ["downtime_end", "Back Up"], ["downtime_hours", "Downtime (hrs)"],
+    ["asset_id", "Equipment #"], ["component_affected", "Event"], ["cause_code", "Reason"],
+    ["description", "Description"], ["wo_reference", "WO-number"],
+    ["downtime_start", "Downtime Start"], ["downtime_end", "Downtime End"],
+    ["downtime_hours", "Downtime Hours"], ["repair_status", "Status"],
   ].map(([key, label]) => ({ key, label }));
 
-  const formatBookedOff = (row) => row.breakdown_date ? `${row.breakdown_date}${row.time_reported ? ` ${row.time_reported}` : ""}` : "";
-  const formatBackUp = (row) => row.downtime_end
-    ? new Date(row.downtime_end).toLocaleString("en-ZA", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "")
+  const formatDateTime = (iso) => iso
+    ? new Date(iso).toLocaleString("en-ZA", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "")
     : "";
+
+  // Same comparator drives every column - clicking Status groups equal
+  // values together as a side effect of sorting, same as any other
+  // column; no special-case grouping logic needed beyond that.
+  const sortValue = (row, key) => {
+    if (key === "downtime_start" || key === "downtime_end") {
+      return row[key] ? new Date(row[key]).getTime() : Infinity; // still-open events sort to the end
+    }
+    if (key === "downtime_hours") return Number(row[key] ?? 0);
+    return String(row[key] ?? "").toLowerCase();
+  };
+
+  const toggleSort = (key) => {
+    if (key === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("asc"); }
+  };
 
   const filtered = useMemo(() => {
     let rows = breakdowns;
@@ -1408,8 +1430,13 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
       const q = query.toLowerCase();
       rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q)));
     }
-    return [...rows].sort((a, b) => (b.breakdown_date || "").localeCompare(a.breakdown_date || ""));
-  }, [breakdowns, assets, query, selectedFleet, selectedAsset]);
+    return [...rows].sort((a, b) => {
+      const va = sortValue(a, sortKey), vb = sortValue(b, sortKey);
+      if (va < vb) return sortDir === "asc" ? -1 : 1;
+      if (va > vb) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [breakdowns, assets, query, selectedFleet, selectedAsset, sortKey, sortDir]);
 
   const handleSaved = () => {
     setShowForm(false);
@@ -1428,8 +1455,8 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
     const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
     const headerRow = columns.map((c) => c.label);
     const dataRows = filtered.map((row) => columns.map((c) =>
-      c.key === "breakdown_date" ? formatBookedOff(row)
-      : c.key === "downtime_end" ? (formatBackUp(row) || "Still down")
+      c.key === "downtime_start" ? formatDateTime(row.downtime_start)
+      : c.key === "downtime_end" ? (formatDateTime(row.downtime_end) || "Still down")
       : (row[c.key] ?? "")
     ));
     const aoa = [["Events"], [`Exported: ${timestamp}`], [], headerRow, ...dataRows];
@@ -1478,7 +1505,17 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
           <thead>
             <tr style={{ background: "#F7F6F1" }}>
               {columns.map((c) => (
-                <th key={c.key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8" }}>{c.label}</th>
+                <th
+                  key={c.key}
+                  onClick={() => toggleSort(c.key)}
+                  title="Click to sort"
+                  style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#5F5E5A", whiteSpace: "nowrap", borderBottom: "1px solid #E4E2D8", cursor: "pointer", userSelect: "none" }}
+                >
+                  {c.label}
+                  <span style={{ display: "inline-block", width: 12, textAlign: "center", color: sortKey === c.key ? NAVY : "#C7C5BB" }}>
+                    {sortKey === c.key ? (sortDir === "asc" ? "▲" : "▼") : "↕"}
+                  </span>
+                </th>
               ))}
               <th style={{ padding: "9px 12px", borderBottom: "1px solid #E4E2D8" }}></th>
             </tr>
@@ -1493,9 +1530,9 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
                 >
                   {columns.map((c) => (
                     <td key={c.key} onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>
-                      {c.key === "repair_status" || c.key === "severity" ? <Badge value={row[c.key]} />
-                        : c.key === "breakdown_date" ? formatBookedOff(row)
-                        : c.key === "downtime_end" ? (formatBackUp(row) || <span style={{ color: "#B4B2A9" }}>Still down</span>)
+                      {c.key === "repair_status" ? <Badge value={row[c.key]} />
+                        : c.key === "downtime_start" ? formatDateTime(row.downtime_start)
+                        : c.key === "downtime_end" ? (formatDateTime(row.downtime_end) || <span style={{ color: "#B4B2A9" }}>Still down</span>)
                         : c.key === "component_affected" && isRepeat ? (
                           <span title={`${row.repeat_count} breakdowns on this component for this machine`} style={{ display: "flex", alignItems: "center", gap: 5 }}>
                             {row[c.key] || <span style={{ color: "#B4B2A9" }}>-</span>}
@@ -3799,7 +3836,7 @@ function GanttTooltip({ active, payload }) {
 // BarChart using the standard technique for faking a Gantt with a
 // generic bar library - a transparent "offset" segment positions each
 // bar's start, stacked with a visible "duration" segment for its length.
-function EventTimeline({ breakdowns, workOrders }) {
+function EventTimeline({ breakdowns, workOrders, fromDateTime, toDateTime }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [nowTick, setNowTick] = useState(() => new Date());
 
@@ -3808,8 +3845,14 @@ function EventTimeline({ breakdowns, workOrders }) {
     return () => clearInterval(interval);
   }, []);
 
-  const windowStart = useMemo(() => new Date(nowTick.getTime() - 6 * 3600000), [nowTick]);
-  const windowEnd = useMemo(() => new Date(nowTick.getTime() + 6 * 3600000), [nowTick]);
+  // Driven by the page's own date range picker when provided (Downtime
+  // Summary) - selecting a range changes what the timeline shows, same
+  // as it changes the table below it. Falls back to a live ±6h window
+  // around "now" when no range is passed in (Dashboard's usage).
+  const windowStart = useMemo(() => fromDateTime ? new Date(fromDateTime) : new Date(nowTick.getTime() - 6 * 3600000), [fromDateTime, nowTick]);
+  const windowEnd = useMemo(() => toDateTime ? new Date(toDateTime) : new Date(nowTick.getTime() + 6 * 3600000), [toDateTime, nowTick]);
+  const windowHrs = Math.max(0.1, (windowEnd.getTime() - windowStart.getTime()) / 3600000);
+  const nowInWindow = nowTick >= windowStart && nowTick <= windowEnd;
 
   const events = useMemo(() => {
     const bEvents = breakdowns
@@ -3837,7 +3880,7 @@ function EventTimeline({ breakdowns, workOrders }) {
         const clippedStartMs = Math.max(e.start.getTime(), windowStart.getTime());
         const clippedEndMs = Math.min(effectiveEnd.getTime(), windowEnd.getTime());
         const offsetHrs = (clippedStartMs - windowStart.getTime()) / 3600000;
-        const durationHrs = Math.max(0.05, (clippedEndMs - clippedStartMs) / 3600000);
+        const durationHrs = Math.max(windowHrs * 0.004, (clippedEndMs - clippedStartMs) / 3600000);
         // Only meaningful for still-open events, and only if it actually
         // falls within this bar's own visible span - otherwise the little
         // marker line would render outside the bar it's meant to sit on.
@@ -3847,10 +3890,12 @@ function EventTimeline({ breakdowns, workOrders }) {
         return { ...e, offsetHrs, durationHrs, expectedUpHrs };
       })
       .sort((a, b) => a.offsetHrs - b.offsetHrs);
-  }, [breakdowns, workOrders, statusFilter, nowTick, windowStart, windowEnd]);
+  }, [breakdowns, workOrders, statusFilter, nowTick, windowStart, windowEnd, windowHrs]);
 
   const nowOffsetHrs = (nowTick.getTime() - windowStart.getTime()) / 3600000;
-  const formatHourTick = (h) => new Date(windowStart.getTime() + h * 3600000).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" });
+  const formatTick = (h) => new Date(windowStart.getTime() + h * 3600000).toLocaleString("en-ZA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  const tickCount = 6;
+  const ticks = Array.from({ length: tickCount + 1 }, (_, i) => Math.round((windowHrs / tickCount) * i * 100) / 100);
 
   // Draws the normal bar rect, plus - for a breakdown that's still open
   // and has an Expected Up Time set - a thin dark line marking where in
@@ -3888,21 +3933,23 @@ function EventTimeline({ breakdowns, workOrders }) {
         </select>
       </div>
       <p style={{ fontSize: 12, color: "#898781", margin: "0 0 12px" }}>
-        {formatHourTick(0)} to {formatHourTick(12)} - 6 hours either side of now. In-progress bars keep extending live as time passes.
+        {formatTick(0)} to {formatTick(windowHrs)}{fromDateTime && toDateTime ? " - matches the date range selected below." : " - 6 hours either side of now."} In-progress bars keep extending live as time passes.
       </p>
       {events.length === 0 ? (
         <div style={{ border: "1px solid #E4E2D8", borderRadius: 10, background: "#fff", padding: 24, textAlign: "center" }}>
-          <p style={{ fontSize: 13, color: "#898781", margin: 0 }}>No events in this 12-hour window.</p>
+          <p style={{ fontSize: 13, color: "#898781", margin: 0 }}>No events in this date range.</p>
         </div>
       ) : (
         <div style={{ height: Math.max(180, events.length * 38 + 50), background: "#fff", border: "1px solid #E4E2D8", borderRadius: 10, padding: "10px 8px" }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={events} layout="vertical" margin={{ left: 4, right: 12, top: 6, bottom: 6 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" horizontal={false} />
-              <XAxis type="number" domain={[0, 12]} ticks={[0, 2, 4, 6, 8, 10, 12]} tickFormatter={formatHourTick} tick={{ fontSize: 11, fill: "#5F5E5A" }} axisLine={{ stroke: "#E4E2D8" }} tickLine={false} />
+              <XAxis type="number" domain={[0, windowHrs]} ticks={ticks} tickFormatter={formatTick} tick={{ fontSize: 11, fill: "#5F5E5A" }} axisLine={{ stroke: "#E4E2D8" }} tickLine={false} />
               <YAxis type="category" dataKey="label" width={200} tick={{ fontSize: 11, fill: "#2C2C2A" }} axisLine={false} tickLine={false} />
               <Tooltip content={<GanttTooltip />} />
-              <ReferenceLine x={nowOffsetHrs} stroke="#C0392B" strokeWidth={1.5} strokeDasharray="4 4" label={{ value: "Now", position: "top", fill: "#C0392B", fontSize: 11, fontWeight: 700 }} />
+              {nowInWindow && (
+                <ReferenceLine x={nowOffsetHrs} stroke="#C0392B" strokeWidth={1.5} strokeDasharray="4 4" label={{ value: "Now", position: "top", fill: "#C0392B", fontSize: 11, fontWeight: 700 }} />
+              )}
               <Bar dataKey="offsetHrs" stackId="a" fill="transparent" isAnimationActive={false} />
               <Bar dataKey="durationHrs" stackId="a" radius={[4, 4, 4, 4]} isAnimationActive={false} shape={DurationBarShape}>
                 {events.map((e) => <Cell key={e.id} fill={e.completed ? "#5FBF8F" : "#C0392B"} />)}
@@ -3921,8 +3968,13 @@ function EventTimeline({ breakdowns, workOrders }) {
 }
 
 function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
-  const [fromDateTime, setFromDateTime] = useState(DEFAULT_FROM);
-  const [toDateTime, setToDateTime] = useState(DEFAULT_TO);
+  // Lazy initializers so "now" is computed fresh at mount time, not once
+  // at app load - since this page fully unmounts when you navigate away
+  // (the sidebar swaps which page renders), coming back always resets to
+  // a fresh 24-hour window rather than remembering whatever was picked
+  // last time.
+  const [fromDateTime, setFromDateTime] = useState(() => toDatetimeLocalValue(new Date(Date.now() - 24 * 3600000)));
+  const [toDateTime, setToDateTime] = useState(() => toDatetimeLocalValue(new Date()));
   const [showPrint, setShowPrint] = useState(false);
   const [selectedFleet, setSelectedFleet] = useState("");
   const [selectedAsset, setSelectedAsset] = useState("");
@@ -3969,7 +4021,7 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
 
   return (
     <div>
-      <EventTimeline breakdowns={breakdowns} workOrders={workOrders} />
+      <EventTimeline breakdowns={breakdowns} workOrders={workOrders} fromDateTime={fromDateTime} toDateTime={toDateTime} />
 
       <DateRangePicker fromDateTime={fromDateTime} toDateTime={toDateTime} setFromDateTime={setFromDateTime} setToDateTime={setToDateTime} />
       <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
