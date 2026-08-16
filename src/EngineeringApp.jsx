@@ -4132,9 +4132,10 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
 
       const colCount = DOWNTIME_SUMMARY_COLUMNS.length;
       const BRAND = "FF1F6668";
-      const HEADER_TEXT = "FFFFFFFF";
+      const HEADER_FILL = "FFD9D9D9";
+      const HEADER_TEXT = "FF000000";
       const BAND = "FFF7F8F6";
-      const BORDER = "FFE2E6E3";
+      const BORDER = "FF808080";
       const thinBorder = {
         top: { style: "thin", color: { argb: BORDER } },
         bottom: { style: "thin", color: { argb: BORDER } },
@@ -4181,7 +4182,7 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
         const cell = ws.getCell(headerRowIdx, i + 1);
         cell.value = label;
         cell.font = { bold: true, color: { argb: HEADER_TEXT } };
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BRAND } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: HEADER_FILL } };
         cell.alignment = { vertical: "middle" };
         cell.border = thinBorder;
       });
@@ -6111,6 +6112,245 @@ function QuoteDocLink({ path }) {
   return <a href={url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: NAVY, whiteSpace: "nowrap" }}>View quote</a>;
 }
 
+function ChangeoutForm({ component, assets, workOrders, isFirstChangeout, currentHours, onClose, onSaved }) {
+  const [workOrderId, setWorkOrderId] = useState("");
+  const [changeoutDate, setChangeoutDate] = useState(todayForInput());
+  const [changeoutHours, setChangeoutHours] = useState(currentHours ?? "");
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const woOptions = useMemo(() => workOrders.filter((w) => w.asset_id === component.asset_id), [workOrders, component.asset_id]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!isFirstChangeout && !reason.trim()) { setError("Enter why the previous component was changed."); return; }
+    setSaving(true);
+    try {
+      const wo = woOptions.find((w) => String(w.id) === String(workOrderId));
+      const payload = {
+        component_id: component.component_id,
+        asset_id: component.asset_id,
+        changeout_date: changeoutDate,
+        changeout_hours: changeoutHours === "" ? null : Number(changeoutHours),
+        work_order_id: workOrderId || null,
+        event_id: wo?.event_id || null,
+        reason_for_change: isFirstChangeout ? null : reason.trim(),
+      };
+      const { error: dbError } = await supabase.from("component_changeout_log").insert(payload);
+      if (dbError) throw dbError;
+      onSaved();
+    } catch (err) {
+      setError(err.message || String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' };
+  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
+      <form onSubmit={handleSubmit} style={{ background: "#fff", borderRadius: 12, padding: 24, width: 440, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto" }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>Log Changeout</h3>
+        <p style={{ fontSize: 12.5, color: "#859195", margin: "0 0 16px" }}>{component.component_id} on {component.asset_id}</p>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Linked Work Order (optional)</label>
+          <select value={workOrderId} onChange={(e) => setWorkOrderId(e.target.value)} style={fieldStyle}>
+            <option value="">- None -</option>
+            {woOptions.map((w) => <option key={w.id} value={w.id}>{w.wo_no}{w.problem_scope ? ` - ${w.problem_scope}` : ""}</option>)}
+          </select>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <div>
+            <label style={labelStyle}>Changeout Date</label>
+            <input type="date" value={changeoutDate} onChange={(e) => setChangeoutDate(e.target.value)} required max={todayForInput()} style={fieldStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Hour Meter at Changeout</label>
+            <input type="number" step="0.1" value={changeoutHours} onChange={(e) => setChangeoutHours(e.target.value)} style={fieldStyle} />
+          </div>
+        </div>
+
+        {isFirstChangeout ? (
+          <p style={{ fontSize: 12, color: "#859195", background: "#F7F8F6", border: "1px solid #E2E6E3", borderRadius: 8, padding: "8px 10px", marginBottom: 18 }}>
+            This is the first changeout on record for this component - no previous one to explain yet.
+          </p>
+        ) : (
+          <div style={{ marginBottom: 18 }}>
+            <label style={labelStyle}>Why was the previous component changed?</label>
+            <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} required style={{ ...fieldStyle, resize: "vertical" }} />
+          </div>
+        )}
+
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
+            {saving ? "Saving…" : "Log Changeout"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function ComponentsPage({ assets, components, breakdowns, workOrders, dailyHours, userEmail, onRefresh }) {
+  const [targets, setTargets] = useState([]);
+  const [changeouts, setChangeouts] = useState([]);
+  const [loadingExtra, setLoadingExtra] = useState(true);
+  const [query, setQuery] = useState("");
+  const [editingTarget, setEditingTarget] = useState(null); // component_id currently being edited
+  const [targetInput, setTargetInput] = useState("");
+  const [changeoutFor, setChangeoutFor] = useState(null); // component row
+
+  const loadExtra = useCallback(async () => {
+    setLoadingExtra(true);
+    const [t, c] = await Promise.all([
+      supabase.from("component_targets").select("*"),
+      supabase.from("component_changeout_log").select("*").order("changeout_date", { ascending: false }),
+    ]);
+    setTargets(t.data || []);
+    setChangeouts(c.data || []);
+    setLoadingExtra(false);
+  }, []);
+
+  useEffect(() => { loadExtra(); }, [loadExtra]);
+
+  // Latest closing hours per asset from Daily Hours - this is what
+  // stands in for "the machine's current hours" throughout this page.
+  const currentHoursByAsset = useMemo(() => {
+    const map = new Map();
+    dailyHours.forEach((h) => {
+      const prev = map.get(h.asset_id);
+      if (!prev || h.log_date > prev.log_date) map.set(h.asset_id, h);
+    });
+    const out = new Map();
+    map.forEach((h, assetId) => out.set(assetId, h.closing_hours ?? h.opening_hours ?? null));
+    return out;
+  }, [dailyHours]);
+
+  const targetByComponent = useMemo(() => new Map(targets.map((t) => [t.component_id, t.target_hours])), [targets]);
+
+  const changeoutsByComponent = useMemo(() => {
+    const map = new Map();
+    changeouts.forEach((c) => {
+      if (!map.has(c.component_id)) map.set(c.component_id, []);
+      map.get(c.component_id).push(c);
+    });
+    return map;
+  }, [changeouts]);
+
+  const woNoById = useMemo(() => Object.fromEntries(workOrders.map((w) => [w.id, w.wo_no])), [workOrders]);
+
+  const rows = useMemo(() => components
+    .filter((c) => Object.values(c).some((v) => String(v ?? "").toLowerCase().includes(query.toLowerCase())))
+    .map((c) => {
+      const asset = assets.find((a) => a.asset_id === c.asset_id);
+      const history = changeoutsByComponent.get(c.component_id) || [];
+      const latest = history[0] || null;
+      const target = targetByComponent.get(c.component_id) ?? null;
+      const currentHours = currentHoursByAsset.get(c.asset_id) ?? null;
+      const baselineHours = latest?.changeout_hours ?? asset?.opening_hours ?? null;
+      const hoursSinceChangeout = (currentHours != null && baselineHours != null) ? currentHours - baselineHours : null;
+      const pctLifeUsed = (target && hoursSinceChangeout != null) ? (hoursSinceChangeout / target) * 100 : null;
+      return { ...c, target, currentHours, hoursSinceChangeout, pctLifeUsed, latest, changeoutCount: history.length };
+    }), [components, assets, changeoutsByComponent, targetByComponent, currentHoursByAsset, query]);
+
+  const saveTarget = async (componentId) => {
+    const value = targetInput === "" ? null : Number(targetInput);
+    await supabase.from("component_targets").upsert({ component_id: componentId, target_hours: value }, { onConflict: "component_id" });
+    setEditingTarget(null);
+    loadExtra();
+  };
+
+  const pctColor = (pct) => pct == null ? "#859195" : pct >= 100 ? "#7A3330" : pct >= 80 ? "#7A5320" : "#2C5646";
+
+  return (
+    <div>
+      <div style={{ position: "relative", maxWidth: 280, marginBottom: 12 }}>
+        <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search this table"
+          style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none", boxSizing: "border-box" }} />
+      </div>
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: "#F7F8F6" }}>
+              {["Component #", "Equipment #", "Type", "Target Hrs", "Current Hrs", "Hrs Since Changeout", "% Life Used", "Status", "Linked WO", "Reason (previous component)"].map((h) => (
+                <th key={h} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{h}</th>
+              ))}
+              <th style={{ borderBottom: "1px solid #E2E6E3" }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loadingExtra ? (
+              <tr><td colSpan={11} style={{ padding: 20, textAlign: "center", color: "#859195" }}>Loading…</td></tr>
+            ) : rows.length === 0 ? (
+              <tr><td colSpan={11} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No rows match your search.</td></tr>
+            ) : rows.map((r) => (
+              <tr key={r.component_id} style={{ borderBottom: "1px solid #EFEEE7" }}>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.component_id}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.asset_id}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.component_type}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
+                  {editingTarget === r.component_id ? (
+                    <span style={{ display: "flex", gap: 4 }}>
+                      <input type="number" autoFocus value={targetInput} onChange={(e) => setTargetInput(e.target.value)}
+                        style={{ width: 70, padding: "3px 6px", fontSize: 12.5, border: "1px solid #E2E6E3", borderRadius: 6 }} />
+                      <button onClick={() => saveTarget(r.component_id)} style={{ fontSize: 11.5, color: NAVY, background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Save</button>
+                    </span>
+                  ) : (
+                    <span onClick={() => { setEditingTarget(r.component_id); setTargetInput(r.target ?? ""); }} style={{ cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted", color: r.target ? "#183642" : "#859195" }}>
+                      {r.target ?? "Set target"}
+                    </span>
+                  )}
+                </td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.currentHours ?? <span style={{ color: "#B4B2A9" }}>-</span>}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.hoursSinceChangeout != null ? Math.round(r.hoursSinceChangeout) : <span style={{ color: "#B4B2A9" }}>-</span>}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
+                  {r.pctLifeUsed != null ? (
+                    <span style={{ fontWeight: 700, color: pctColor(r.pctLifeUsed) }}>{r.pctLifeUsed.toFixed(0)}%</span>
+                  ) : <span style={{ color: "#B4B2A9" }}>-</span>}
+                </td>
+                <td style={{ padding: "9px 12px" }}><Badge value={r.status} /></td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
+                  {r.latest?.work_order_id ? (woNoById[r.latest.work_order_id] || "-") : <span style={{ color: "#B4B2A9" }}>-</span>}
+                </td>
+                <td style={{ padding: "9px 12px", maxWidth: 220 }}>
+                  {r.latest?.reason_for_change || <span style={{ color: "#B4B2A9" }}>-</span>}
+                </td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
+                  <button onClick={() => setChangeoutFor(r)} style={{ fontSize: 12, color: NAVY, background: "none", border: `1px solid ${NAVY}`, borderRadius: 6, padding: "4px 9px", cursor: "pointer", fontWeight: 600 }}>
+                    Log Changeout
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {changeoutFor && (
+        <ChangeoutForm
+          component={changeoutFor}
+          assets={assets}
+          workOrders={workOrders}
+          isFirstChangeout={changeoutFor.changeoutCount === 0}
+          currentHours={changeoutFor.currentHours}
+          onClose={() => setChangeoutFor(null)}
+          onSaved={() => { setChangeoutFor(null); loadExtra(); onRefresh(); }}
+        />
+      )}
+    </div>
+  );
+}
+
 function AssetsPage({ assets, selectedSiteId, onRefresh }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -7570,6 +7810,8 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
               <BacklogsPage assets={assets} backlogs={backlogs} workOrders={workOrders} userEmail={userEmail} onRefresh={loadRestOfData} />
             ) : active === "daily_service" ? (
               <DailyServicePage assets={assets} dailyServiceChecklist={dailyServiceChecklist} breakdowns={breakdowns} dailyHours={dailyHours} userEmail={userEmail} onRefresh={loadRestOfData} />
+            ) : active === "components" ? (
+              <ComponentsPage assets={assets} components={components} breakdowns={breakdowns} workOrders={workOrders} dailyHours={dailyHours} userEmail={userEmail} onRefresh={loadRestOfData} />
             ) : active === "parts" ? (
               <PartsPage parts={parts} selectedSiteId={selectedSiteId} onRefresh={loadRestOfData} />
             ) : active === "audit" ? (
