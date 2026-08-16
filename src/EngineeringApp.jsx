@@ -223,6 +223,7 @@ const NAV = [
   // not in the nav, so it's a one-line change to bring back.
   // { key: "cost_ledger", label: "Cost Ledger", icon: DollarSign },
   { key: "site_management", label: "Site Management", icon: MapPin },
+  { key: "component_codes", label: "Component Codes", icon: CircleDot },
   { key: "audit", label: "Audit Trail", icon: History },
 ];
 
@@ -1093,7 +1094,7 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
 }
 
 
-function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved, userEmail, workOrders, parts, onRefresh }) {
+function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved, userEmail, workOrders, parts, componentCodes, onRefresh }) {
   const [assetId, setAssetId] = useState(existing?.asset_id || activatingWorkOrder?.asset_id || assets[0]?.asset_id || "");
   const [causeCode, setCauseCode] = useState(existing?.cause_code || CAUSE_CODES[0]);
   const [severity, setSeverity] = useState(existing?.severity || "Medium");
@@ -1110,7 +1111,6 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
     existing?.expected_up_time ? isoToInputValue(existing.expected_up_time) : ""
   );
   const [reportedBy] = useState(existing?.reported_by || userEmail || "");
-  const [isDailyService, setIsDailyService] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -1121,7 +1121,6 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
   const [savedRecord, setSavedRecord] = useState(existing || null);
   const currentId = savedRecord?.id;
   const hasSavedRecord = !!savedRecord;
-  const breakdownDateLabel = downtimeStart ? new Date(downtimeStart).toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" }) : "this date";
 
   // Downtime End only makes sense once the breakdown is actually Closed -
   // an "in progress" event by definition doesn't have an end yet. Auto-fills
@@ -1262,20 +1261,6 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
         }
       }
 
-      // Opt-in - ticking this pulls the event straight through to the
-      // Daily Service report for that asset+date, same as logging it
-      // directly there. Upsert is idempotent, so saving again (e.g.
-      // editing the event later) doesn't create a duplicate day.
-      if (isDailyService) {
-        const { error: dsError } = await supabase.from("daily_service_checklist").upsert({
-          asset_id: assetId,
-          service_date: breakdownDate,
-          completed_by: reportedBy || null,
-          notes: `Logged via Event${savedRecord?.wo_reference ? ` ${savedRecord.wo_reference}` : ""}`,
-        }, { onConflict: "asset_id,service_date" });
-        if (dsError) throw dsError;
-      }
-
       onRefresh?.();
     } catch (err) {
       setError(err.message || String(err));
@@ -1308,11 +1293,11 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
         </div>
 
         <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>Downtime Start</label>
+          <label style={labelStyle}>Downtime</label>
           <DateTimeField value={downtimeStart} onChange={setDowntimeStart} max={nowForInput()} required />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>Downtime End {status !== "Closed" && <span style={{ fontWeight: 400, color: "#859195" }}>(set Status to Closed first)</span>}</label>
+          <label style={labelStyle}>Uptime {status !== "Closed" && <span style={{ fontWeight: 400, color: "#859195" }}>(set Status to Closed first)</span>}</label>
           <DateTimeField value={downtimeEnd} onChange={setDowntimeEnd} max={nowForInput()} disabled={status !== "Closed"} />
         </div>
         <div style={{ marginBottom: 12 }}>
@@ -1320,7 +1305,7 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
           <DateTimeField value={expectedUpTime} onChange={setExpectedUpTime} disabled={status === "Closed"} />
         </div>
         <p style={{ fontSize: 11.5, color: "#859195", margin: "-6px 0 14px" }}>
-          Downtime Start defaults to right now, but you can set it earlier if you're logging something that happened previously (e.g. catching up after time away from the system) - future dates and times aren't allowed. Downtime End only opens up once Status is Closed - an event that's still active doesn't have an end yet, and having both set at once would throw off MTBF, MTTR, Availability and Utilisation. Expected Up Time is your best estimate of when the machine will be back - unlike the other two, future dates are fine here, since that's the whole point of it.
+          Downtime defaults to right now, but you can set it earlier if you're logging something that happened previously (e.g. catching up after time away from the system) - future dates and times aren't allowed. Uptime only opens up once Status is Closed - an event that's still active doesn't have an end yet, and having both set at once would throw off MTBF, MTTR, Availability and Utilisation. Expected Up Time is your best estimate of when the machine will be back - unlike the other two, future dates are fine here, since that's the whole point of it.
         </p>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
@@ -1336,6 +1321,19 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
               {SEVERITIES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Component Code</label>
+          <select
+            value=""
+            onChange={(e) => { if (e.target.value) setComponentAffected(e.target.value); }}
+            style={fieldStyle}
+          >
+            <option value="">- Select a component -</option>
+            {componentCodes.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+          </select>
+          <p style={{ fontSize: 11, color: "#859195", margin: "4px 0 0" }}>Selecting one fills in Component / System Affected below - you can still edit it after.</p>
         </div>
 
         <div style={{ marginBottom: 12 }}>
@@ -1360,16 +1358,6 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
             <input type="text" value={savedRecord?.wo_reference || "Generated automatically on save"} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#4B5659" }} />
           </div>
         </div>
-
-        <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, color: "#183642", margin: "0 0 18px", cursor: "pointer" }}>
-          <input type="checkbox" checked={isDailyService} onChange={(e) => setIsDailyService(e.target.checked)} style={{ width: 16, height: 16, marginTop: 2 }} />
-          <span>
-            This event was the Daily Service
-            <span style={{ display: "block", fontSize: 11.5, color: "#859195", fontWeight: 400 }}>
-              Marks {breakdownDateLabel} as serviced for {assetId} on the Daily Service report - same as logging it there directly.
-            </span>
-          </span>
-        </label>
 
         <div style={{ marginBottom: 18 }}>
           <label style={labelStyle}>Reported By</label>
@@ -1404,7 +1392,7 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
   );
 }
 
-function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, parts }) {
+function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, parts, componentCodes }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [activating, setActivating] = useState(null); // scheduled Work Order being booked down
@@ -1661,6 +1649,7 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
           userEmail={userEmail}
           workOrders={workOrders}
           parts={parts}
+          componentCodes={componentCodes}
           onRefresh={onRefresh}
         />
       )}
@@ -5112,6 +5101,74 @@ const AUDIT_COLUMNS = [
   ["action", "Action"], ["record_id", "Record #"], ["deletion_reason", "Reason (if deleted)"],
 ];
 
+function ComponentCodesAdminPage({ componentCodes, isAdmin, onRefresh }) {
+  const [newName, setNewName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [deleting, setDeleting] = useState(null);
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!newName.trim()) return;
+    setSaving(true);
+    try {
+      const { error: dbError } = await supabase.from("component_codes").insert({ name: newName.trim() });
+      if (dbError) throw dbError;
+      setNewName("");
+      onRefresh();
+    } catch (err) {
+      setError(err.message || String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    setDeleting(id);
+    await supabase.from("component_codes").delete().eq("id", id);
+    onRefresh();
+    setDeleting(null);
+  };
+
+  if (!isAdmin) {
+    return <p style={{ fontSize: 13.5, color: "#4B5659" }}>Only an admin can manage component codes.</p>;
+  }
+
+  return (
+    <div style={{ maxWidth: 480 }}>
+      <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 16px" }}>
+        These names populate the Component Code dropdown on the Log Event form. Add whatever the team uses - Engine, Transmission, LH Wheel Station, and so on.
+      </p>
+      <form onSubmit={handleAdd} style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+        <input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          placeholder="e.g. Torque Converter"
+          style={{ flex: 1, padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box" }}
+        />
+        <button type="submit" disabled={saving || !newName.trim()} style={{ background: NAVY, border: "none", color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
+          {saving ? "Adding…" : "+ Add"}
+        </button>
+      </form>
+      {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+
+      <div style={{ border: "1px solid #E2E6E3", borderRadius: 10, overflow: "hidden" }}>
+        {componentCodes.length === 0 ? (
+          <p style={{ padding: 16, fontSize: 13, color: "#859195", margin: 0 }}>No component codes yet - add the first one above.</p>
+        ) : componentCodes.map((c, i) => (
+          <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 14px", borderBottom: i < componentCodes.length - 1 ? "1px solid #EFEEE7" : "none" }}>
+            <span style={{ fontSize: 13.5, color: "#183642" }}>{c.name}</span>
+            <button onClick={() => handleDelete(c.id)} disabled={deleting === c.id} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "flex" }}>
+              <Trash2 size={15} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SiteManagementPage({ isAdmin, onSitesChanged }) {
   const [sites, setSites] = useState([]);
   const [users, setUsers] = useState([]);
@@ -7401,6 +7458,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
   const [auditLog, setAuditLog] = useState([]);
   const [backlogs, setBacklogs] = useState([]);
   const [dailyServiceChecklist, setDailyServiceChecklist] = useState([]);
+  const [componentCodes, setComponentCodes] = useState([]);
   const [restLoading, setRestLoading] = useState(true);
   const [restError, setRestError] = useState(null);
 
@@ -7453,7 +7511,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
     try {
       const [
         siteAssetsRes, fuelRes, oilRes, woRes, serviceRes, inspRes,
-        compRes, tyreRes, partsRes, warrRes, docRes, backlogsRes, dailyServiceRes,
+        compRes, tyreRes, partsRes, warrRes, docRes, backlogsRes, dailyServiceRes, componentCodesRes,
       ] = await Promise.all([
         supabase.from("assets").select("asset_id").eq("site_id", selectedSiteId),
         supabase.from("fuel_log_calc").select("*"),
@@ -7468,8 +7526,9 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
         supabase.from("document_register_calc").select("*"),
         supabase.from("backlogs").select("*"),
         supabase.from("daily_service_checklist").select("*"),
+        supabase.from("component_codes").select("*").order("name"),
       ]);
-      const results = { siteAssetsRes, fuelRes, oilRes, woRes, serviceRes, inspRes, compRes, tyreRes, partsRes, warrRes, docRes, backlogsRes, dailyServiceRes };
+      const results = { siteAssetsRes, fuelRes, oilRes, woRes, serviceRes, inspRes, compRes, tyreRes, partsRes, warrRes, docRes, backlogsRes, dailyServiceRes, componentCodesRes };
       for (const [name, res] of Object.entries(results)) {
         if (res.error) throw new Error(`${name}: ${res.error.message}`);
       }
@@ -7512,6 +7571,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
       setWarrantyDocs([...warrantyRows, ...docRows]);
       setBacklogs(bySite(backlogsRes.data));
       setDailyServiceChecklist(bySite(dailyServiceRes.data));
+      setComponentCodes(componentCodesRes.data || []);
     } catch (err) {
       setRestError(err.message || String(err));
     } finally {
@@ -7664,7 +7724,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
           )}
           {(engineeringExpanded || !sidebarOpen) && NAV.filter((n) =>
             !n.group &&
-            ((n.key !== "audit" && n.key !== "site_management") || isAdmin) &&
+            ((n.key !== "audit" && n.key !== "site_management" && n.key !== "component_codes") || isAdmin) &&
             (myRole !== "operator" || n.operatorVisible)
           ).map(({ key, label, icon: Icon }) => (
             <button
@@ -7780,14 +7840,14 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
                 </p>
               </div>
             ) : (coreLoading && ["dashboard", "fleet_performance", "assets", "daily_hours", "breakdowns", "downtime_summary"].includes(active)) ||
-             (restLoading && ["dashboard", "fuel_log", "oil_consumption", "work_orders", "downtime_summary", "planned_maintenance", "inspections", "components", "tyres", "parts", "warranty_docs", "audit", "backlog_report", "daily_service", "breakdowns"].includes(active)) ? (
+             (restLoading && ["dashboard", "fuel_log", "oil_consumption", "work_orders", "downtime_summary", "planned_maintenance", "inspections", "components", "tyres", "parts", "warranty_docs", "audit", "backlog_report", "daily_service", "breakdowns", "component_codes"].includes(active)) ? (
               <p style={{ fontSize: 13, color: "#859195" }}>Loading…</p>
             ) : active === "dashboard" ? (
               <Dashboard assets={assets} breakdowns={breakdowns} workOrders={workOrders} plannedMaintenance={plannedMaintenance} components={components} parts={parts} inspections={inspections} onNavigate={setActive} />
             ) : active === "fleet_performance" ? (
               <FleetPerformance assets={assets} breakdowns={breakdowns} />
             ) : active === "breakdowns" ? (
-              <BreakdownsPage assets={assets} breakdowns={breakdowns} workOrders={workOrders} parts={parts} onRefresh={() => { loadCoreData(); loadRestOfData(); }} userEmail={userEmail} />
+              <BreakdownsPage assets={assets} breakdowns={breakdowns} workOrders={workOrders} parts={parts} componentCodes={componentCodes} onRefresh={() => { loadCoreData(); loadRestOfData(); }} userEmail={userEmail} />
             ) : active === "assets" ? (
               <AssetsPage assets={assets} selectedSiteId={selectedSiteId} onRefresh={loadCoreData} />
             ) : active === "daily_hours" ? (
@@ -7818,6 +7878,8 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
               <AuditTrailPage auditLog={auditLog} isAdmin={isAdmin} />
             ) : active === "site_management" ? (
               <SiteManagementPage isAdmin={isAdmin} onSitesChanged={() => window.location.reload()} />
+            ) : active === "component_codes" ? (
+              <ComponentCodesAdminPage componentCodes={componentCodes} isAdmin={isAdmin} onRefresh={loadRestOfData} />
             ) : (
               <DataTable
                 columns={activeConfig.cols.map(([key, label]) => ({ key, label }))}
