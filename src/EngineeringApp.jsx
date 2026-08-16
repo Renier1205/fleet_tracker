@@ -1522,6 +1522,17 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
     XLSX.writeFile(wb, `Events_${now.toISOString().slice(0, 10)}.xlsx`);
   };
 
+  const EVENT_FIELDS = [
+    { key: "downtime_start", header: "Downtime Start (YYYY-MM-DD HH:MM)", type: "datetime" },
+    { key: "downtime_end", header: "Downtime End (YYYY-MM-DD HH:MM, blank if still open)", type: "datetime" },
+    { key: "cause_code", header: "Cause", type: "text" },
+    { key: "severity", header: "Severity", type: "text" },
+    { key: "component_affected", header: "Component", type: "text" },
+    { key: "description", header: "Description", type: "text" },
+    { key: "repair_status", header: "Status", type: "text" },
+    { key: "expected_up_time", header: "Expected Up Time (YYYY-MM-DD HH:MM)", type: "datetime" },
+  ];
+
   return (
     <div>
       <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
@@ -1550,6 +1561,26 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
           </button>
         </div>
       </div>
+
+      <details style={{ marginBottom: 16 }}>
+        <summary style={{ cursor: "pointer", fontSize: 12.5, fontWeight: 600, color: NAVY, marginBottom: 8 }}>Offline backup (Excel)</summary>
+        <div style={{ marginTop: 8 }}>
+          <ExcelSync
+            data={breakdowns} assets={assets} fields={EVENT_FIELDS} tableName="breakdown_log"
+            sheetTitle="Events Backup" filenamePrefix="Events_Backup" onRefresh={onRefresh}
+            extraOnSave={(obj) => {
+              const extra = { reported_by: obj.reported_by || userEmail || null };
+              if (obj.downtime_start) {
+                const d = new Date(obj.downtime_start);
+                const pad = (n) => String(n).padStart(2, "0");
+                extra.breakdown_date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+                extra.time_reported = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+              }
+              return extra;
+            }}
+          />
+        </div>
+      </details>
 
       <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -2591,37 +2622,33 @@ function InspectionsPage({ assets, inspections, userEmail, onRefresh }) {
     setDeleting(null);
   };
 
-  const exportToExcel = () => {
-    const now = new Date();
-    const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
-    const headerRow = columns.map((c) => c.label);
-    const dataRows = filtered.map((row) => columns.map((c) => row[c.key] ?? ""));
-    const aoa = [["Inspections"], [`Exported: ${timestamp}`], [], headerRow, ...dataRows];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: columns.length - 1 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: columns.length - 1 } }];
-    ws["!cols"] = columns.map((c) => ({ wch: Math.max(c.label.length + 2, 14) }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Inspections");
-    XLSX.writeFile(wb, `Inspections_${now.toISOString().slice(0, 10)}.xlsx`);
-  };
+  const INSPECTION_FIELDS = [
+    { key: "log_date", header: "Date (YYYY-MM-DD)", type: "date" },
+    { key: "inspection_type", header: "Inspection Type", type: "text" },
+    { key: "result", header: "Result (Pass/Fail)", type: "text" },
+    { key: "defect_finding", header: "Defect Finding", type: "text" },
+    { key: "risk_rating", header: "Risk Rating", type: "text" },
+    { key: "immediate_action", header: "Immediate Action", type: "text" },
+    { key: "next_inspection_date", header: "Next Inspection Date (YYYY-MM-DD)", type: "date" },
+  ];
 
   return (
     <div>
       <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 12, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
           <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search inspections" style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }} />
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
-            <Download size={14} /> Export to Excel
-          </button>
-          <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
-            + Log Inspection
-          </button>
-        </div>
+        <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+          + Log Inspection
+        </button>
       </div>
+      <ExcelSync
+        data={inspections} assets={assets} fields={INSPECTION_FIELDS} tableName="inspections"
+        sheetTitle="Inspections" filenamePrefix="Inspections" onRefresh={onRefresh}
+        extraOnSave={(obj) => ({ inspector: obj.inspector || userEmail || null })}
+      />
       <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
@@ -3364,37 +3391,30 @@ function FuelLogPage({ assets, fuelLog, userEmail, dailyHours, onRefresh }) {
     setDeleting(null);
   };
 
-  const exportToExcel = () => {
-    const now = new Date();
-    const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
-    const headerRow = columns.map((c) => c.label);
-    const dataRows = filtered.map((row) => columns.map((c) => row[c.key] ?? ""));
-    const aoa = [["Fuel Log"], [`Exported: ${timestamp}`], [], headerRow, ...dataRows];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: columns.length - 1 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: columns.length - 1 } }];
-    ws["!cols"] = columns.map((c) => ({ wch: Math.max(c.label.length + 2, 14) }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Fuel Log");
-    XLSX.writeFile(wb, `Fuel_Log_${now.toISOString().slice(0, 10)}.xlsx`);
-  };
+  const FUEL_LOG_FIELDS = [
+    { key: "fill_date", header: "Date (YYYY-MM-DD)", type: "date" },
+    { key: "hour_meter", header: "Hour Meter", type: "number" },
+    { key: "litres", header: "Litres", type: "number" },
+    { key: "notes", header: "Notes", type: "text" },
+  ];
 
   return (
     <div>
       <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 12, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
           <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search fuel log" style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }} />
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
-            <Download size={14} /> Export to Excel
-          </button>
-          <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
-            + Log Fuel
-          </button>
-        </div>
+        <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+          + Log Fuel
+        </button>
       </div>
+      <ExcelSync
+        data={fuelLog} assets={assets} fields={FUEL_LOG_FIELDS} tableName="fuel_log"
+        sheetTitle="Fuel Log" filenamePrefix="Fuel_Log" onRefresh={onRefresh}
+        extraOnSave={(obj) => ({ recorded_by: obj.recorded_by || userEmail || null })}
+      />
       <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
@@ -3604,37 +3624,32 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, dailyHours, onR
     setDeleting(null);
   };
 
-  const exportToExcel = () => {
-    const now = new Date();
-    const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
-    const headerRow = columns.map((c) => c.label);
-    const dataRows = filtered.map((row) => columns.map((c) => row[c.key] ?? ""));
-    const aoa = [["Oil Consumption"], [`Exported: ${timestamp}`], [], headerRow, ...dataRows];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: columns.length - 1 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: columns.length - 1 } }];
-    ws["!cols"] = columns.map((c) => ({ wch: Math.max(c.label.length + 2, 14) }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Oil Consumption");
-    XLSX.writeFile(wb, `Oil_Consumption_${now.toISOString().slice(0, 10)}.xlsx`);
-  };
+  const OIL_FIELDS = [
+    { key: "fill_date", header: "Date (YYYY-MM-DD)", type: "date" },
+    { key: "hour_meter", header: "Hour Meter", type: "number" },
+    { key: "oil_type", header: "Oil Type", type: "text" },
+    { key: "litres", header: "Litres", type: "number" },
+    { key: "fill_reason", header: "Fill Reason", type: "text" },
+    { key: "notes", header: "Notes", type: "text" },
+  ];
 
   return (
     <div>
       <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 12, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
           <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search oil consumption" style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }} />
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
-            <Download size={14} /> Export to Excel
-          </button>
-          <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
-            + Log Oil
-          </button>
-        </div>
+        <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+          + Log Oil
+        </button>
       </div>
+      <ExcelSync
+        data={oilConsumption} assets={assets} fields={OIL_FIELDS} tableName="oil_consumption"
+        sheetTitle="Oil Consumption" filenamePrefix="Oil_Consumption" onRefresh={onRefresh}
+        extraOnSave={(obj) => ({ recorded_by: obj.recorded_by || userEmail || null })}
+      />
       <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
@@ -3905,10 +3920,21 @@ function GanttTooltip({ active, payload }) {
 function EventTimeline({ breakdowns, workOrders, fromDateTime, toDateTime }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [nowTick, setNowTick] = useState(() => new Date());
+  // Self-contained rather than threaded down as a prop, since this chart
+  // gets embedded in more than one page - the equipment-name column eats
+  // most of a phone-width chart at the same fixed width used on desktop,
+  // squeezing the actual timeline bars into a thin sliver.
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.innerWidth < 560);
 
   useEffect(() => {
     const interval = setInterval(() => setNowTick(new Date()), 60000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => setNarrow(window.innerWidth < 560);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
   // Driven by the page's own date range picker when provided (Downtime
@@ -3987,7 +4013,7 @@ function EventTimeline({ breakdowns, workOrders, fromDateTime, toDateTime }) {
 
   const nowOffsetHrs = (nowTick.getTime() - windowStart.getTime()) / 3600000;
   const formatTick = (h) => new Date(windowStart.getTime() + h * 3600000).toLocaleString("en-ZA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-  const tickCount = 6;
+  const tickCount = narrow ? 3 : 6;
   const ticks = Array.from({ length: tickCount + 1 }, (_, i) => Math.round((windowHrs / tickCount) * i * 100) / 100);
 
   // Draws the solid "actual so far" bar, and - for a still-open event -
@@ -4038,8 +4064,8 @@ function EventTimeline({ breakdowns, workOrders, fromDateTime, toDateTime }) {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={events} layout="vertical" margin={{ left: 4, right: 12, top: 6, bottom: 6 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" horizontal={false} />
-              <XAxis type="number" domain={[0, windowHrs]} ticks={ticks} tickFormatter={formatTick} tick={{ fontSize: 11, fill: "#4B5659" }} axisLine={{ stroke: "#E2E6E3" }} tickLine={false} />
-              <YAxis type="category" dataKey="label" width={220} tick={{ fontSize: 11, fill: "#183642" }} axisLine={false} tickLine={false} />
+              <XAxis type="number" domain={[0, windowHrs]} ticks={ticks} tickFormatter={formatTick} tick={{ fontSize: narrow ? 9.5 : 11, fill: "#4B5659" }} axisLine={{ stroke: "#E2E6E3" }} tickLine={false} />
+              <YAxis type="category" dataKey="label" width={narrow ? 110 : 220} tick={{ fontSize: narrow ? 9.5 : 11, fill: "#183642" }} axisLine={false} tickLine={false} />
               <Tooltip content={<GanttTooltip />} />
               {nowInWindow && (
                 <ReferenceLine x={nowOffsetHrs} stroke="#B85450" strokeWidth={1.5} strokeDasharray="4 4" label={{ value: "Now", position: "top", fill: "#B85450", fontSize: 11, fontWeight: 700 }} />
@@ -4258,40 +4284,36 @@ function WorkOrdersPage({ assets, workOrders, userEmail, onRefresh }) {
     setDeleting(null);
   };
 
-  const exportToExcel = () => {
-    const now = new Date();
-    const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
-    const headerRow = columns.map((c) => c.label);
-    const dataRows = filtered.map((row) => columns.map((c) => row[c.key] ?? ""));
-    const aoa = [["Work Orders"], [`Exported: ${timestamp}`], [], headerRow, ...dataRows];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!merges"] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: columns.length - 1 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: columns.length - 1 } },
-    ];
-    ws["!cols"] = columns.map((c) => ({ wch: Math.max(c.label.length + 2, 14) }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Work Orders");
-    XLSX.writeFile(wb, `Work_Orders_${now.toISOString().slice(0, 10)}.xlsx`);
-  };
+  const WORK_ORDER_FIELDS = [
+    { key: "work_type", header: "Work Type", type: "text" },
+    { key: "priority", header: "Priority", type: "text" },
+    { key: "problem_scope", header: "Problem / Scope", type: "text" },
+    { key: "component", header: "Component", type: "text" },
+    { key: "status", header: "Status", type: "text" },
+    { key: "planned_start", header: "Planned Start (YYYY-MM-DD HH:MM)", type: "datetime" },
+    { key: "actual_start", header: "Actual Start (YYYY-MM-DD HH:MM)", type: "datetime" },
+    { key: "actual_finish", header: "Actual Finish (YYYY-MM-DD HH:MM)", type: "datetime" },
+    { key: "technician_vendor", header: "Technician / Vendor", type: "text" },
+    { key: "closeout_notes", header: "Closeout Notes", type: "text" },
+  ];
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 12, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
           <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search work orders"
             style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }} />
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
-            <Download size={14} /> Export to Excel
-          </button>
-          <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
-            + Add Work Order
-          </button>
-        </div>
+        <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+          + Add Work Order
+        </button>
       </div>
+      <ExcelSync
+        data={workOrders} assets={assets} fields={WORK_ORDER_FIELDS} tableName="work_orders"
+        sheetTitle="Work Orders" filenamePrefix="Work_Orders" onRefresh={onRefresh}
+        extraOnSave={(obj) => (obj.id ? {} : { request_date: todayForInput() })}
+      />
 
       <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -5368,6 +5390,133 @@ function AuditTrailPage({ auditLog, isAdmin }) {
   );
 }
 
+// Turns a raw Excel cell value into the right JS type for a given
+// field. Excel/xlsx hands back native Date objects for date-formatted
+// cells and strings/numbers for everything else, so this normalizes
+// both cases per field type.
+function excelCoerce(type, raw) {
+  if (raw === "" || raw == null) return null;
+  if (type === "number") {
+    const n = Number(raw);
+    return Number.isNaN(n) ? null : n;
+  }
+  if (type === "datetime") {
+    if (raw instanceof Date) return raw.toISOString();
+    const d = new Date(String(raw).trim().replace(" ", "T"));
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  if (type === "date") {
+    if (raw instanceof Date) {
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${raw.getFullYear()}-${pad(raw.getMonth() + 1)}-${pad(raw.getDate())}`;
+    }
+    return String(raw).trim();
+  }
+  return String(raw).trim(); // text
+}
+
+// Shared offline-backup Export/Upload bar, used identically across Fuel
+// Log, Oil Consumption, Events, Inspections, and Work Orders: export the
+// current data to Excel (with a hidden ID column), fill in new rows or
+// edit existing ones while offline, then upload the same file once back
+// online. Rows with an ID update that entry; rows without one get added
+// as new - nothing is ever deleted by an upload.
+function ExcelSync({ data, assets, fields, tableName, sheetTitle, filenamePrefix, onRefresh, extraOnSave }) {
+  const [importing, setImporting] = useState(false);
+  const [message, setMessage] = useState(null);
+  const fileInputRef = React.useRef(null);
+
+  const headers = ["ID", "Equipment #", ...fields.map((f) => f.header)];
+
+  const exportToExcel = () => {
+    const now = new Date();
+    const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
+    const dataRows = data.map((row) => [row.id ?? "", row.asset_id ?? "", ...fields.map((f) => row[f.key] ?? "")]);
+    const aoa = [[sheetTitle], [`Exported: ${timestamp}`], [], headers, ...dataRows];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: headers.length - 1 } },
+    ];
+    ws["!cols"] = headers.map((h) => ({ wch: Math.max(h.length + 2, 14) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetTitle.slice(0, 31));
+    XLSX.writeFile(wb, `${filenamePrefix}_${now.toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const handleFileSelected = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setMessage(null);
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+      const headerRowIndex = raw.findIndex((row) => row[0] === "ID" && row[1] === "Equipment #");
+      const dataStart = headerRowIndex >= 0 ? headerRowIndex + 1 : 0;
+
+      const assetIds = new Set(assets.map((a) => a.asset_id));
+      let skipped = 0;
+      const rows = [];
+      raw.slice(dataStart).forEach((row) => {
+        const assetId = String(row[1] ?? "").trim();
+        if (!assetId) return; // blank row
+        if (!assetIds.has(assetId)) { skipped++; return; }
+        const obj = { asset_id: assetId };
+        const idVal = row[0];
+        if (idVal !== "" && idVal != null && !Number.isNaN(Number(idVal))) obj.id = Number(idVal);
+        fields.forEach((f, i) => { obj[f.key] = excelCoerce(f.type, row[2 + i]); });
+        if (extraOnSave) Object.assign(obj, extraOnSave(obj));
+        rows.push(obj);
+      });
+
+      if (rows.length === 0) {
+        setMessage({ type: "error", text: "No valid rows found - make sure Equipment # matches an existing asset ID exactly." });
+        setImporting(false);
+        return;
+      }
+
+      const { error } = await supabase.from(tableName).upsert(rows, { onConflict: "id" });
+      if (error) throw error;
+
+      setMessage({
+        type: "success",
+        text: `Imported ${rows.length} row${rows.length === 1 ? "" : "s"}${skipped ? ` (${skipped} skipped - Equipment # didn't match an existing asset)` : ""}. Rows with an ID updated that entry; blank-ID rows were added as new.`,
+      });
+      onRefresh();
+    } catch (err) {
+      setMessage({ type: "error", text: err.message || String(err) });
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      {message && (
+        <div style={{ marginBottom: 10, padding: "8px 12px", borderRadius: 8, fontSize: 12.5, background: message.type === "error" ? "#F6E2E0" : "#E2EFE9", color: message.type === "error" ? "#7A3330" : "#2C5646" }}>
+          {message.text}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
+        <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
+          <Download size={14} /> Export to Excel
+        </button>
+        <button onClick={() => fileInputRef.current?.click()} disabled={importing} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: importing ? "default" : "pointer", opacity: importing ? 0.6 : 1 }}>
+          <Upload size={14} /> {importing ? "Importing…" : "Upload Excel"}
+        </button>
+        <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileSelected} style={{ display: "none" }} />
+      </div>
+      <p style={{ fontSize: 11.5, color: "#859195", margin: "6px 0 0", textAlign: "right" }}>
+        Offline backup: export, fill it in during an outage, then upload the same file once you're back online.
+      </p>
+    </div>
+  );
+}
+
 function PartsPage({ parts, selectedSiteId, onRefresh }) {
   const [subTab, setSubTab] = useState("inventory"); // "inventory" | "quotes"
   const [showForm, setShowForm] = useState(false);
@@ -6389,15 +6538,28 @@ function FleetPerformance({ assets, breakdowns }) {
 // target line, legend below) rather than the flatter light chart style
 // used elsewhere in the app - these four are deliberately styled to
 // match that reference rather than the rest of the app's charts.
+// Rounds a domain max up to a "nice" round number (1/2/5 x a power of
+// ten) instead of an arbitrary decimal like 34.04 - purely cosmetic, but
+// a jagged axis top reads as broken on a phone where there's little else
+// to anchor the eye.
+function niceDomainMax(value) {
+  if (!value || value <= 0) return 10;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(value)));
+  const normalized = value / magnitude;
+  const niceNormalized = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  return niceNormalized * magnitude;
+}
+
 function KpiBarChart({ title, data, xKey, dataKey, target, domainMax, valueFormatter, meetsTarget, unitSuffix, onClick }) {
   const gradGreen = `grad-green-${dataKey}`;
   const gradRed = `grad-red-${dataKey}`;
+  const niceMax = domainMax === 100 ? 100 : niceDomainMax(domainMax);
   return (
     <div>
       {title && <p style={{ fontSize: 12.5, fontWeight: 600, margin: "0 0 6px", color: "#4B5659" }}>{title}</p>}
-      <div onClick={onClick} style={{ height: 220, background: "#292929", border: "1px solid #1C1C1C", borderRadius: 10, padding: "16px 8px 4px", cursor: onClick ? "pointer" : "default" }}>
+      <div onClick={onClick} style={{ height: 240, background: "#292929", border: "1px solid #1C1C1C", borderRadius: 10, padding: "18px 8px 4px", cursor: onClick ? "pointer" : "default" }}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 14, right: 8, left: 0, bottom: 0 }}>
+          <BarChart data={data} margin={{ top: 20, right: 8, left: 0, bottom: 20 }}>
             <defs>
               <linearGradient id={gradGreen} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#8FE8B4" />
@@ -6409,8 +6571,8 @@ function KpiBarChart({ title, data, xKey, dataKey, target, domainMax, valueForma
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#3D3D3D" vertical={false} />
-            <XAxis dataKey={xKey} tick={{ fontSize: 10.5, fill: "#CFCFCF" }} axisLine={{ stroke: "#4A4A4A" }} tickLine={false} />
-            <YAxis domain={[0, domainMax]} tick={{ fontSize: 11, fill: "#CFCFCF" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}${unitSuffix || ""}`} />
+            <XAxis dataKey={xKey} interval={0} angle={-30} textAnchor="end" height={44} tick={{ fontSize: 10, fill: "#CFCFCF" }} axisLine={{ stroke: "#4A4A4A" }} tickLine={false} />
+            <YAxis domain={[0, niceMax]} tick={{ fontSize: 11, fill: "#CFCFCF" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}${unitSuffix || ""}`} />
             <Tooltip formatter={(v) => `${Number(v).toFixed(1)}${unitSuffix || ""}`} contentStyle={{ background: "#1F1F1F", border: "1px solid #444", borderRadius: 8 }} labelStyle={{ color: "#fff" }} itemStyle={{ color: "#fff" }} />
             <Bar dataKey={dataKey} radius={[3, 3, 0, 0]} cursor={onClick ? "pointer" : "default"}>
               {data.map((row, i) => <Cell key={i} fill={meetsTarget(row) ? `url(#${gradGreen})` : `url(#${gradRed})`} />)}
@@ -6680,7 +6842,7 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
           <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: NAVY }}>Currently in progress</h3>
           <span style={{ fontSize: 11.5, color: "#859195" }}>Live as of {nowTick.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })} - updates automatically</span>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 20, marginBottom: 24 }}>
           <div style={{ border: "1px solid #E2E6E3", borderRadius: 12, background: "#fff", overflow: "hidden" }}>
             <div onClick={() => onNavigate?.("breakdowns")} style={{ padding: "10px 14px", background: "#F6E2E0", fontSize: 12.5, fontWeight: 700, color: "#7A3330", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span>Events - {inProgressBreakdowns.length} in progress</span>
