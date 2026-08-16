@@ -11,6 +11,7 @@ export default function App() {
   const [myRole, setMyRole] = useState("manager");
   const [mySites, setMySites] = useState(undefined);
   const [myPageAccess, setMyPageAccess] = useState([]); // empty = no restriction beyond role
+  const [myFullName, setMyFullName] = useState(undefined); // undefined = still checking, null = needs to be set
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
@@ -109,6 +110,28 @@ export default function App() {
       });
   }, [session]);
 
+  const loadMyProfile = React.useCallback(() => {
+    if (!session) {
+      setMyFullName(undefined);
+      return;
+    }
+    supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("user_id", session.user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Profile check failed:", error.message);
+          setMyFullName(null);
+        } else {
+          setMyFullName(data?.full_name || null);
+        }
+      });
+  }, [session]);
+
+  useEffect(() => { loadMyProfile(); }, [loadMyProfile]);
+
   // Still resolving the session on first load
   if (session === undefined) {
     return null;
@@ -125,6 +148,14 @@ export default function App() {
 
   if (!licenseActive) {
     return <AccessSuspended />;
+  }
+
+  if (myFullName === undefined) {
+    return null;
+  }
+
+  if (myFullName === null) {
+    return <NamePrompt userEmail={session.user.email} onSaved={loadMyProfile} />;
   }
 
   if (mySites === undefined) {
@@ -149,5 +180,50 @@ export default function App() {
     );
   }
 
-  return <EngineeringApp userEmail={session.user.email} isAdmin={isAdmin} myRole={myRole} mySites={mySites} myPageAccess={myPageAccess} />;
+  return <EngineeringApp userEmail={session.user.email} isAdmin={isAdmin} myRole={myRole} mySites={mySites} myPageAccess={myPageAccess} myFullName={myFullName} onNameSaved={loadMyProfile} />;
+}
+
+function NamePrompt({ userEmail, onSaved }) {
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setSaving(true);
+    setError("");
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error: err } = await supabase.from("profiles").upsert({ user_id: user.id, full_name: name.trim(), updated_at: new Date().toISOString() });
+    setSaving(false);
+    if (err) {
+      setError(err.message);
+    } else {
+      onSaved();
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: "-apple-system, sans-serif", padding: 24, background: "#F7F8F6" }}>
+      <form onSubmit={handleSubmit} style={{ background: "#fff", borderRadius: 12, padding: 32, width: 380, maxWidth: "100%", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", boxSizing: "border-box" }}>
+        <p style={{ fontSize: 16, fontWeight: 700, color: "#1F6668", margin: "0 0 6px" }}>What's your name?</p>
+        <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>
+          Used for the Audit Trail and anywhere the system shows who did something - your name, not your email ({userEmail}).
+        </p>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Full name and surname"
+          autoFocus
+          required
+          style={{ width: "100%", padding: "10px 12px", fontSize: 16, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", marginBottom: 16 }}
+        />
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+        <button type="submit" disabled={saving || !name.trim()} style={{ width: "100%", padding: "11px 0", background: "#1F6668", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
+          {saving ? "Saving…" : "Continue"}
+        </button>
+      </form>
+    </div>
+  );
 }

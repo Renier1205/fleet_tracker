@@ -1232,10 +1232,15 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
     };
 
     try {
+      const eventSummaryParts = [description];
+      if (componentAffected) eventSummaryParts.push(`Component: ${componentAffected}`);
+      const eventSummary = eventSummaryParts.join(" - ");
+
       if (hasSavedRecord) {
         const { error: dbError } = await supabase.from("breakdown_log").update(payload).eq("id", currentId);
         if (dbError) throw dbError;
         setSavedRecord({ ...savedRecord, ...payload });
+        logActivity("Events", currentId, status === "Closed" ? "closed" : "updated", eventSummary);
       } else {
         const { data, error: dbError } = await supabase.from("breakdown_log").insert(payload).select().single();
         if (dbError) throw dbError;
@@ -1243,6 +1248,7 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
         // is what lets a Work Order (and parts against it) be added right
         // away, in the same session, instead of having to reopen it.
         setSavedRecord(data);
+        logActivity("Events", data.id, "created", eventSummary);
 
         // This event was created by booking down a scheduled Planned
         // Maintenance job, not logged from scratch - link that same Work
@@ -1752,10 +1758,15 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
     };
 
     try {
-      const { error: dbError } = isEdit
-        ? await supabase.from("work_orders").update(payload).eq("id", existing.id)
-        : await supabase.from("work_orders").insert(payload);
+      const woSummaryParts = [problemScope];
+      if (component) woSummaryParts.push(`Component: ${component}`);
+      const woSummary = woSummaryParts.join(" - ");
+
+      const { data, error: dbError } = isEdit
+        ? await supabase.from("work_orders").update(payload).eq("id", existing.id).select().single()
+        : await supabase.from("work_orders").insert(payload).select().single();
       if (dbError) throw dbError;
+      logActivity("Work Orders", (isEdit ? existing.id : data?.id), status === "Closed" ? "closed" : (isEdit ? "updated" : "created"), woSummary);
       onSaved();
     } catch (err) {
       setError(err.message || String(err));
@@ -2769,10 +2780,13 @@ function BacklogForm({ assets, workOrders, existing, userEmail, onClose, onSaved
         closed_date: status === "Closed" ? (existing?.closed_date || todayForInput()) : null,
       };
 
-      const { error: dbError } = isEdit
-        ? await supabase.from("backlogs").update(payload).eq("id", existing.id)
-        : await supabase.from("backlogs").insert(payload);
+      const { data, error: dbError } = isEdit
+        ? await supabase.from("backlogs").update(payload).eq("id", existing.id).select().single()
+        : await supabase.from("backlogs").insert(payload).select().single();
       if (dbError) throw dbError;
+      const backlogSummaryParts = [description.trim()];
+      if (componentCode) backlogSummaryParts.push(`Component: ${componentCode}`);
+      logActivity("Backlogs", (isEdit ? existing.id : data?.id), status === "Closed" ? "closed" : (isEdit ? "updated" : "created"), backlogSummaryParts.join(" - "));
       onSaved();
     } catch (err) {
       setError(err.message || String(err));
@@ -5089,17 +5103,13 @@ const PARTS_IMPORT_KEYS = ["part_no", "description", "qty_in_stock", "minimum_qt
 
 const TABLE_NAME_LABELS = {
   assets: "Assets", daily_hours: "Daily Hours", fuel_log: "Fuel Log", oil_consumption: "Oil Consumption",
-  breakdown_log: "Breakdowns", work_orders: "Work Orders", service_schedule: "Planned Maintenance",
+  breakdown_log: "Events", work_orders: "Work Orders", service_schedule: "Planned Maintenance",
   inspections: "Inspections", component_types: "Components", component_changeouts: "Components",
   tyre_tracking: "Tyres", parts_inventory: "Parts Inventory", warranty_register: "Warranty & Documents",
   document_register: "Warranty & Documents", scheduled_hours: "Monthly Scheduled Hours",
   equipment_class_cost_rates: "Cost Rates", shift_reports: "Shift Reports", technician_job_cards: "Job Cards",
+  backlogs: "Backlogs", daily_service_checklist: "Daily Service", quote_prices: "Quote Price List",
 };
-
-const AUDIT_COLUMNS = [
-  ["changed_at", "Date & Time"], ["changed_by_email", "User"], ["table_name", "Tab"],
-  ["action", "Action"], ["record_id", "Record #"], ["deletion_reason", "Reason (if deleted)"],
-];
 
 function ComponentCodesAdminPage({ componentCodes, isAdmin, onRefresh }) {
   const [newName, setNewName] = useState("");
@@ -5456,7 +5466,25 @@ function PageAccessModal({ user, onClose }) {
   );
 }
 
-function AuditTrailPage({ auditLog, isAdmin }) {
+const ACTIVITY_VERB = { created: "created", updated: "updated", closed: "closed", deleted: "deleted" };
+const ACTIVITY_ARTICLE = { Events: "an", Backlogs: "a", "Work Orders": "a", "Daily Service": "a" };
+
+function activitySentence(row, nameByUser) {
+  const name = nameByUser.get(row.user_id) || "Someone";
+  const verb = ACTIVITY_VERB[row.action] || row.action;
+  const article = ACTIVITY_ARTICLE[row.table_name] || "a";
+  const table = row.table_name || "record";
+  const date = row.created_at ? new Date(row.created_at).toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" }) : "";
+  const time = row.created_at ? new Date(row.created_at).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" }) : "";
+  return `${name} ${verb} ${article} ${table.replace(/s$/, "")} on ${date} at ${time}${row.summary ? ` - ${row.summary}` : ""}`;
+}
+
+const ACTIVITY_COLUMNS = [
+  ["created_at", "Date & Time"], ["user_name", "User"], ["table_name", "Tab"],
+  ["action", "Action"], ["summary", "Details"],
+];
+
+function AuditTrailPage({ activityLog, profiles, isAdmin }) {
   const [tableFilter, setTableFilter] = useState("");
   const [actionFilter, setActionFilter] = useState("");
   const [userFilter, setUserFilter] = useState("");
@@ -5473,37 +5501,37 @@ function AuditTrailPage({ auditLog, isAdmin }) {
     );
   }
 
-  const tables = useMemo(() => [...new Set(auditLog.map((r) => r.table_name))].filter(Boolean).sort(), [auditLog]);
-  const users = useMemo(() => [...new Set(auditLog.map((r) => r.changed_by_email))].filter(Boolean).sort(), [auditLog]);
+  const nameByUser = useMemo(() => new Map(profiles.map((p) => [p.user_id, p.full_name])), [profiles]);
+  const tables = useMemo(() => [...new Set(activityLog.map((r) => r.table_name))].filter(Boolean).sort(), [activityLog]);
+  const users = useMemo(() => [...new Set(activityLog.map((r) => nameByUser.get(r.user_id)))].filter(Boolean).sort(), [activityLog, nameByUser]);
 
   const filtered = useMemo(() => {
-    return auditLog.filter((r) => {
+    return activityLog.filter((r) => {
       if (tableFilter && r.table_name !== tableFilter) return false;
       if (actionFilter && r.action !== actionFilter) return false;
-      if (userFilter && r.changed_by_email !== userFilter) return false;
-      if (fromDate && new Date(r.changed_at) < new Date(fromDate)) return false;
-      if (toDate && new Date(r.changed_at) > new Date(toDate + "T23:59:59")) return false;
+      if (userFilter && nameByUser.get(r.user_id) !== userFilter) return false;
+      if (fromDate && new Date(r.created_at) < new Date(fromDate)) return false;
+      if (toDate && new Date(r.created_at) > new Date(toDate + "T23:59:59")) return false;
       return true;
     });
-  }, [auditLog, tableFilter, actionFilter, userFilter, fromDate, toDate]);
+  }, [activityLog, tableFilter, actionFilter, userFilter, fromDate, toDate, nameByUser]);
 
   const formatDT = (v) => v ? new Date(v).toLocaleString("en-ZA", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-";
-  const tableLabel = (name) => TABLE_NAME_LABELS[name] || name;
 
   const exportToExcel = () => {
     const now = new Date();
     const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
-    const headerRow = AUDIT_COLUMNS.map((c) => c[1]);
-    const dataRows = filtered.map((r) => AUDIT_COLUMNS.map(([key]) =>
-      key === "changed_at" ? formatDT(r[key]) : key === "table_name" ? tableLabel(r[key]) : (r[key] ?? "")
-    ));
+    const headerRow = ACTIVITY_COLUMNS.map((c) => c[1]);
+    const dataRows = filtered.map((r) => [
+      formatDT(r.created_at), nameByUser.get(r.user_id) || "-", r.table_name, r.action, r.summary || "",
+    ]);
     const aoa = [["Audit Trail"], [`Exported: ${timestamp}`], [], headerRow, ...dataRows];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     ws["!merges"] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: AUDIT_COLUMNS.length - 1 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: AUDIT_COLUMNS.length - 1 } },
+      { s: { r: 0, c: 0 }, e: { r: 0, c: ACTIVITY_COLUMNS.length - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: ACTIVITY_COLUMNS.length - 1 } },
     ];
-    ws["!cols"] = AUDIT_COLUMNS.map((c) => ({ wch: Math.max(c[1].length + 2, 16) }));
+    ws["!cols"] = ACTIVITY_COLUMNS.map((c) => ({ wch: c[0] === "summary" ? 50 : Math.max(c[1].length + 2, 16) }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Audit Trail");
     XLSX.writeFile(wb, `Audit_Trail_${now.toISOString().slice(0, 10)}.xlsx`);
@@ -5513,16 +5541,21 @@ function AuditTrailPage({ auditLog, isAdmin }) {
 
   return (
     <div>
+      <p style={{ fontSize: 12.5, color: "#859195", margin: "0 0 14px" }}>
+        Covers Events, Work Orders and Backlogs, plus every deletion anywhere in the app. Other tabs (Daily Hours, Fuel Log, etc.) aren't summarised here yet - a fast follow-up once you confirm this is the level of detail you want.
+      </p>
+
       <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
         <select value={tableFilter} onChange={(e) => setTableFilter(e.target.value)} style={selectStyle}>
           <option value="">All tabs</option>
-          {tables.map((t) => <option key={t} value={t}>{tableLabel(t)}</option>)}
+          {tables.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
         <select value={actionFilter} onChange={(e) => setActionFilter(e.target.value)} style={selectStyle}>
           <option value="">All actions</option>
-          <option value="INSERT">Created</option>
-          <option value="UPDATE">Edited</option>
-          <option value="DELETE">Deleted</option>
+          <option value="created">Created</option>
+          <option value="updated">Updated</option>
+          <option value="closed">Closed</option>
+          <option value="deleted">Deleted</option>
         </select>
         <select value={userFilter} onChange={(e) => setUserFilter(e.target.value)} style={selectStyle}>
           <option value="">All users</option>
@@ -5533,7 +5566,7 @@ function AuditTrailPage({ auditLog, isAdmin }) {
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <p style={{ fontSize: 13, color: "#4B5659", margin: 0 }}>{filtered.length} of {auditLog.length} entries shown</p>
+        <p style={{ fontSize: 13, color: "#4B5659", margin: 0 }}>{filtered.length} of {activityLog.length} entries shown</p>
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
             <Download size={14} /> Export to Excel
@@ -5544,31 +5577,17 @@ function AuditTrailPage({ auditLog, isAdmin }) {
         </div>
       </div>
 
-      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-          <thead>
-            <tr style={{ background: "#F7F8F6" }}>
-              {AUDIT_COLUMNS.map(([key, label]) => (
-                <th key={key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{label}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((r, i) => (
-              <tr key={r.id ?? i} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none" }}>
-                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{formatDT(r.changed_at)}</td>
-                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.changed_by_email || "-"}</td>
-                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{tableLabel(r.table_name)}</td>
-                <td style={{ padding: "9px 12px" }}><Badge value={r.action} /></td>
-                <td style={{ padding: "9px 12px" }}>{r.record_id ?? "-"}</td>
-                <td style={{ padding: "9px 12px" }}>{r.deletion_reason || <span style={{ color: "#B4B2A9" }}>-</span>}</td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr><td colSpan={AUDIT_COLUMNS.length} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No audit entries match your filters.</td></tr>
-            )}
-          </tbody>
-        </table>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {filtered.map((r, i) => (
+          <div key={r.id ?? i} style={{ border: "1px solid #E2E6E3", borderRadius: 10, padding: "12px 16px", background: "#fff" }}>
+            <p style={{ fontSize: 13.5, color: "#183642", margin: 0, lineHeight: 1.5 }}>{activitySentence(r, nameByUser)}</p>
+          </div>
+        ))}
+        {filtered.length === 0 && (
+          <div style={{ border: "1px solid #E2E6E3", borderRadius: 10, padding: 24, textAlign: "center", color: "#859195", fontSize: 13 }}>
+            No audit entries match your filters.
+          </div>
+        )}
       </div>
 
       {showPrint && (
@@ -5599,27 +5618,13 @@ function AuditTrailPage({ auditLog, isAdmin }) {
                 {fromDate || toDate ? `${fromDate || "earliest"} to ${toDate || "latest"}` : "All recorded activity"} · Generated {new Date().toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" })}
               </p>
 
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5 }}>
-                <thead>
-                  <tr>
-                    {AUDIT_COLUMNS.map(([key, label]) => (
-                      <th key={key} style={{ textAlign: "left", padding: "5px 8px", border: "1px solid #ccc", background: "#F2F1EA" }}>{label}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((r, i) => (
-                    <tr key={r.id ?? i}>
-                      <td style={{ padding: "5px 8px", border: "1px solid #ccc" }}>{formatDT(r.changed_at)}</td>
-                      <td style={{ padding: "5px 8px", border: "1px solid #ccc" }}>{r.changed_by_email || "-"}</td>
-                      <td style={{ padding: "5px 8px", border: "1px solid #ccc" }}>{tableLabel(r.table_name)}</td>
-                      <td style={{ padding: "5px 8px", border: "1px solid #ccc" }}>{r.action}</td>
-                      <td style={{ padding: "5px 8px", border: "1px solid #ccc" }}>{r.record_id ?? "-"}</td>
-                      <td style={{ padding: "5px 8px", border: "1px solid #ccc" }}>{r.deletion_reason || "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {filtered.map((r, i) => (
+                  <p key={r.id ?? i} style={{ fontSize: 11.5, padding: "6px 8px", border: "1px solid #ccc", margin: 0 }}>
+                    {activitySentence(r, nameByUser)}
+                  </p>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -6659,6 +6664,18 @@ function aggregateMetrics(kpiRows, assetIds) {
 // performs the actual delete. The existing audit trigger already captures
 // what was deleted automatically - this captures why, as a required step
 // rather than an afterthought.
+// Best-effort - never blocks or fails the user's actual save because a
+// log write hiccupped. Every insert/update/delete flows through here
+// with a plain-English summary already built at the point it happens,
+// rather than trying to reconstruct one later from a raw row diff.
+async function logActivity(tableName, recordId, action, summary) {
+  try {
+    await supabase.from("activity_log").insert({ table_name: tableName, record_id: recordId != null ? String(recordId) : null, action, summary });
+  } catch (err) {
+    console.error("Activity log write failed:", err);
+  }
+}
+
 async function deleteWithReason(tableName, recordId, idColumn, reason, userEmail) {
   const { error: logError } = await supabase.from("deletion_log").insert({
     table_name: tableName, record_id: String(recordId), reason, deleted_by_email: userEmail || null,
@@ -6666,6 +6683,7 @@ async function deleteWithReason(tableName, recordId, idColumn, reason, userEmail
   if (logError) throw logError;
   const { error: deleteError } = await supabase.from(tableName).delete().eq(idColumn, recordId);
   if (deleteError) throw deleteError;
+  logActivity(TABLE_NAME_LABELS[tableName] || tableName, recordId, "deleted", reason);
 }
 
 function DeleteConfirmModal({ itemLabel, userEmail, onCancel, onConfirm }) {
@@ -7069,6 +7087,81 @@ function KpiLegend({ targetLabel }) {
       <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#2F9E63", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Target met</span>
       <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#A62A1E", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Target not met</span>
       <span><span style={{ display: "inline-block", width: 12, height: 3, background: "#F5C518", borderRadius: 2, marginRight: 6, verticalAlign: "middle" }} />{targetLabel || "Target"}</span>
+    </div>
+  );
+}
+
+function UserMenu({ myFullName, isAdmin, myRole, onNameSaved }) {
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [nameInput, setNameInput] = useState(myFullName || "");
+  const [saving, setSaving] = useState(false);
+  const ref = React.useRef(null);
+
+  useEffect(() => {
+    const onClick = (e) => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setEditing(false); } };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  const initials = (myFullName || "?")
+    .split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("") || "?";
+  const roleLabel = isAdmin ? "Administrator" : myRole === "manager" ? "Manager" : "Operator";
+
+  const handleSaveName = async () => {
+    if (!nameInput.trim()) return;
+    setSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from("profiles").upsert({ user_id: user.id, full_name: nameInput.trim(), updated_at: new Date().toISOString() });
+    setSaving(false);
+    setEditing(false);
+    setOpen(false);
+    onNameSaved?.();
+  };
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{ display: "flex", alignItems: "center", gap: 9, background: "none", border: "none", cursor: "pointer", padding: "4px 6px", borderRadius: 8 }}
+      >
+        <span style={{ width: 32, height: 32, borderRadius: "50%", background: NAVY, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12.5, fontWeight: 700, flexShrink: 0 }}>
+          {initials}
+        </span>
+        <span style={{ textAlign: "left", display: window.innerWidth < 480 ? "none" : "block" }}>
+          <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#183642", lineHeight: 1.2 }}>{myFullName || "Set your name"}</span>
+          <span style={{ display: "block", fontSize: 11, color: "#859195", lineHeight: 1.2 }}>{roleLabel}</span>
+        </span>
+        <ChevronDown size={14} style={{ color: "#859195", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
+      </button>
+
+      {open && (
+        <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, background: "#fff", border: "1px solid #E2E6E3", borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", padding: 10, width: 220, zIndex: 30 }}>
+          {editing ? (
+            <div>
+              <input
+                type="text"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                autoFocus
+                style={{ width: "100%", padding: "7px 9px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 6, boxSizing: "border-box", marginBottom: 8 }}
+              />
+              <button onClick={handleSaveName} disabled={saving || !nameInput.trim()} style={{ width: "100%", background: NAVY, color: "#fff", border: "none", padding: "7px 0", borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          ) : (
+            <>
+              <button onClick={() => { setNameInput(myFullName || ""); setEditing(true); }} style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: "8px 8px", fontSize: 13, color: "#183642", cursor: "pointer", borderRadius: 6 }}>
+                Edit name
+              </button>
+              <button onClick={() => supabase.auth.signOut()} style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: "8px 8px", fontSize: 13, color: "#B85450", cursor: "pointer", borderRadius: 6 }}>
+                Sign out
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -7527,7 +7620,7 @@ function buildTableConfig(assets, dailyHours, breakdowns, fuelLog, oilConsumptio
   };
 }
 
-export default function App({ userEmail, isAdmin, myRole = "manager", mySites = [], myPageAccess = [] }) {
+export default function App({ userEmail, isAdmin, myRole = "manager", mySites = [], myPageAccess = [], myFullName, onNameSaved }) {
   const [active, setActive] = useState(() => (myRole === "operator" ? "daily_hours" : "dashboard"));
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [engineeringExpanded, setEngineeringExpanded] = useState(true);
@@ -7555,6 +7648,8 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
   const [parts, setParts] = useState([]);
   const [warrantyDocs, setWarrantyDocs] = useState([]);
   const [auditLog, setAuditLog] = useState([]);
+  const [activityLog, setActivityLog] = useState([]);
+  const [profiles, setProfiles] = useState([]);
   const [backlogs, setBacklogs] = useState([]);
   const [dailyServiceChecklist, setDailyServiceChecklist] = useState([]);
   const [componentCodes, setComponentCodes] = useState([]);
@@ -7685,6 +7780,14 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
     // every site is the point of it.
     const { data: auditData, error: auditError } = await supabase.from("audit_report").select("*").limit(200);
     if (!auditError) setAuditLog(auditData || []);
+
+    const { data: activityData, error: activityError } = await supabase.from("activity_log").select("*").order("created_at", { ascending: false }).limit(500);
+    if (!activityError) setActivityLog(activityData || []);
+
+    // Everyone's names, not just the current user's - needed to show who
+    // did what throughout the Audit Trail regardless of who's looking.
+    const { data: profilesData, error: profilesError } = await supabase.from("profiles").select("*");
+    if (!profilesError) setProfiles(profilesData || []);
   }, [selectedSiteId]);
 
   useEffect(() => {
@@ -7914,21 +8017,27 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
         {/* Mobile top bar */}
         {isMobile && (
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: "1px solid #E2E6E3", position: "sticky", top: 0, background: "#fff", zIndex: 10 }}>
-            <button onClick={() => setSidebarOpen(true)} aria-label="Open menu" style={{ background: "none", border: "none", color: NAVY, cursor: "pointer", padding: 6, display: "flex" }}>
-              <Menu size={20} />
-            </button>
-            <span style={{ fontSize: 16, fontWeight: 700, color: NAVY }}>
-              {pageTitle}
-            </span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 16px", borderBottom: "1px solid #E2E6E3", position: "sticky", top: 0, background: "#fff", zIndex: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button onClick={() => setSidebarOpen(true)} aria-label="Open menu" style={{ background: "none", border: "none", color: NAVY, cursor: "pointer", padding: 6, display: "flex" }}>
+                <Menu size={20} />
+              </button>
+              <span style={{ fontSize: 16, fontWeight: 700, color: NAVY }}>
+                {pageTitle}
+              </span>
+            </div>
+            <UserMenu myFullName={myFullName} isAdmin={isAdmin} myRole={myRole} onNameSaved={onNameSaved} />
           </div>
         )}
 
         <div style={{ padding: isMobile ? "16px" : "24px 28px", overflow: "auto", flex: 1 }}>
           {!isMobile && (
-            <h2 style={{ fontSize: 19, fontWeight: 700, margin: "0 0 18px", color: NAVY }}>
-              {pageTitle}
-            </h2>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+              <h2 style={{ fontSize: 19, fontWeight: 700, margin: 0, color: NAVY }}>
+                {pageTitle}
+              </h2>
+              <UserMenu myFullName={myFullName} isAdmin={isAdmin} myRole={myRole} onNameSaved={onNameSaved} />
+            </div>
           )}
 
           {(coreError || restError) && (
@@ -7988,7 +8097,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
             ) : active === "parts" ? (
               <PartsPage parts={parts} selectedSiteId={selectedSiteId} onRefresh={loadRestOfData} />
             ) : active === "audit" ? (
-              <AuditTrailPage auditLog={auditLog} isAdmin={isAdmin} />
+              <AuditTrailPage activityLog={activityLog} profiles={profiles} isAdmin={isAdmin} />
             ) : active === "site_management" ? (
               <SiteManagementPage isAdmin={isAdmin} onSitesChanged={() => window.location.reload()} />
             ) : active === "component_codes" ? (
