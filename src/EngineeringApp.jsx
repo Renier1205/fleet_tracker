@@ -1094,11 +1094,12 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
 }
 
 
-function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved, userEmail, workOrders, parts, componentCodes, onRefresh }) {
+function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved, userEmail, myFullName, workOrders, parts, componentCodes, onRefresh }) {
   const [assetId, setAssetId] = useState(existing?.asset_id || activatingWorkOrder?.asset_id || assets[0]?.asset_id || "");
   const [causeCode, setCauseCode] = useState(existing?.cause_code || CAUSE_CODES[0]);
   const [severity, setSeverity] = useState(existing?.severity || "Medium");
   const [componentAffected, setComponentAffected] = useState(existing?.component_affected || activatingWorkOrder?.component || "");
+  const [componentCode, setComponentCode] = useState(existing?.component_affected || activatingWorkOrder?.component || "");
   const [description, setDescription] = useState(existing?.description || activatingWorkOrder?.problem_scope || "");
   const [status, setStatus] = useState(existing?.repair_status || "In Progress");
   const [downtimeStart, setDowntimeStart] = useState(
@@ -1110,7 +1111,7 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
   const [expectedUpTime, setExpectedUpTime] = useState(
     existing?.expected_up_time ? isoToInputValue(existing.expected_up_time) : ""
   );
-  const [reportedBy] = useState(existing?.reported_by || userEmail || "");
+  const [reportedBy] = useState(existing?.reported_by || myFullName || userEmail || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -1332,8 +1333,8 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Component Code</label>
           <select
-            value=""
-            onChange={(e) => { if (e.target.value) setComponentAffected(e.target.value); }}
+            value={componentCode}
+            onChange={(e) => { setComponentCode(e.target.value); if (e.target.value) setComponentAffected(e.target.value); }}
             style={fieldStyle}
           >
             <option value="">- Select a component -</option>
@@ -1398,7 +1399,7 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
   );
 }
 
-function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, parts, componentCodes }) {
+function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, myFullName, workOrders, parts, componentCodes }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [activating, setActivating] = useState(null); // scheduled Work Order being booked down
@@ -1653,6 +1654,7 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, workOrders, 
           onClose={() => { setShowForm(false); setEditing(null); setActivating(null); }}
           onSaved={handleSaved}
           userEmail={userEmail}
+          myFullName={myFullName}
           workOrders={workOrders}
           parts={parts}
           componentCodes={componentCodes}
@@ -8069,7 +8071,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
             ) : active === "fleet_performance" ? (
               <FleetPerformance assets={assets} breakdowns={breakdowns} />
             ) : active === "breakdowns" ? (
-              <BreakdownsPage assets={assets} breakdowns={breakdowns} workOrders={workOrders} parts={parts} componentCodes={componentCodes} onRefresh={() => { loadCoreData(); loadRestOfData(); }} userEmail={userEmail} />
+              <BreakdownsPage assets={assets} breakdowns={breakdowns} workOrders={workOrders} parts={parts} componentCodes={componentCodes} onRefresh={() => { loadCoreData(); loadRestOfData(); }} userEmail={userEmail} myFullName={myFullName} />
             ) : active === "assets" ? (
               <AssetsPage assets={assets} selectedSiteId={selectedSiteId} onRefresh={loadCoreData} />
             ) : active === "daily_hours" ? (
