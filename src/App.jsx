@@ -10,6 +10,7 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [myRole, setMyRole] = useState("manager");
   const [mySites, setMySites] = useState(undefined);
+  const [myPageAccess, setMyPageAccess] = useState([]); // empty = no restriction beyond role
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
@@ -89,6 +90,25 @@ export default function App() {
       });
   }, [session]);
 
+  useEffect(() => {
+    if (!session) {
+      setMyPageAccess([]);
+      return;
+    }
+    supabase
+      .from("user_page_access")
+      .select("page_key")
+      .eq("user_id", session.user.id)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Page access check failed:", error.message);
+          setMyPageAccess([]); // fail open - role-based visibility still applies
+        } else {
+          setMyPageAccess((data || []).map((r) => r.page_key));
+        }
+      });
+  }, [session]);
+
   // Still resolving the session on first load
   if (session === undefined) {
     return null;
@@ -129,5 +149,5 @@ export default function App() {
     );
   }
 
-  return <EngineeringApp userEmail={session.user.email} isAdmin={isAdmin} myRole={myRole} mySites={mySites} />;
+  return <EngineeringApp userEmail={session.user.email} isAdmin={isAdmin} myRole={myRole} mySites={mySites} myPageAccess={myPageAccess} />;
 }

@@ -5179,6 +5179,7 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
   const [newSiteLocation, setNewSiteLocation] = useState("");
   const [savingSite, setSavingSite] = useState(false);
   const [message, setMessage] = useState(null);
+  const [managingUser, setManagingUser] = useState(null);
 
   const loadAll = React.useCallback(async () => {
     setLoading(true);
@@ -5302,7 +5303,7 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
 
       <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 6px", color: NAVY }}>User Access</h3>
       <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 12px" }}>
-        Tick a box to grant a user access to that site. A user with only one site never sees a site switcher - it only appears once someone has more than one, which is what makes them a manager in practice. A newly granted site starts completely blank for that user until data gets logged against it. Role controls which tabs they see at all: Manager sees everything, Operator sees only the data-entry tabs (Daily Hours, Fuel Log, Oil Consumption, Breakdowns, Work Orders, Inspections) - no dashboards or reports. Admin is granted separately via SQL, not from here, to avoid accidentally locking yourself out.
+        Tick a box to grant a user access to that site. A user with only one site never sees a site switcher - it only appears once someone has more than one, which is what makes them a manager in practice. A newly granted site starts completely blank for that user until data gets logged against it. Role controls which tabs they see at all: Manager sees everything, Operator sees only the data-entry tabs (Daily Hours, Fuel Log, Oil Consumption, Breakdowns, Work Orders, Inspections) - no dashboards or reports. Use "Manage pages" for finer control than that - tick exactly which pages a specific person can see, on top of their role. Admin is granted separately via SQL, not from here, to avoid accidentally locking yourself out.
       </p>
       {loading ? (
         <p style={{ fontSize: 13, color: "#859195" }}>Loading…</p>
@@ -5316,6 +5317,7 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
                 {sites.map((s) => (
                   <th key={s.id} style={{ textAlign: "center", padding: "9px 12px", fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3", whiteSpace: "nowrap" }}>{s.site_name}</th>
                 ))}
+                <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3", whiteSpace: "nowrap" }}>Pages</th>
               </tr>
             </thead>
             <tbody>
@@ -5343,16 +5345,113 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
                         <input type="checkbox" checked={hasAccess(u.id, s.id)} onChange={() => toggleAccess(u.id, s.id)} style={{ width: 16, height: 16, cursor: "pointer" }} />
                       </td>
                     ))}
+                    <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
+                      {role === "admin" ? (
+                        <span style={{ fontSize: 12, color: "#859195" }}>Full access</span>
+                      ) : (
+                        <button onClick={() => setManagingUser(u)} style={{ fontSize: 12, color: NAVY, background: "none", border: `1px solid ${NAVY}`, borderRadius: 6, padding: "4px 9px", cursor: "pointer", fontWeight: 600 }}>
+                          Manage pages
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
               {users.length === 0 && (
-                <tr><td colSpan={sites.length + 2} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No users found.</td></tr>
+                <tr><td colSpan={sites.length + 3} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No users found.</td></tr>
               )}
             </tbody>
           </table>
         </div>
       )}
+
+      {managingUser && (
+        <PageAccessModal user={managingUser} onClose={() => setManagingUser(null)} />
+      )}
+    </div>
+  );
+}
+
+function PageAccessModal({ user, onClose }) {
+  const tickablePages = NAV.filter((n) => !n.group && n.key !== "audit" && n.key !== "site_management" && n.key !== "component_codes");
+  const [checked, setChecked] = useState(new Set(tickablePages.map((p) => p.key))); // default: everything ticked, until we know otherwise
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error: err } = await supabase.from("user_page_access").select("page_key").eq("user_id", user.id);
+      if (cancelled) return;
+      if (!err && data && data.length > 0) {
+        setChecked(new Set(data.map((r) => r.page_key)));
+      }
+      // No rows = no explicit restriction yet, so leave everything ticked
+      // (that's this person's actual current access, via their role).
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [user.id]);
+
+  const toggle = (key) => {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      const { error: delErr } = await supabase.from("user_page_access").delete().eq("user_id", user.id);
+      if (delErr) throw delErr;
+      // Ticking every page back on is the same as having no restriction
+      // at all, so that state is stored as no rows rather than a
+      // redundant "everything allowed" list.
+      if (checked.size < tickablePages.length) {
+        const rows = [...checked].map((page_key) => ({ user_id: user.id, page_key }));
+        const { error: insErr } = await supabase.from("user_page_access").insert(rows);
+        if (insErr) throw insErr;
+      }
+      onClose();
+    } catch (err) {
+      setError(err.message || String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
+      <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 420, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto" }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>Manage Pages</h3>
+        <p style={{ fontSize: 12.5, color: "#859195", margin: "0 0 16px" }}>{user.email}</p>
+
+        {loading ? (
+          <p style={{ fontSize: 13, color: "#859195" }}>Loading…</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 18 }}>
+            {tickablePages.map((p) => (
+              <label key={p.key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: "#183642", padding: "5px 4px", cursor: "pointer" }}>
+                <input type="checkbox" checked={checked.has(p.key)} onChange={() => toggle(p.key)} style={{ width: 15, height: 15, cursor: "pointer" }} />
+                {p.label}
+              </label>
+            ))}
+          </div>
+        )}
+
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="button" onClick={handleSave} disabled={saving || loading} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -7428,7 +7527,7 @@ function buildTableConfig(assets, dailyHours, breakdowns, fuelLog, oilConsumptio
   };
 }
 
-export default function App({ userEmail, isAdmin, myRole = "manager", mySites = [] }) {
+export default function App({ userEmail, isAdmin, myRole = "manager", mySites = [], myPageAccess = [] }) {
   const [active, setActive] = useState(() => (myRole === "operator" ? "daily_hours" : "dashboard"));
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [engineeringExpanded, setEngineeringExpanded] = useState(true);
@@ -7631,6 +7730,14 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
     if (isMobile) setSidebarOpen(false);
   };
 
+  // Per-user page visibility, layered on top of the role system rather
+  // than replacing it - an empty myPageAccess means this person has no
+  // explicit restrictions, so their normal role-based access applies
+  // unchanged. The moment an admin has ticked/unticked anything for
+  // them, that list becomes their full, explicit allow-list. Admins are
+  // never restricted by this, however their own access list looks.
+  const canSeePage = (key) => isAdmin || myPageAccess.length === 0 || myPageAccess.includes(key);
+
   const sidebarWidth = isMobile ? 240 : (sidebarOpen ? 220 : 56);
 
   return (
@@ -7725,7 +7832,8 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
           {(engineeringExpanded || !sidebarOpen) && NAV.filter((n) =>
             !n.group &&
             ((n.key !== "audit" && n.key !== "site_management" && n.key !== "component_codes") || isAdmin) &&
-            (myRole !== "operator" || n.operatorVisible)
+            (myRole !== "operator" || n.operatorVisible) &&
+            canSeePage(n.key)
           ).map(({ key, label, icon: Icon }) => (
             <button
               key={key}
@@ -7762,7 +7870,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
                 </button>
               ) : null}
               {(backlogsExpanded || !sidebarOpen) && NAV.filter((n) =>
-                n.group === "backlogs" && (myRole !== "operator" || n.operatorVisible)
+                n.group === "backlogs" && (myRole !== "operator" || n.operatorVisible) && canSeePage(n.key)
               ).map(({ key, label, icon: Icon }) => (
                 <button
                   key={key}
@@ -7832,6 +7940,11 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
           <PageErrorBoundary key={active}>
             {active === "about" ? (
               <AboutPage />
+            ) : !canSeePage(active) ? (
+              <div style={{ background: "#F6E2E0", border: "1px solid #DDB6B2", borderRadius: 10, padding: 28, textAlign: "center" }}>
+                <p style={{ fontWeight: 700, fontSize: 14, color: "#7A3330", margin: "0 0 6px" }}>Access restricted</p>
+                <p style={{ fontSize: 13, color: "#7A3330", margin: 0 }}>You don't have access to this page. Ask your administrator if you need it.</p>
+              </div>
             ) : !selectedSiteId ? (
               <div style={{ background: "#F5E9D8", border: "1px solid #E3C79B", borderRadius: 10, padding: 24, textAlign: "center" }}>
                 <p style={{ fontWeight: 700, fontSize: 14, color: "#7A5320", margin: "0 0 6px" }}>No site selected</p>
