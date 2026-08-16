@@ -4116,30 +4116,111 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
 
   const formatDT = (v) => v ? new Date(v).toLocaleString("en-ZA", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-";
 
-  const exportToExcel = () => {
-    const now = new Date();
-    const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
-    const headerRow = DOWNTIME_SUMMARY_COLUMNS.map((c) => c[1]);
-    const dataRows = rows.map((r) => DOWNTIME_SUMMARY_COLUMNS.map(([key]) =>
-      key === "downtime_start" || key === "downtime_end" ? formatDT(r[key]) : (r[key] ?? "")
-    ));
-    const aoa = [
-      ["Shift Downtime Summary"],
-      [`Date Range: ${formatRangeForDisplay(fromDateTime, toDateTime)}`],
-      [`Exported: ${timestamp}`],
-      [],
-      headerRow, ...dataRows,
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!merges"] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: DOWNTIME_SUMMARY_COLUMNS.length - 1 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: DOWNTIME_SUMMARY_COLUMNS.length - 1 } },
-      { s: { r: 2, c: 0 }, e: { r: 2, c: DOWNTIME_SUMMARY_COLUMNS.length - 1 } },
-    ];
-    ws["!cols"] = DOWNTIME_SUMMARY_COLUMNS.map((c) => ({ wch: Math.max(c[1].length + 2, 16) }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Downtime Summary");
-    XLSX.writeFile(wb, `Shift_Downtime_Summary_${now.toISOString().slice(0, 10)}.xlsx`);
+  const [exporting, setExporting] = useState(false);
+
+  const exportToExcel = async () => {
+    setExporting(true);
+    try {
+      // Loaded on demand rather than bundled into the main app - this
+      // library is only needed the moment someone clicks Export, and
+      // pulling it in upfront would add real weight to every page load,
+      // including on a slow site connection.
+      const { default: ExcelJS } = await import("exceljs");
+      const wb = new ExcelJS.Workbook();
+      wb.creator = "Fleet Tracker";
+      wb.created = new Date();
+
+      const colCount = DOWNTIME_SUMMARY_COLUMNS.length;
+      const BRAND = "FF1F6668";
+      const HEADER_TEXT = "FFFFFFFF";
+      const BAND = "FFF7F8F6";
+      const BORDER = "FFE2E6E3";
+      const thinBorder = {
+        top: { style: "thin", color: { argb: BORDER } },
+        bottom: { style: "thin", color: { argb: BORDER } },
+        left: { style: "thin", color: { argb: BORDER } },
+        right: { style: "thin", color: { argb: BORDER } },
+      };
+
+      const ws = wb.addWorksheet("Downtime Summary");
+
+      // Title
+      ws.mergeCells(1, 1, 1, colCount);
+      const titleCell = ws.getCell(1, 1);
+      titleCell.value = "Shift Downtime Summary";
+      titleCell.font = { size: 20, bold: true, color: { argb: BRAND } };
+      titleCell.alignment = { vertical: "middle" };
+      ws.getRow(1).height = 32;
+
+      // Info block - equipment scope, date range, export timestamp
+      const scopeLabel = selectedAsset || selectedFleet || "All equipment";
+      const infoRows = [
+        ["Fleet / Equipment", scopeLabel],
+        ["Date Range", formatRangeForDisplay(fromDateTime, toDateTime)],
+        ["Exported", new Date().toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" })],
+      ];
+      let r = 2;
+      infoRows.forEach(([label, value]) => {
+        ws.getCell(r, 1).value = label;
+        ws.getCell(r, 1).font = { bold: true, color: { argb: "FF4B5659" } };
+        ws.mergeCells(r, 2, r, colCount);
+        ws.getCell(r, 2).value = value;
+        ws.getCell(r, 2).font = { color: { argb: "FF183642" } };
+        r++;
+      });
+
+      // Thick underline separating the info block from the table, echoing
+      // the double blue rule under the title on the reference report.
+      for (let c = 1; c <= colCount; c++) {
+        ws.getCell(r, c).border = { bottom: { style: "medium", color: { argb: BRAND } } };
+      }
+      r += 2;
+
+      const headerRowIdx = r;
+      DOWNTIME_SUMMARY_COLUMNS.forEach(([, label], i) => {
+        const cell = ws.getCell(headerRowIdx, i + 1);
+        cell.value = label;
+        cell.font = { bold: true, color: { argb: HEADER_TEXT } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BRAND } };
+        cell.alignment = { vertical: "middle" };
+        cell.border = thinBorder;
+      });
+      ws.getRow(headerRowIdx).height = 20;
+
+      const STATUS_COLOR = { Closed: "FF2C5646", Completed: "FF2C5646", "In Progress": "FF7A3330", "Awaiting Parts": "FF7A5320" };
+      rows.forEach((row, idx) => {
+        const rowIdx = headerRowIdx + 1 + idx;
+        DOWNTIME_SUMMARY_COLUMNS.forEach(([key], colIdx) => {
+          const cell = ws.getCell(rowIdx, colIdx + 1);
+          cell.value =
+            key === "downtime_start" || key === "downtime_end" ? formatDT(row[key])
+            : key === "downtime_hours" ? (row[key] != null ? Number(row[key]).toFixed(2) : "-")
+            : (row[key] ?? "-");
+          cell.border = thinBorder;
+          if (idx % 2 === 1) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BAND } };
+          if (key === "status" && STATUS_COLOR[row[key]]) cell.font = { bold: true, color: { argb: STATUS_COLOR[row[key]] } };
+          if (key === "event") cell.font = { bold: true, color: { argb: row[key] === "Breakdown" ? "FF7A3330" : "FF1F6668" } };
+        });
+      });
+
+      DOWNTIME_SUMMARY_COLUMNS.forEach(([key, label], i) => {
+        ws.getColumn(i + 1).width = key === "description" ? 34 : Math.max(label.length + 4, 16);
+      });
+      ws.views = [{ state: "frozen", ySplit: headerRowIdx }];
+
+      const buf = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Shift_Downtime_Summary_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -4150,8 +4231,8 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
       <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
 
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginBottom: 12 }}>
-        <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
-          <Download size={14} /> Export to Excel
+        <button onClick={exportToExcel} disabled={exporting} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: exporting ? "default" : "pointer", opacity: exporting ? 0.6 : 1 }}>
+          <Download size={14} /> {exporting ? "Preparing…" : "Export to Excel"}
         </button>
         <button onClick={() => setShowPrint(true)} style={{ display: "flex", alignItems: "center", gap: 6, background: NAVY, border: "none", color: "#fff", fontSize: 13, fontWeight: 700, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
           <Printer size={14} /> Print for Sign-off
