@@ -5181,30 +5181,36 @@ function ComponentCodesAdminPage({ componentCodes, isAdmin, onRefresh }) {
   );
 }
 
-function SiteManagementPage({ isAdmin, onSitesChanged }) {
+function SiteManagementPage({ isAdmin, onSitesChanged, onNameSaved }) {
   const [sites, setSites] = useState([]);
   const [users, setUsers] = useState([]);
   const [access, setAccess] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newSiteName, setNewSiteName] = useState("");
   const [newSiteLocation, setNewSiteLocation] = useState("");
   const [savingSite, setSavingSite] = useState(false);
   const [message, setMessage] = useState(null);
   const [managingUser, setManagingUser] = useState(null);
+  const [editingNameFor, setEditingNameFor] = useState(null);
+  const [nameInput, setNameInput] = useState("");
+  const [savingName, setSavingName] = useState(false);
 
   const loadAll = React.useCallback(async () => {
     setLoading(true);
-    const [sitesRes, usersRes, accessRes, rolesRes] = await Promise.all([
+    const [sitesRes, usersRes, accessRes, rolesRes, profilesRes] = await Promise.all([
       supabase.rpc("list_all_sites_for_admin"),
       supabase.rpc("list_users_for_admin"),
       supabase.rpc("list_site_access_for_admin"),
       supabase.rpc("list_user_roles_for_admin"),
+      supabase.from("profiles").select("*"),
     ]);
     if (!sitesRes.error) setSites(sitesRes.data || []);
     if (!usersRes.error) setUsers(usersRes.data || []);
     if (!accessRes.error) setAccess(accessRes.data || []);
     if (!rolesRes.error) setRoles(rolesRes.data || []);
+    if (!profilesRes.error) setProfiles(profilesRes.data || []);
     setLoading(false);
   }, []);
 
@@ -5249,6 +5255,21 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
   };
 
   const getRole = (userId) => roles.find((r) => r.user_id === userId)?.role || "manager";
+
+  const getName = (userId) => profiles.find((p) => p.user_id === userId)?.full_name || "";
+
+  const handleSaveName = async (userId) => {
+    setSavingName(true);
+    const { error } = await supabase.from("profiles").upsert({ user_id: userId, full_name: nameInput.trim() || null, updated_at: new Date().toISOString() });
+    setSavingName(false);
+    if (error) {
+      setMessage({ type: "error", text: error.message });
+    } else {
+      setEditingNameFor(null);
+      loadAll();
+      onNameSaved?.(); // in case the admin just edited their own name - refreshes the header immediately
+    }
+  };
 
   const handleRoleChange = async (userId, newRole) => {
     const { error } = await supabase.rpc("set_user_role", { target_user_id: userId, new_role: newRole });
@@ -5315,7 +5336,7 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
 
       <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 6px", color: NAVY }}>User Access</h3>
       <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 12px" }}>
-        Tick a box to grant a user access to that site. A user with only one site never sees a site switcher - it only appears once someone has more than one, which is what makes them a manager in practice. A newly granted site starts completely blank for that user until data gets logged against it. Role controls which tabs they see at all: Manager sees everything, Operator sees only the data-entry tabs (Daily Hours, Fuel Log, Oil Consumption, Breakdowns, Work Orders, Inspections) - no dashboards or reports. Use "Manage pages" for finer control than that - tick exactly which pages a specific person can see, on top of their role. Admin is granted separately via SQL, not from here, to avoid accidentally locking yourself out.
+        Tick a box to grant a user access to that site. A user with only one site never sees a site switcher - it only appears once someone has more than one, which is what makes them a manager in practice. A newly granted site starts completely blank for that user until data gets logged against it. Names are set here by you only - people can't edit their own, by design. Role controls which tabs they see at all: Manager sees everything, Operator sees only the data-entry tabs (Daily Hours, Fuel Log, Oil Consumption, Breakdowns, Work Orders, Inspections) - no dashboards or reports. Use "Manage pages" for finer control than that - tick exactly which pages a specific person can see, on top of their role. Admin is granted separately via SQL, not from here, to avoid accidentally locking yourself out.
       </p>
       {loading ? (
         <p style={{ fontSize: 13, color: "#859195" }}>Loading…</p>
@@ -5325,6 +5346,7 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
             <thead>
               <tr style={{ background: "#F7F8F6" }}>
                 <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3", whiteSpace: "nowrap" }}>User</th>
+                <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3", whiteSpace: "nowrap" }}>Name</th>
                 <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3", whiteSpace: "nowrap" }}>Role</th>
                 {sites.map((s) => (
                   <th key={s.id} style={{ textAlign: "center", padding: "9px 12px", fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3", whiteSpace: "nowrap" }}>{s.site_name}</th>
@@ -5338,6 +5360,29 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
                 return (
                   <tr key={u.id} style={{ borderBottom: i < users.length - 1 ? "1px solid #EFEEE7" : "none" }}>
                     <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{u.email}</td>
+                    <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
+                      {editingNameFor === u.id ? (
+                        <span style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                          <input
+                            type="text"
+                            autoFocus
+                            value={nameInput}
+                            onChange={(e) => setNameInput(e.target.value)}
+                            placeholder="Full name and surname"
+                            style={{ padding: "4px 7px", fontSize: 12.5, border: "1px solid #E2E6E3", borderRadius: 6, width: 150 }}
+                          />
+                          <button onClick={() => handleSaveName(u.id)} disabled={savingName} style={{ fontSize: 11.5, color: NAVY, background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Save</button>
+                          <button onClick={() => setEditingNameFor(null)} style={{ fontSize: 11.5, color: "#859195", background: "none", border: "none", cursor: "pointer" }}>Cancel</button>
+                        </span>
+                      ) : (
+                        <span
+                          onClick={() => { setEditingNameFor(u.id); setNameInput(getName(u.id)); }}
+                          style={{ cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted", color: getName(u.id) ? "#183642" : "#859195" }}
+                        >
+                          {getName(u.id) || "Set name"}
+                        </span>
+                      )}
+                    </td>
                     <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
                       {role === "admin" ? (
                         <Badge value="Admin" />
@@ -5370,7 +5415,7 @@ function SiteManagementPage({ isAdmin, onSitesChanged }) {
                 );
               })}
               {users.length === 0 && (
-                <tr><td colSpan={sites.length + 3} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No users found.</td></tr>
+                <tr><td colSpan={sites.length + 4} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No users found.</td></tr>
               )}
             </tbody>
           </table>
@@ -7051,12 +7096,27 @@ function KpiBarChart({ title, data, xKey, dataKey, target, domainMax, valueForma
   const gradGreen = `grad-green-${dataKey}`;
   const gradRed = `grad-red-${dataKey}`;
   const niceMax = domainMax === 100 ? 100 : niceDomainMax(domainMax);
+
+  // On a phone-width screen, side-by-side columns with rotated labels
+  // just don't have room for names like "LIEBHERR EXCAVATOR" - they
+  // collide into unreadable text. Stacking equipment one per row instead
+  // (each with its own line for its name) fixes that at any label length,
+  // same fix already used for the Event Timeline further up this page.
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.innerWidth < 560);
+  useEffect(() => {
+    const onResize = () => setNarrow(window.innerWidth < 560);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const chartHeight = narrow ? Math.max(180, data.length * 40 + 30) : 240;
+
   return (
     <div>
       {title && <p style={{ fontSize: 12.5, fontWeight: 600, margin: "0 0 6px", color: "#4B5659" }}>{title}</p>}
-      <div onClick={onClick} style={{ height: 240, background: "#292929", border: "1px solid #1C1C1C", borderRadius: 10, padding: "18px 8px 4px", cursor: onClick ? "pointer" : "default" }}>
+      <div onClick={onClick} style={{ height: chartHeight, background: "#292929", border: "1px solid #1C1C1C", borderRadius: 10, padding: narrow ? "10px 10px 10px 4px" : "18px 8px 4px", cursor: onClick ? "pointer" : "default" }}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 20, right: 8, left: 0, bottom: 20 }}>
+          <BarChart data={data} layout={narrow ? "vertical" : "horizontal"} margin={narrow ? { top: 4, right: 30, left: 4, bottom: 4 } : { top: 20, right: 8, left: 0, bottom: 20 }}>
             <defs>
               <linearGradient id={gradGreen} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#8FE8B4" />
@@ -7067,15 +7127,24 @@ function KpiBarChart({ title, data, xKey, dataKey, target, domainMax, valueForma
                 <stop offset="100%" stopColor="#A62A1E" />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#3D3D3D" vertical={false} />
-            <XAxis dataKey={xKey} interval={0} angle={-30} textAnchor="end" height={44} tick={{ fontSize: 10, fill: "#CFCFCF" }} axisLine={{ stroke: "#4A4A4A" }} tickLine={false} />
-            <YAxis domain={[0, niceMax]} tick={{ fontSize: 11, fill: "#CFCFCF" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}${unitSuffix || ""}`} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#3D3D3D" vertical={narrow} horizontal={!narrow} />
+            {narrow ? (
+              <>
+                <XAxis type="number" domain={[0, niceMax]} tick={{ fontSize: 10, fill: "#CFCFCF" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}${unitSuffix || ""}`} />
+                <YAxis type="category" dataKey={xKey} width={82} tick={{ fontSize: 10, fill: "#CFCFCF" }} axisLine={{ stroke: "#4A4A4A" }} tickLine={false} />
+              </>
+            ) : (
+              <>
+                <XAxis dataKey={xKey} interval={0} angle={-30} textAnchor="end" height={44} tick={{ fontSize: 10, fill: "#CFCFCF" }} axisLine={{ stroke: "#4A4A4A" }} tickLine={false} />
+                <YAxis domain={[0, niceMax]} tick={{ fontSize: 11, fill: "#CFCFCF" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}${unitSuffix || ""}`} />
+              </>
+            )}
             <Tooltip formatter={(v) => `${Number(v).toFixed(1)}${unitSuffix || ""}`} contentStyle={{ background: "#1F1F1F", border: "1px solid #444", borderRadius: 8 }} labelStyle={{ color: "#fff" }} itemStyle={{ color: "#fff" }} />
-            <Bar dataKey={dataKey} radius={[3, 3, 0, 0]} cursor={onClick ? "pointer" : "default"}>
+            <Bar dataKey={dataKey} radius={narrow ? [0, 3, 3, 0] : [3, 3, 0, 0]} cursor={onClick ? "pointer" : "default"}>
               {data.map((row, i) => <Cell key={i} fill={meetsTarget(row) ? `url(#${gradGreen})` : `url(#${gradRed})`} />)}
-              <LabelList dataKey={dataKey} position="top" formatter={valueFormatter} fill="#fff" fontSize={11} fontWeight={700} />
+              <LabelList dataKey={dataKey} position={narrow ? "right" : "top"} formatter={valueFormatter} fill="#fff" fontSize={11} fontWeight={700} />
             </Bar>
-            <ReferenceLine y={target} stroke="#F5C518" strokeWidth={2.5} />
+            <ReferenceLine {...(narrow ? { x: target } : { y: target })} stroke="#F5C518" strokeWidth={2.5} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -7093,15 +7162,12 @@ function KpiLegend({ targetLabel }) {
   );
 }
 
-function UserMenu({ myFullName, isAdmin, myRole, onNameSaved }) {
+function UserMenu({ myFullName, isAdmin, myRole }) {
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [nameInput, setNameInput] = useState(myFullName || "");
-  const [saving, setSaving] = useState(false);
   const ref = React.useRef(null);
 
   useEffect(() => {
-    const onClick = (e) => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setEditing(false); } };
+    const onClick = (e) => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); } };
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
@@ -7109,17 +7175,6 @@ function UserMenu({ myFullName, isAdmin, myRole, onNameSaved }) {
   const initials = (myFullName || "?")
     .split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("") || "?";
   const roleLabel = isAdmin ? "Administrator" : myRole === "manager" ? "Manager" : "Operator";
-
-  const handleSaveName = async () => {
-    if (!nameInput.trim()) return;
-    setSaving(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from("profiles").upsert({ user_id: user.id, full_name: nameInput.trim(), updated_at: new Date().toISOString() });
-    setSaving(false);
-    setEditing(false);
-    setOpen(false);
-    onNameSaved?.();
-  };
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
@@ -7131,37 +7186,19 @@ function UserMenu({ myFullName, isAdmin, myRole, onNameSaved }) {
           {initials}
         </span>
         <span style={{ textAlign: "left", display: window.innerWidth < 480 ? "none" : "block" }}>
-          <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#183642", lineHeight: 1.2 }}>{myFullName || "Set your name"}</span>
+          <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#183642", lineHeight: 1.2 }}>{myFullName || "Name not set"}</span>
           <span style={{ display: "block", fontSize: 11, color: "#859195", lineHeight: 1.2 }}>{roleLabel}</span>
         </span>
         <ChevronDown size={14} style={{ color: "#859195", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
       </button>
 
       {open && (
-        <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, background: "#fff", border: "1px solid #E2E6E3", borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", padding: 10, width: 220, zIndex: 30 }}>
-          {editing ? (
-            <div>
-              <input
-                type="text"
-                value={nameInput}
-                onChange={(e) => setNameInput(e.target.value)}
-                autoFocus
-                style={{ width: "100%", padding: "7px 9px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 6, boxSizing: "border-box", marginBottom: 8 }}
-              />
-              <button onClick={handleSaveName} disabled={saving || !nameInput.trim()} style={{ width: "100%", background: NAVY, color: "#fff", border: "none", padding: "7px 0", borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
-                {saving ? "Saving…" : "Save"}
-              </button>
-            </div>
-          ) : (
-            <>
-              <button onClick={() => { setNameInput(myFullName || ""); setEditing(true); }} style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: "8px 8px", fontSize: 13, color: "#183642", cursor: "pointer", borderRadius: 6 }}>
-                Edit name
-              </button>
-              <button onClick={() => supabase.auth.signOut()} style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: "8px 8px", fontSize: 13, color: "#B85450", cursor: "pointer", borderRadius: 6 }}>
-                Sign out
-              </button>
-            </>
-          )}
+        <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, background: "#fff", border: "1px solid #E2E6E3", borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", padding: 10, width: 200, zIndex: 30 }}>
+          {/* Names are set by an admin only, from the User Access page -
+              deliberately no self-service edit here. */}
+          <button onClick={() => supabase.auth.signOut()} style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: "8px 8px", fontSize: 13, color: "#B85450", cursor: "pointer", borderRadius: 6 }}>
+            Sign out
+          </button>
         </div>
       )}
     </div>
@@ -8028,7 +8065,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
                 {pageTitle}
               </span>
             </div>
-            <UserMenu myFullName={myFullName} isAdmin={isAdmin} myRole={myRole} onNameSaved={onNameSaved} />
+            <UserMenu myFullName={myFullName} isAdmin={isAdmin} myRole={myRole} />
           </div>
         )}
 
@@ -8038,7 +8075,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
               <h2 style={{ fontSize: 19, fontWeight: 700, margin: 0, color: NAVY }}>
                 {pageTitle}
               </h2>
-              <UserMenu myFullName={myFullName} isAdmin={isAdmin} myRole={myRole} onNameSaved={onNameSaved} />
+              <UserMenu myFullName={myFullName} isAdmin={isAdmin} myRole={myRole} />
             </div>
           )}
 
@@ -8101,7 +8138,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
             ) : active === "audit" ? (
               <AuditTrailPage activityLog={activityLog} profiles={profiles} isAdmin={isAdmin} />
             ) : active === "site_management" ? (
-              <SiteManagementPage isAdmin={isAdmin} onSitesChanged={() => window.location.reload()} />
+              <SiteManagementPage isAdmin={isAdmin} onSitesChanged={() => window.location.reload()} onNameSaved={onNameSaved} />
             ) : active === "component_codes" ? (
               <ComponentCodesAdminPage componentCodes={componentCodes} isAdmin={isAdmin} onRefresh={loadRestOfData} />
             ) : (

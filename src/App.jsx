@@ -40,6 +40,28 @@ export default function App() {
       });
   }, [session]);
 
+  // Banning someone (or suspending the license) in Supabase only blocks
+  // future sign-ins - it doesn't revoke a session that's already open.
+  // Without this, someone already working when they get banned would
+  // keep working until their token happened to expire on its own. This
+  // re-checks the real, current status directly from the database every
+  // 20 seconds and force-signs-out the instant either one fails, rather
+  // than trusting whatever the token they're already holding says.
+  useEffect(() => {
+    if (!session) return;
+    const check = async () => {
+      const [{ data: banned }, { data: licenseOk }] = await Promise.all([
+        supabase.rpc("is_banned"),
+        supabase.rpc("is_license_active"),
+      ]);
+      if (banned || licenseOk === false) {
+        await supabase.auth.signOut();
+      }
+    };
+    const interval = setInterval(check, 20000);
+    return () => clearInterval(interval);
+  }, [session]);
+
   useEffect(() => {
     if (!session) {
       setIsAdmin(false);
@@ -154,8 +176,28 @@ export default function App() {
     return null;
   }
 
-  if (myFullName === null) {
-    return <NamePrompt userEmail={session.user.email} onSaved={loadMyProfile} />;
+  // Only admins fill in names now - a non-admin with no name yet just
+  // has to wait. An admin with no name yet still gets in, since they're
+  // the one who has to set it (their own included) from the User Access
+  // page - blocking them here would be a lock with no key.
+  if (myFullName === null && !isAdmin) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: "-apple-system, sans-serif", padding: 24, background: "#F7F8F6" }}>
+        <div style={{ background: "#fff", borderRadius: 12, padding: 32, width: 380, maxWidth: "100%", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", boxSizing: "border-box", textAlign: "center" }}>
+          <p style={{ fontSize: 16, fontWeight: 700, color: "#1F6668", margin: "0 0 8px" }}>Almost there</p>
+          <p style={{ fontSize: 13.5, color: "#4B5659", margin: "0 0 18px" }}>
+            Your administrator still needs to set your name up before you can continue. Check back shortly, or let them know you're waiting.
+          </p>
+          <p style={{ fontSize: 12, color: "#859195", margin: "0 0 18px" }}>Signed in as {session.user.email}</p>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 18px", borderRadius: 8, fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (mySites === undefined) {
@@ -181,49 +223,4 @@ export default function App() {
   }
 
   return <EngineeringApp userEmail={session.user.email} isAdmin={isAdmin} myRole={myRole} mySites={mySites} myPageAccess={myPageAccess} myFullName={myFullName} onNameSaved={loadMyProfile} />;
-}
-
-function NamePrompt({ userEmail, onSaved }) {
-  const [name, setName] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    setSaving(true);
-    setError("");
-    const { data: { user } } = await supabase.auth.getUser();
-    const { error: err } = await supabase.from("profiles").upsert({ user_id: user.id, full_name: name.trim(), updated_at: new Date().toISOString() });
-    setSaving(false);
-    if (err) {
-      setError(err.message);
-    } else {
-      onSaved();
-    }
-  };
-
-  return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: "-apple-system, sans-serif", padding: 24, background: "#F7F8F6" }}>
-      <form onSubmit={handleSubmit} style={{ background: "#fff", borderRadius: 12, padding: 32, width: 380, maxWidth: "100%", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", boxSizing: "border-box" }}>
-        <p style={{ fontSize: 16, fontWeight: 700, color: "#1F6668", margin: "0 0 6px" }}>What's your name?</p>
-        <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>
-          Used for the Audit Trail and anywhere the system shows who did something - your name, not your email ({userEmail}).
-        </p>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Full name and surname"
-          autoFocus
-          required
-          style={{ width: "100%", padding: "10px 12px", fontSize: 16, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", marginBottom: 16 }}
-        />
-        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
-        <button type="submit" disabled={saving || !name.trim()} style={{ width: "100%", padding: "11px 0", background: "#1F6668", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
-          {saving ? "Saving…" : "Continue"}
-        </button>
-      </form>
-    </div>
-  );
 }

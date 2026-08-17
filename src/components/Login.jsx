@@ -17,7 +17,10 @@ export default function Login() {
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (signInError) {
-      setError(signInError.message);
+      // Supabase's own wording ("User is banned") is blunt and exposes an
+      // internal mechanism - swap it for something a real person should
+      // see, without changing what actually happened.
+      setError(/banned/i.test(signInError.message) ? "Please contact the administrator." : signInError.message);
     }
     // On success, the onAuthStateChange listener in App.jsx picks up the
     // new session automatically — nothing else to do here.
