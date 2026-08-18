@@ -13,19 +13,29 @@
 // fraction of a cent to a few cents, depending on the model and image
 // size).
 
-const EXTRACTION_PROMPT = `You are reading a scanned supplier quote for mining equipment parts.
+const EXTRACTION_PROMPT = `You are reading a scanned supplier quote for mining equipment parts. The quote may be in any language, or a mix of languages (e.g. Arabic and English side by side).
 
-Extract every part/price line item from this quote. Return ONLY a JSON array (no other text, no markdown code fences) where each item is an object with exactly these keys:
-- "supplier": the supplier/vendor company name as printed on the quote (same value for every line unless the document genuinely lists different suppliers per line)
-- "part_no": the part or item number/code for that line
-- "part_description": a short description of the part
-- "price": the unit price as a plain number (no currency symbols, no commas) - if the line shows quantity and a line total, calculate and return the unit price, not the total
+First, identify the primary language the quote is written in.
+
+Then extract every part/price line item. Return ONLY a JSON object (no other text, no markdown code fences) with exactly this shape:
+{
+  "detected_language": "the primary language of the document, in English, e.g. \\"Arabic\\", \\"English\\", \\"Arabic and English\\"",
+  "items": [
+    {
+      "supplier": "the supplier/vendor company name as printed on the quote - keep company/brand names as printed, do not translate them",
+      "part_no": "the part or item number/code for that line, as printed",
+      "part_description": "a short description of the part, translated into English if the original is in another language",
+      "price": "the unit price as a plain number (no currency symbols, no commas) - if the line shows quantity and a line total, calculate and return the unit price, not the total"
+    }
+  ]
+}
 
 Rules:
-- Only include real part/price line items. Skip headers, page totals, subtotals, tax lines, delivery charges, and terms & conditions.
+- Only include real part/price line items. Skip headers, page totals, subtotals, tax lines, delivery/discount lines, and terms & conditions.
+- Translate part_description into clear English regardless of the source language. Do not translate the supplier's company name or the part number/code - keep those exactly as printed.
 - If a text field can't be determined for a line, use an empty string. If price can't be determined, use null.
-- If you cannot find any part/price line items at all, return an empty array: []
-- Return ONLY the JSON array. Nothing before it, nothing after it.`;
+- If you cannot find any part/price line items at all, return {"detected_language": "...", "items": []}.
+- Return ONLY the JSON object described above. Nothing before it, nothing after it.`;
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -86,20 +96,21 @@ export default async function handler(req, res) {
     }
 
     const cleaned = textBlock.text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
-    let items;
+    let parsed;
     try {
-      items = JSON.parse(cleaned);
+      parsed = JSON.parse(cleaned);
     } catch (parseErr) {
       res.status(502).json({ error: "Couldn't parse the AI's response as JSON", raw: textBlock.text });
       return;
     }
 
+    const items = Array.isArray(parsed) ? parsed : parsed?.items; // tolerate either shape
     if (!Array.isArray(items)) {
-      res.status(502).json({ error: "AI response wasn't a JSON array as expected", raw: textBlock.text });
+      res.status(502).json({ error: "AI response wasn't in the expected shape", raw: textBlock.text });
       return;
     }
 
-    res.status(200).json({ items });
+    res.status(200).json({ items, detectedLanguage: parsed?.detected_language || null });
   } catch (err) {
     res.status(500).json({ error: err.message || String(err) });
   }

@@ -116,7 +116,7 @@ function formatRangeForDisplay(fromStr, toStr) {
   const opts = { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" };
   const from = new Date(fromStr);
   const to = new Date(toStr);
-  return `${from.toLocaleString("en-ZA", opts)} – ${to.toLocaleString("en-ZA", opts)}`;
+  return `${from.toLocaleString("en-ZA", opts)} - ${to.toLocaleString("en-ZA", opts)}`;
 }
 
 // Default range on first load: start of this month through now
@@ -649,7 +649,7 @@ function DailyHoursForm({ assets, dailyHours, existing, onClose, onSaved }) {
           <div>
             <label style={labelStyle}>Shift</label>
             <select value={shift} onChange={(e) => setShift(e.target.value)} disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#4B5659" } : {}) }}>
-              {SHIFTS.map((s) => <option key={s} value={s}>{s} {s === "Day" ? "(07:00–19:00)" : "(19:00–07:00)"}</option>)}
+              {SHIFTS.map((s) => <option key={s} value={s}>{s} {s === "Day" ? "(07:00-19:00)" : "(19:00-07:00)"}</option>)}
             </select>
           </div>
         </div>
@@ -6079,7 +6079,7 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
       if (items.length === 0) {
         setExtractError("No part/price lines were found on this document - you can still add rows manually below, or try a clearer scan.");
       }
-      setReview({ file, items: items.length ? items : [{ supplier: "", part_no: "", part_description: "", price: "" }] });
+      setReview({ file, items: items.length ? items : [{ supplier: "", part_no: "", part_description: "", price: "" }], detectedLanguage: data.detectedLanguage || null });
     } catch (err) {
       setExtractError(err.message || String(err));
     } finally {
@@ -6161,7 +6161,7 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
           {extracting ? "Reading quote…" : "Drag a scanned quote here, or click to browse"}
         </p>
         <p style={{ fontSize: 12, color: "#859195", margin: 0 }}>
-          Image or PDF - Claude will read it and pull out the Supplier, Part, Part Number and Price for you to review before saving.
+          Image or PDF, any language - Claude will read it, translate part descriptions into English automatically, and pull out the Supplier, Part, Part Number and Price for you to review before saving.
         </p>
         <input
           ref={fileInputRef}
@@ -6182,6 +6182,12 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
         <div style={{ border: "1px solid #E2E6E3", borderRadius: 10, padding: 16, marginBottom: 20, background: "#fff" }}>
           <p style={{ fontSize: 13.5, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>Review before saving</p>
           <p style={{ fontSize: 12, color: "#859195", margin: "0 0 14px" }}>Check what Claude read off the quote - fix anything that's wrong, remove lines that shouldn't be there, then save. Lines flagged "In stock" already have some on hand - worth checking before ordering more.</p>
+          {review.detectedLanguage && !/^english$/i.test(review.detectedLanguage) && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#DCEFED", border: "1px solid #A9D6D2", borderRadius: 8, padding: "7px 11px", marginBottom: 14, fontSize: 12, color: "#183642" }}>
+              <span>🌐</span>
+              <span>Detected language: <strong>{review.detectedLanguage}</strong> - part descriptions below were translated into English. Supplier names and part numbers are kept as printed on the original.</span>
+            </div>
+          )}
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>

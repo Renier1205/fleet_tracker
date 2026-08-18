@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
-// These come from your .env file (see .env.example) — never hardcode
+// These come from your .env file (see .env.example) - never hardcode
 // real values directly in this file, especially if this project ever
 // ends up in a public repository.
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;

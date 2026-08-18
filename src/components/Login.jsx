@@ -23,7 +23,7 @@ export default function Login() {
       setError(/banned/i.test(signInError.message) ? "Please contact the administrator." : signInError.message);
     }
     // On success, the onAuthStateChange listener in App.jsx picks up the
-    // new session automatically — nothing else to do here.
+    // new session automatically - nothing else to do here.
   };
 
   return (
@@ -65,7 +65,7 @@ export default function Login() {
         </button>
 
         <p style={{ fontSize: 11.5, color: "#859195", marginTop: 18, marginBottom: 0 }}>
-          Accounts are created by your administrator — there's no self-signup here.
+          Accounts are created by your administrator - there's no self-signup here.
         </p>
       </form>
     </div>
