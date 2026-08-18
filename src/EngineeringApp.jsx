@@ -612,10 +612,17 @@ function DailyHoursForm({ assets, dailyHours, existing, onClose, onSaved }) {
     };
 
     try {
-      const { error: dbError } = isEdit
-        ? await supabase.from("daily_hours").update(payload).eq("id", existing.id)
-        : await supabase.from("daily_hours").insert(payload);
-      if (dbError) throw dbError;
+      const assetName = assets.find((a) => a.asset_id === assetId)?.asset_name || assetId;
+      const summary = `${assetName} - ${shift} shift, ${logDate}, closing hours ${closingHours}${status !== "Operating" ? ` (${status})` : ""}`;
+      if (isEdit) {
+        const { error: dbError } = await supabase.from("daily_hours").update(payload).eq("id", existing.id);
+        if (dbError) throw dbError;
+        logActivity("Daily Hours", existing.id, "updated", summary);
+      } else {
+        const { data, error: dbError } = await supabase.from("daily_hours").insert(payload).select().single();
+        if (dbError) throw dbError;
+        logActivity("Daily Hours", data?.id, "created", summary);
+      }
       onSaved();
     } catch (err) {
       setError(err.message || String(err));
@@ -2384,10 +2391,17 @@ function FuelLogForm({ assets, existing, userEmail, dailyHours, onClose, onSaved
       litres: Number(litres), recorded_by: recordedBy || null, notes: notes || null,
     };
     try {
-      const { error: dbError } = isEdit
-        ? await supabase.from("fuel_log").update(payload).eq("id", existing.id)
-        : await supabase.from("fuel_log").insert(payload);
-      if (dbError) throw dbError;
+      const assetName = assets.find((a) => a.asset_id === assetId)?.asset_name || assetId;
+      const summary = `${assetName} - ${litres}L on ${fillDate}, hour meter ${hourMeter}`;
+      if (isEdit) {
+        const { error: dbError } = await supabase.from("fuel_log").update(payload).eq("id", existing.id);
+        if (dbError) throw dbError;
+        logActivity("Fuel Log", existing.id, "updated", summary);
+      } else {
+        const { data, error: dbError } = await supabase.from("fuel_log").insert(payload).select().single();
+        if (dbError) throw dbError;
+        logActivity("Fuel Log", data?.id, "created", summary);
+      }
       onSaved();
     } catch (err) {
       setError(err.message || String(err));
@@ -2494,10 +2508,17 @@ function InspectionForm({ assets, existing, userEmail, onClose, onSaved }) {
       signed_off: signedOff,
     };
     try {
-      const { error: dbError } = isEdit
-        ? await supabase.from("inspections").update(payload).eq("id", existing.id)
-        : await supabase.from("inspections").insert(payload);
-      if (dbError) throw dbError;
+      const assetName = assets.find((a) => a.asset_id === assetId)?.asset_name || assetId;
+      const summary = `${assetName} - ${inspectionType} inspection on ${logDate}, result: ${result}${result !== "Pass" ? ` (${riskRating} risk)` : ""}`;
+      if (isEdit) {
+        const { error: dbError } = await supabase.from("inspections").update(payload).eq("id", existing.id);
+        if (dbError) throw dbError;
+        logActivity("Inspections", existing.id, "updated", summary);
+      } else {
+        const { data, error: dbError } = await supabase.from("inspections").insert(payload).select().single();
+        if (dbError) throw dbError;
+        logActivity("Inspections", data?.id, "created", summary);
+      }
       onSaved();
     } catch (err) {
       setError(err.message || String(err));
@@ -3524,10 +3545,17 @@ function OilConsumptionForm({ assets, existing, userEmail, dailyHours, onClose, 
       litres: Number(litres), fill_reason: fillReason, recorded_by: recordedBy || null, notes: notes || null,
     };
     try {
-      const { error: dbError } = isEdit
-        ? await supabase.from("oil_consumption").update(payload).eq("id", existing.id)
-        : await supabase.from("oil_consumption").insert(payload);
-      if (dbError) throw dbError;
+      const assetName = assets.find((a) => a.asset_id === assetId)?.asset_name || assetId;
+      const summary = `${assetName} - ${litres}L ${oilType} (${fillReason}) on ${fillDate}`;
+      if (isEdit) {
+        const { error: dbError } = await supabase.from("oil_consumption").update(payload).eq("id", existing.id);
+        if (dbError) throw dbError;
+        logActivity("Oil Consumption", existing.id, "updated", summary);
+      } else {
+        const { data, error: dbError } = await supabase.from("oil_consumption").insert(payload).select().single();
+        if (dbError) throw dbError;
+        logActivity("Oil Consumption", data?.id, "created", summary);
+      }
       onSaved();
     } catch (err) {
       setError(err.message || String(err));
@@ -5041,10 +5069,16 @@ function PartForm({ existing, selectedSiteId, onClose, onSaved }) {
       ...(isEdit ? {} : { site_id: selectedSiteId }),
     };
     try {
-      const { error: dbError } = isEdit
-        ? await supabase.from("parts_inventory").update(payload).eq("id", existing.id)
-        : await supabase.from("parts_inventory").insert(payload);
-      if (dbError) throw dbError;
+      const summary = `${partNo} - ${description} (qty: ${qtyInStock}${supplier ? `, supplier: ${supplier}` : ""})`;
+      if (isEdit) {
+        const { error: dbError } = await supabase.from("parts_inventory").update(payload).eq("id", existing.id);
+        if (dbError) throw dbError;
+        logActivity("Parts Inventory", existing.id, "updated", summary);
+      } else {
+        const { data, error: dbError } = await supabase.from("parts_inventory").insert(payload).select().single();
+        if (dbError) throw dbError;
+        logActivity("Parts Inventory", data?.id, "created", summary);
+      }
       onSaved();
     } catch (err) {
       setError(err.message || String(err));
@@ -5513,22 +5547,9 @@ function PageAccessModal({ user, onClose }) {
   );
 }
 
-const ACTIVITY_VERB = { created: "created", updated: "updated", closed: "closed", deleted: "deleted" };
-const ACTIVITY_ARTICLE = { Events: "an", Backlogs: "a", "Work Orders": "a", "Daily Service": "a" };
-
-function activitySentence(row, nameByUser) {
-  const name = nameByUser.get(row.user_id) || "Someone";
-  const verb = ACTIVITY_VERB[row.action] || row.action;
-  const article = ACTIVITY_ARTICLE[row.table_name] || "a";
-  const table = row.table_name || "record";
-  const date = row.created_at ? new Date(row.created_at).toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" }) : "";
-  const time = row.created_at ? new Date(row.created_at).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" }) : "";
-  return `${name} ${verb} ${article} ${table.replace(/s$/, "")} on ${date} at ${time}${row.summary ? ` - ${row.summary}` : ""}`;
-}
-
 const ACTIVITY_COLUMNS = [
-  ["created_at", "Date & Time"], ["user_name", "User"], ["table_name", "Tab"],
-  ["action", "Action"], ["summary", "Details"],
+  ["created_at", "Date & Time"], ["table_name", "Tab"],
+  ["action", "Action"], ["summary", "Details"], ["user_name", "User"],
 ];
 
 function AuditTrailPage({ activityLog, profiles, isAdmin }) {
@@ -5570,7 +5591,7 @@ function AuditTrailPage({ activityLog, profiles, isAdmin }) {
     const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
     const headerRow = ACTIVITY_COLUMNS.map((c) => c[1]);
     const dataRows = filtered.map((r) => [
-      formatDT(r.created_at), nameByUser.get(r.user_id) || "-", r.table_name, r.action, r.summary || "",
+      formatDT(r.created_at), r.table_name, r.action, r.summary || "", nameByUser.get(r.user_id) || "-",
     ]);
     const aoa = [["Audit Trail"], [`Exported: ${timestamp}`], [], headerRow, ...dataRows];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -5589,7 +5610,7 @@ function AuditTrailPage({ activityLog, profiles, isAdmin }) {
   return (
     <div>
       <p style={{ fontSize: 12.5, color: "#859195", margin: "0 0 14px" }}>
-        Covers Events, Work Orders and Backlogs, plus every deletion anywhere in the app. Other tabs (Daily Hours, Fuel Log, etc.) aren't summarised here yet - a fast follow-up once you confirm this is the level of detail you want.
+        Covers Events, Work Orders, Backlogs, Daily Hours, Fuel Log, Oil Consumption, Inspections, Parts Inventory and the Quote Price List, plus every deletion anywhere in the app. Filter by tab, action, user or date range below, or export the current view to Excel.
       </p>
 
       <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
@@ -5624,17 +5645,29 @@ function AuditTrailPage({ activityLog, profiles, isAdmin }) {
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {filtered.map((r, i) => (
-          <div key={r.id ?? i} style={{ border: "1px solid #E2E6E3", borderRadius: 10, padding: "12px 16px", background: "#fff" }}>
-            <p style={{ fontSize: 13.5, color: "#183642", margin: 0, lineHeight: 1.5 }}>{activitySentence(r, nameByUser)}</p>
-          </div>
-        ))}
-        {filtered.length === 0 && (
-          <div style={{ border: "1px solid #E2E6E3", borderRadius: 10, padding: 24, textAlign: "center", color: "#859195", fontSize: 13 }}>
-            No audit entries match your filters.
-          </div>
-        )}
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: "#F7F8F6" }}>
+              {ACTIVITY_COLUMNS.map(([key, label]) => (
+                <th key={key} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr><td colSpan={ACTIVITY_COLUMNS.length} style={{ padding: 24, textAlign: "center", color: "#859195" }}>No audit entries match your filters.</td></tr>
+            ) : filtered.map((r, i) => (
+              <tr key={r.id ?? i} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none" }}>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{formatDT(r.created_at)}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.table_name || "-"}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap", textTransform: "capitalize" }}>{r.action || "-"}</td>
+                <td style={{ padding: "9px 12px" }}>{r.summary || "-"}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap", fontWeight: 600, color: "#183642" }}>{nameByUser.get(r.user_id) || "Unknown"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {showPrint && (
@@ -5665,13 +5698,26 @@ function AuditTrailPage({ activityLog, profiles, isAdmin }) {
                 {fromDate || toDate ? `${fromDate || "earliest"} to ${toDate || "latest"}` : "All recorded activity"} · Generated {new Date().toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" })}
               </p>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {filtered.map((r, i) => (
-                  <p key={r.id ?? i} style={{ fontSize: 11.5, padding: "6px 8px", border: "1px solid #ccc", margin: 0 }}>
-                    {activitySentence(r, nameByUser)}
-                  </p>
-                ))}
-              </div>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5 }}>
+                <thead>
+                  <tr>
+                    {ACTIVITY_COLUMNS.map(([key, label]) => (
+                      <th key={key} style={{ textAlign: "left", padding: "6px 8px", border: "1px solid #ccc", background: "#F0F3F8" }}>{label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((r, i) => (
+                    <tr key={r.id ?? i}>
+                      <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap" }}>{formatDT(r.created_at)}</td>
+                      <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap" }}>{r.table_name || "-"}</td>
+                      <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap", textTransform: "capitalize" }}>{r.action || "-"}</td>
+                      <td style={{ padding: "6px 8px", border: "1px solid #ccc" }}>{r.summary || "-"}</td>
+                      <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap", fontWeight: 700 }}>{nameByUser.get(r.user_id) || "Unknown"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -6132,6 +6178,9 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
       if (payload.length === 0) { setSaving(false); return; }
       const { error: insertErr } = await supabase.from("quote_prices").insert(payload);
       if (insertErr) throw insertErr;
+      const suppliers = [...new Set(payload.map((p) => p.supplier).filter(Boolean))].join(", ") || "Unknown supplier";
+      const partList = payload.map((p) => p.part_description || p.part_no || "item").join(", ");
+      logActivity("Quote Price List", `quote-${Date.now()}`, "created", `Loaded quote from ${suppliers} - ${payload.length} line item${payload.length !== 1 ? "s" : ""}: ${partList}`);
       setReview(null);
       load();
     } catch (err) {
