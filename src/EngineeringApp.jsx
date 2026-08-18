@@ -1399,7 +1399,10 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
         )}
 
         {hasSavedRecord && (
-          <EventWorkOrdersPanel event={savedRecord} assets={assets} parts={parts} onRefresh={onRefresh} />
+          <>
+            <EventPulledPartsPanel event={savedRecord} parts={parts} onRefresh={onRefresh} />
+            <EventWorkOrdersPanel event={savedRecord} assets={assets} parts={parts} onRefresh={onRefresh} />
+          </>
         )}
       </form>
     </div>
@@ -1882,7 +1885,7 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
   );
 }
 
-function PartUsedForm({ parts, workOrder, onClose, onSaved }) {
+function PartUsedForm({ parts, workOrder, event, onClose, onSaved }) {
   const [partId, setPartId] = useState(parts[0]?.id || "");
   const [qty, setQty] = useState(1);
   const [notes, setNotes] = useState("");
@@ -1915,7 +1918,8 @@ function PartUsedForm({ parts, workOrder, onClose, onSaved }) {
     setSaving(true);
     try {
       const { error: insertErr } = await supabase.from("parts_used").insert({
-        work_order_id: workOrder.id,
+        work_order_id: workOrder?.id ?? null,
+        event_id: event?.id ?? null,
         part_id: Number(partId),
         qty_used: qtyNum,
         notes: notes || null,
@@ -1929,6 +1933,13 @@ function PartUsedForm({ parts, workOrder, onClose, onSaved }) {
         .update({ qty_in_stock: (selectedPart?.qty_in_stock ?? 0) - qtyNum })
         .eq("id", partId);
       if (stockErr) throw stockErr;
+
+      logActivity(
+        "Events",
+        event?.id ?? workOrder?.id ?? null,
+        "updated",
+        `Pulled ${qtyNum} × ${selectedPart?.part_no || "part"} - ${selectedPart?.description || ""}${workOrder ? ` against Work Order ${workOrder.wo_no}` : " directly from inventory"}`
+      );
 
       onSaved();
     } catch (err) {
@@ -1944,8 +1955,10 @@ function PartUsedForm({ parts, workOrder, onClose, onSaved }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 70, padding: 16 }}>
       <form onSubmit={handleSubmit} style={{ background: "#fff", borderRadius: 12, padding: 24, width: 400, maxWidth: "100%" }}>
-        <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>Add Part Used</h3>
-        <p style={{ fontSize: 12, color: "#859195", margin: "0 0 16px" }}>Against Work Order {workOrder.wo_no}</p>
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>Pull Part from Inventory</h3>
+        <p style={{ fontSize: 12, color: "#859195", margin: "0 0 16px" }}>
+          {workOrder ? `Against Work Order ${workOrder.wo_no}` : "Pulled directly against this event - only use this for parts already in stock."}
+        </p>
 
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Part</label>
@@ -1969,7 +1982,7 @@ function PartUsedForm({ parts, workOrder, onClose, onSaved }) {
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
           <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
-            {saving ? "Saving…" : "Add Part"}
+            {saving ? "Saving…" : "Pull Part"}
           </button>
         </div>
       </form>
@@ -2035,6 +2048,77 @@ function PartsUsedList({ workOrder, parts }) {
   );
 }
 
+// Parts pulled straight from Inventory against this event - for parts
+// already on hand. Separate from Work Orders (below), which are for
+// parts that need to be ordered in first.
+function EventPulledPartsPanel({ event, parts, onRefresh }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+
+  const partById = useMemo(() => Object.fromEntries(parts.map((p) => [p.id, p])), [parts]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from("parts_used").select("*").eq("event_id", event.id).order("created_at", { ascending: false });
+    if (!error) setRows(data || []);
+    setLoading(false);
+  }, [event.id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const confirmRow = async (row) => {
+    await supabase.from("parts_used").update({ status: "Confirmed", confirmed_at: new Date().toISOString() }).eq("id", row.id);
+    load();
+  };
+
+  return (
+    <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid #E2E6E3" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: 0 }}>Parts Pulled from Inventory</p>
+        <button type="button" onClick={() => setShowAdd(true)} style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12.5, fontWeight: 600, padding: "6px 12px", borderRadius: 8, cursor: "pointer" }}>
+          + Pull Part
+        </button>
+      </div>
+      <p style={{ fontSize: 11.5, color: "#859195", margin: "0 0 10px" }}>
+        For parts you already have on hand - stock is deducted immediately. If a part needs to be ordered instead, use Order Parts (New Work Order) below.
+      </p>
+
+      {loading ? (
+        <p style={{ fontSize: 12.5, color: "#859195", margin: 0 }}>Loading…</p>
+      ) : rows.length === 0 ? (
+        <p style={{ fontSize: 12.5, color: "#859195", margin: 0 }}>No parts pulled from inventory against this event yet.</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {rows.map((r) => {
+            const p = partById[r.part_id];
+            return (
+              <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, background: "#F9F8F4", border: "1px solid #E2E6E3", borderRadius: 6, padding: "7px 10px" }}>
+                <span>{p ? `${p.part_no} - ${p.description}` : "Part"} × {r.qty_used}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Badge value={r.status} />
+                  {r.status === "Pending" && (
+                    <button onClick={() => confirmRow(r)} style={{ background: "none", border: "none", color: "#2C5646", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>Confirm</button>
+                  )}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {showAdd && (
+        <PartUsedForm
+          parts={parts}
+          event={event}
+          onClose={() => setShowAdd(false)}
+          onSaved={() => { setShowAdd(false); load(); onRefresh?.(); }}
+        />
+      )}
+    </div>
+  );
+}
+
 function EventWorkOrdersPanel({ event, assets, parts, onRefresh }) {
   const [linked, setLinked] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2064,17 +2148,20 @@ function EventWorkOrdersPanel({ event, assets, parts, onRefresh }) {
 
   return (
     <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid #E2E6E3" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-        <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: 0 }}>Linked Work Orders</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: 0 }}>Work Orders</p>
         <button type="button" onClick={() => { setEditingWo(null); setShowWoForm(true); }} style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12.5, fontWeight: 600, padding: "6px 12px", borderRadius: 8, cursor: "pointer" }}>
-          + Add Work Order
+          + Order Parts (New Work Order)
         </button>
       </div>
+      <p style={{ fontSize: 11.5, color: "#859195", margin: "0 0 10px" }}>
+        For parts that need to be ordered in rather than pulled from stock - each Work Order gets its own number, and parts can still be logged against it once it arrives.
+      </p>
 
       {loading ? (
         <p style={{ fontSize: 12.5, color: "#859195", margin: 0 }}>Loading…</p>
       ) : linked.length === 0 ? (
-        <p style={{ fontSize: 12.5, color: "#859195", margin: 0 }}>No Work Orders linked to this event yet - each one gets its own work order number, and you can log parts used against it once it's created.</p>
+        <p style={{ fontSize: 12.5, color: "#859195", margin: 0 }}>No Work Orders linked to this event yet.</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {linked.map((w) => (
