@@ -540,6 +540,19 @@ function todayForInput() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+// Formats a price with a space as the thousands separator and 2 decimal
+// places (e.g. 16938 -> "16 938.00") - easier to read at a glance than a
+// long run of digits, without relying on a locale's own grouping/decimal
+// conventions (which vary and can be inconsistent across browsers).
+function formatMoney(value) {
+  if (value == null || value === "") return null;
+  const num = Number(value);
+  if (Number.isNaN(num)) return null;
+  const [whole, decimals] = num.toFixed(2).split(".");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return `${grouped}.${decimals}`;
+}
+
 // Finds what Opening Hours SHOULD be for a given asset/date/shift, by
 // looking at the closing hours of the immediately preceding shift already
 // on record. This is a live preview only - the database (via daily_hours_calc's
@@ -6448,7 +6461,7 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
                 <td style={{ padding: "9px 12px" }}>{row.part_description || <span style={{ color: "#B4B2A9" }}>-</span>}</td>
                 <td style={{ padding: "9px 12px" }}>{row.part_no || <span style={{ color: "#B4B2A9" }}>-</span>}</td>
                 <td style={{ padding: "9px 12px" }}>{row.currency || <span style={{ color: "#B4B2A9" }}>-</span>}</td>
-                <td style={{ padding: "9px 12px" }}>{row.price != null ? Number(row.price).toFixed(2) : <span style={{ color: "#B4B2A9" }}>-</span>}</td>
+                <td style={{ padding: "9px 12px" }}>{row.price != null ? formatMoney(row.price) : <span style={{ color: "#B4B2A9" }}>-</span>}</td>
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{row.price_date}</td>
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
                   {stock ? (
