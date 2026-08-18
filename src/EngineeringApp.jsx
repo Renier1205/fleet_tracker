@@ -5953,7 +5953,7 @@ function ExcelSync({ data, assets, fields, tableName, sheetTitle, filenamePrefix
   );
 }
 
-function PartsPage({ parts, selectedSiteId, onRefresh }) {
+function PartsPage({ parts, selectedSiteId, onRefresh, userEmail, isAdmin }) {
   const [subTab, setSubTab] = useState("inventory"); // "inventory" | "quotes"
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -6055,7 +6055,7 @@ function PartsPage({ parts, selectedSiteId, onRefresh }) {
       </div>
 
       {subTab === "quotes" ? (
-        <QuotePriceListPage selectedSiteId={selectedSiteId} parts={parts} />
+        <QuotePriceListPage selectedSiteId={selectedSiteId} parts={parts} userEmail={userEmail} isAdmin={isAdmin} />
       ) : (
       <>
       {importMessage && (
@@ -6145,7 +6145,7 @@ function fileToBase64(file) {
   });
 }
 
-function QuotePriceListPage({ selectedSiteId, parts }) {
+function QuotePriceListPage({ selectedSiteId, parts, userEmail, isAdmin }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -6156,6 +6156,8 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
   const [extractError, setExtractError] = useState("");
   const [review, setReview] = useState(null); // { file, items: [{supplier, part_no, part_description, price}] }
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(null); // row pending delete confirmation
+  const [showDeletedPanel, setShowDeletedPanel] = useState(false);
   const fileInputRef = React.useRef(null);
 
   const load = useCallback(async () => {
@@ -6288,6 +6290,26 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Backs up the full quote row (not just its ID) into quote_prices_deleted
+  // before removing it - so an admin can restore it later if the user who
+  // deleted it comes back asking for it. deleteWithReason still handles the
+  // reason + Audit Trail entry exactly as it does everywhere else in the app.
+  const handleDeleteQuote = async (reason) => {
+    const row = deleting;
+    if (!row) return;
+    const { id, ...rest } = row;
+    const { error: backupErr } = await supabase.from("quote_prices_deleted").insert({
+      ...rest,
+      original_id: id,
+      deleted_by_email: userEmail || null,
+      deletion_reason: reason,
+    });
+    if (backupErr) throw backupErr;
+    await deleteWithReason("quote_prices", row.id, "id", reason, userEmail);
+    setDeleting(null);
+    load();
   };
 
   const columns = [
@@ -6444,13 +6466,14 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
               ))}
               <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>Current stock</th>
               <th style={{ borderBottom: "1px solid #E2E6E3" }}></th>
+              <th style={{ borderBottom: "1px solid #E2E6E3" }}></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={columns.length + 2} style={{ padding: 20, textAlign: "center", color: "#859195" }}>Loading…</td></tr>
+              <tr><td colSpan={columns.length + 3} style={{ padding: 20, textAlign: "center", color: "#859195" }}>Loading…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={columns.length + 2} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
+              <tr><td colSpan={columns.length + 3} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
                 {rows.length === 0 ? "No quotes added yet - drag one in above to get started." : "No entries match your filters."}
               </td></tr>
             ) : filtered.map((row, i) => {
@@ -6473,12 +6496,123 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
                 <td style={{ padding: "9px 12px" }}>
                   {row.quote_document_path && <QuoteDocLink path={row.quote_document_path} />}
                 </td>
+                <td style={{ padding: "9px 12px" }}>
+                  <button type="button" onClick={() => setDeleting(row)} title="Delete quote" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "flex" }}>
+                    <Trash2 size={14} />
+                  </button>
+                </td>
               </tr>
               );
             })}
           </tbody>
         </table>
       </div>
+
+      {deleting && (
+        <DeleteConfirmModal
+          itemLabel={`the quote for ${deleting.part_description || deleting.part_no || "this part"} from ${deleting.supplier || "this supplier"}`}
+          userEmail={userEmail}
+          onCancel={() => setDeleting(null)}
+          onConfirm={handleDeleteQuote}
+        />
+      )}
+
+      {isAdmin && (
+        <div style={{ marginTop: 20 }}>
+          <button type="button" onClick={() => setShowDeletedPanel((v) => !v)} style={{ background: "none", border: "none", color: NAVY, fontSize: 12.5, fontWeight: 600, cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 5 }}>
+            <ChevronDown size={14} style={{ transform: showDeletedPanel ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
+            Deleted Quotes (admin only)
+          </button>
+          {showDeletedPanel && (
+            <DeletedQuotesPanel selectedSiteId={selectedSiteId} userEmail={userEmail} onRestored={load} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Admin-only backup/restore view for quotes someone deleted from the Price
+// List above. Every delete is backed up in full (not just logged) before
+// the row is removed, specifically so a user coming back later saying "I
+// accidentally deleted a quote" can have it restored rather than re-scanned
+// from scratch. Regular users don't see this panel - they'd need to ask an
+// admin, same as any other admin-only page in the app.
+function DeletedQuotesPanel({ selectedSiteId, userEmail, onRestored }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [restoringId, setRestoringId] = useState(null);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error: err } = await supabase
+      .from("quote_prices_deleted")
+      .select("*")
+      .eq("site_id", selectedSiteId)
+      .order("deleted_at", { ascending: false });
+    if (!err) setRows(data || []);
+    setLoading(false);
+  }, [selectedSiteId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const restore = async (row) => {
+    setError("");
+    setRestoringId(row.id);
+    try {
+      const { id, original_id, deleted_by_email, deleted_at, deletion_reason, ...quoteFields } = row;
+      const { error: insertErr } = await supabase.from("quote_prices").insert(quoteFields);
+      if (insertErr) throw insertErr;
+      const { error: deleteErr } = await supabase.from("quote_prices_deleted").delete().eq("id", id);
+      if (deleteErr) throw deleteErr;
+      logActivity("Quote Price List", original_id, "created", `Restored a previously deleted quote: ${quoteFields.part_description || quoteFields.part_no || "item"} from ${quoteFields.supplier || "unknown supplier"}`);
+      onRestored?.();
+      load();
+    } catch (err) {
+      setError(err.message || String(err));
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
+  return (
+    <div style={{ marginTop: 10, border: "1px solid #E2E6E3", borderRadius: 10, overflow: "hidden" }}>
+      {error && (
+        <div style={{ background: "#F6E2E0", border: "1px solid #DDB6B2", color: "#7A3330", borderRadius: 8, padding: "10px 14px", margin: 10, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <thead>
+          <tr style={{ background: "#F7F8F6" }}>
+            {["Supplier", "Part", "Price", "Deleted", "Deleted by", "Reason", ""].map((h) => (
+              <th key={h} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {loading ? (
+            <tr><td colSpan={7} style={{ padding: 20, textAlign: "center", color: "#859195" }}>Loading…</td></tr>
+          ) : rows.length === 0 ? (
+            <tr><td colSpan={7} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No deleted quotes on record.</td></tr>
+          ) : rows.map((row, i) => (
+            <tr key={row.id} style={{ borderBottom: i < rows.length - 1 ? "1px solid #EFEEE7" : "none" }}>
+              <td style={{ padding: "9px 12px" }}>{row.supplier || "-"}</td>
+              <td style={{ padding: "9px 12px" }}>{row.part_description || row.part_no || "-"}</td>
+              <td style={{ padding: "9px 12px" }}>{row.price != null ? formatMoney(row.price) : "-"}</td>
+              <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{row.deleted_at ? new Date(row.deleted_at).toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" }) : "-"}</td>
+              <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{row.deleted_by_email || "-"}</td>
+              <td style={{ padding: "9px 12px" }}>{row.deletion_reason || "-"}</td>
+              <td style={{ padding: "9px 12px" }}>
+                <button type="button" onClick={() => restore(row)} disabled={restoringId === row.id} style={{ background: "none", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 6, cursor: restoringId === row.id ? "default" : "pointer" }}>
+                  {restoringId === row.id ? "Restoring…" : "Restore"}
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -8398,7 +8532,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
             ) : active === "components" ? (
               <ComponentsPage assets={assets} components={components} breakdowns={breakdowns} workOrders={workOrders} dailyHours={dailyHours} userEmail={userEmail} onRefresh={loadRestOfData} />
             ) : active === "parts" ? (
-              <PartsPage parts={parts} selectedSiteId={selectedSiteId} onRefresh={loadRestOfData} />
+              <PartsPage parts={parts} selectedSiteId={selectedSiteId} onRefresh={loadRestOfData} userEmail={userEmail} isAdmin={isAdmin} />
             ) : active === "audit" ? (
               <AuditTrailPage activityLog={activityLog} profiles={profiles} isAdmin={isAdmin} />
             ) : active === "site_management" ? (
