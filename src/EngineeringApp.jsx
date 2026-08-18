@@ -6074,12 +6074,13 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
         supplier: it.supplier || "",
         part_no: it.part_no || "",
         part_description: it.part_description || "",
+        currency: it.currency || "",
         price: it.price ?? "",
       }));
       if (items.length === 0) {
         setExtractError("No part/price lines were found on this document - you can still add rows manually below, or try a clearer scan.");
       }
-      setReview({ file, items: items.length ? items : [{ supplier: "", part_no: "", part_description: "", price: "" }], detectedLanguage: data.detectedLanguage || null });
+      setReview({ file, items: items.length ? items : [{ supplier: "", part_no: "", part_description: "", currency: "", price: "" }], detectedLanguage: data.detectedLanguage || null });
     } catch (err) {
       setExtractError(err.message || String(err));
     } finally {
@@ -6101,7 +6102,7 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
     setReview((r) => ({ ...r, items: r.items.filter((_, idx) => idx !== i) }));
   };
   const addReviewRow = () => {
-    setReview((r) => ({ ...r, items: [...r.items, { supplier: "", part_no: "", part_description: "", price: "" }] }));
+    setReview((r) => ({ ...r, items: [...r.items, { supplier: "", part_no: "", part_description: "", currency: "", price: "" }] }));
   };
 
   const saveReview = async () => {
@@ -6123,6 +6124,7 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
           supplier: it.supplier || "",
           part_no: it.part_no || null,
           part_description: it.part_description || null,
+          currency: it.currency || null,
           price: it.price === "" ? null : Number(it.price),
           price_date: today,
           quote_document_path: quoteDocumentPath,
@@ -6141,7 +6143,7 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
 
   const columns = [
     ["supplier", "Supplier"], ["part_description", "Part"], ["part_no", "Part Number"],
-    ["price", "Price"], ["price_date", "Last updated"],
+    ["currency", "Currency"], ["price", "Price"], ["price_date", "Last updated"],
   ];
 
   return (
@@ -6161,7 +6163,7 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
           {extracting ? "Reading quote…" : "Drag a scanned quote here, or click to browse"}
         </p>
         <p style={{ fontSize: 12, color: "#859195", margin: 0 }}>
-          Image or PDF, any language - Fleet Tracker will read it, translate part descriptions into English automatically, and pull out the Supplier, Part, Part Number and Price for you to review before saving.
+          Image or PDF, any language - Fleet Tracker will read it, translate part descriptions into English automatically, detect the currency, and pull out the Supplier, Part, Part Number and Price for you to review before saving.
         </p>
         <input
           ref={fileInputRef}
@@ -6192,7 +6194,7 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ background: "#F7F8F6" }}>
-                  {["Supplier", "Part", "Part Number", "Price", "Stock", ""].map((h) => (
+                  {["Supplier", "Part", "Part Number", "Currency", "Price", "Stock", ""].map((h) => (
                     <th key={h} style={{ textAlign: "left", padding: "7px 8px", fontWeight: 600, color: "#4B5659", fontSize: 12 }}>{h}</th>
                   ))}
                 </tr>
@@ -6202,16 +6204,34 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
                   const stock = stockFor(row.part_no);
                   return (
                   <tr key={i}>
-                    {["supplier", "part_description", "part_no", "price"].map((field) => (
+                    {["supplier", "part_description", "part_no"].map((field) => (
                       <td key={field} style={{ padding: "4px 8px" }}>
                         <input
-                          type={field === "price" ? "number" : "text"}
+                          type="text"
                           value={row[field]}
                           onChange={(e) => updateReviewRow(i, field, e.target.value)}
                           style={{ width: "100%", padding: "6px 8px", fontSize: 12.5, border: "1px solid #E2E6E3", borderRadius: 6, boxSizing: "border-box" }}
                         />
                       </td>
                     ))}
+                    <td style={{ padding: "4px 8px" }}>
+                      <input
+                        type="text"
+                        value={row.currency}
+                        onChange={(e) => updateReviewRow(i, "currency", e.target.value.toUpperCase())}
+                        placeholder="e.g. ZAR"
+                        maxLength={6}
+                        style={{ width: 64, padding: "6px 8px", fontSize: 12.5, border: "1px solid #E2E6E3", borderRadius: 6, boxSizing: "border-box", textTransform: "uppercase" }}
+                      />
+                    </td>
+                    <td style={{ padding: "4px 8px" }}>
+                      <input
+                        type="number"
+                        value={row.price}
+                        onChange={(e) => updateReviewRow(i, "price", e.target.value)}
+                        style={{ width: "100%", padding: "6px 8px", fontSize: 12.5, border: "1px solid #E2E6E3", borderRadius: 6, boxSizing: "border-box" }}
+                      />
+                    </td>
                     <td style={{ padding: "4px 8px", whiteSpace: "nowrap" }}>
                       {stock ? (
                         <span title={`Already have ${stock.qty_in_stock ?? 0} of ${stock.part_no} in stock`} style={{ fontSize: 10.5, fontWeight: 700, color: "#C58A32", background: "#F3E4C8", padding: "3px 8px", borderRadius: 6 }}>
@@ -6291,6 +6311,7 @@ function QuotePriceListPage({ selectedSiteId, parts }) {
                 <td style={{ padding: "9px 12px" }}>{row.supplier || <span style={{ color: "#B4B2A9" }}>-</span>}</td>
                 <td style={{ padding: "9px 12px" }}>{row.part_description || <span style={{ color: "#B4B2A9" }}>-</span>}</td>
                 <td style={{ padding: "9px 12px" }}>{row.part_no || <span style={{ color: "#B4B2A9" }}>-</span>}</td>
+                <td style={{ padding: "9px 12px" }}>{row.currency || <span style={{ color: "#B4B2A9" }}>-</span>}</td>
                 <td style={{ padding: "9px 12px" }}>{row.price != null ? Number(row.price).toFixed(2) : <span style={{ color: "#B4B2A9" }}>-</span>}</td>
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{row.price_date}</td>
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
@@ -7211,32 +7232,120 @@ function UserMenu({ myFullName, isAdmin, myRole }) {
   );
 }
 
-function AboutPage() {
+function AboutPage({ assets, breakdowns, workOrders, plannedMaintenance, components, parts, inspections, onNavigate }) {
   const capabilities = [
-    ["Equipment & Events", "A live register of every machine, with breakdowns and planned jobs tracked as Events - each with its own linked Work Orders, parts used, and full downtime history."],
-    ["Daily Operations", "Daily Hours, Fuel Log, Oil Consumption and Daily Service compliance, all tied back to the equipment they belong to."],
-    ["Maintenance & Backlogs", "Work Orders, Planned Maintenance schedules, and a Backlog Report that tracks outstanding items back to where they came from - a daily service, a monthly inspection, or a scanned service card."],
-    ["Parts & Pricing", "Parts Inventory with reorder alerts, and a Quote Price List that reads scanned supplier quotes and keeps a running history of what's been quoted, by whom, and when."],
-    ["Reporting", "Availability, MTBF, MTTR and Utilisation, calculated from the same underlying data as everything else in the system - no separate spreadsheet to keep in sync."],
-    ["Accountability", "Every insert, update and deletion is captured in an Audit Trail, with required reasons for anything removed."],
+    ["Equipment & Events", "A live register of every machine, with breakdowns and planned jobs tracked as Events - each with its own linked Work Orders, parts used, and full downtime history.", Truck, "breakdowns"],
+    ["Daily Operations", "Daily Hours, Fuel Log, Oil Consumption and Daily Service compliance, all tied back to the equipment they belong to.", Clock, "daily_hours"],
+    ["Maintenance & Backlogs", "Work Orders, Planned Maintenance schedules, and a Backlog Report that tracks outstanding items back to where they came from - a daily service, a monthly inspection, or a scanned service card.", ClipboardList, "work_orders"],
+    ["Parts & Pricing", "Parts Inventory with reorder alerts, and a Quote Price List that reads scanned supplier quotes and keeps a running history of what's been quoted, by whom, and when.", Package, "parts"],
+    ["Reporting", "Availability, MTBF, MTTR and Utilisation, calculated from the same underlying data as everything else in the system - no separate spreadsheet to keep in sync.", FileBarChart, "mtbf_mttr"],
+    ["Accountability", "Every insert, update and deletion is captured in an Audit Trail, with required reasons for anything removed.", ShieldCheck, "audit"],
+  ];
+
+  const totalAssets = assets.length;
+  const operatingPct = totalAssets
+    ? Math.round((assets.filter((a) => a.status === "Operating").length / totalAssets) * 100)
+    : null;
+  const openWorkOrders = workOrders.filter((w) => w.status !== "Closed").length;
+  const maintenanceDue = plannedMaintenance.filter((p) => p.status !== "OK").length;
+  const partsBelowReorder = parts.filter((p) => p.reorder_status === "REORDER").length;
+
+  const stats = [
+    ["Total Assets", totalAssets, "Active equipment", Truck, "assets"],
+    ["Operating Now", operatingPct != null ? `${operatingPct}%` : "-", "Live snapshot", Activity, "assets"],
+    ["Open Work Orders", openWorkOrders, "In progress or pending", ClipboardList, "work_orders"],
+    ["Planned Maint. Due", maintenanceDue, "Requires attention", CalendarClock, "planned_maintenance"],
+    ["Parts Below Reorder", partsBelowReorder, "Needs restocking", Package, "parts"],
   ];
 
   return (
-    <div style={{ maxWidth: 760 }}>
-      <div style={{ background: NAVY, borderRadius: 12, padding: "32px 28px", marginBottom: 28, color: "#fff" }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 8px" }}>Fleet Tracker</h1>
-        <p style={{ fontSize: 14.5, lineHeight: 1.6, margin: 0, color: "rgba(255,255,255,0.88)" }}>
-          A single system for tracking mining fleet equipment from the moment it's mobilised on site: maintenance, availability, parts, and the reporting that ties it all together - replacing a spreadsheet workbook with one live, multi-site application.
-        </p>
+    <div style={{ maxWidth: 980 }}>
+      {/* Hero */}
+      <div
+        style={{
+          position: "relative", overflow: "hidden", borderRadius: 14, padding: "30px 32px",
+          marginBottom: 22, color: "#fff",
+          background: "linear-gradient(135deg, #14282E 0%, #1F6668 100%)",
+        }}
+      >
+        <div style={{ position: "relative", zIndex: 2, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20, flexWrap: "wrap" }}>
+          <div style={{ maxWidth: 560 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 18 }}>
+              <span style={{
+                width: 22, height: 22, background: "#fff", transform: "rotate(45deg)",
+                display: "inline-block", borderRadius: 4, flexShrink: 0,
+              }} />
+              <span style={{ fontSize: 12.5, fontWeight: 700, letterSpacing: 1.2, color: "rgba(255,255,255,0.92)" }}>
+                DATAVERA <span style={{ fontWeight: 400, opacity: 0.75 }}>ANALYTICS</span>
+              </span>
+            </div>
+
+            <h1 style={{ fontSize: 30, fontWeight: 700, margin: "0 0 8px", letterSpacing: -0.3 }}>Fleet Tracker</h1>
+            <p style={{ fontSize: 15, fontWeight: 600, margin: "0 0 12px", color: "#8FE0D6" }}>
+              Complete visibility. Better decisions. Maximum uptime.
+            </p>
+            <p style={{ fontSize: 13.5, lineHeight: 1.6, margin: 0, color: "rgba(255,255,255,0.82)" }}>
+              One live system that follows your fleet from mobilisation to breakdown to repair - equipment, parts, and reporting all tied together.
+              No more spreadsheets to reconcile, no more guessing what's actually happening on site.
+            </p>
+          </div>
+
+          {/* Line-art equipment illustration */}
+          <svg width="220" height="150" viewBox="0 0 220 150" style={{ flexShrink: 0, opacity: 0.85 }} aria-hidden="true">
+            <ellipse cx="110" cy="128" rx="95" ry="8" fill="rgba(255,255,255,0.06)" />
+            {/* tracks */}
+            <rect x="30" y="100" width="90" height="20" rx="10" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
+            <circle cx="45" cy="110" r="4" fill="rgba(255,255,255,0.5)" />
+            <circle cx="65" cy="110" r="4" fill="rgba(255,255,255,0.5)" />
+            <circle cx="85" cy="110" r="4" fill="rgba(255,255,255,0.5)" />
+            <circle cx="105" cy="110" r="4" fill="rgba(255,255,255,0.5)" />
+            {/* cab */}
+            <rect x="50" y="66" width="34" height="34" rx="3" fill="none" stroke="#fff" strokeWidth="2.2" />
+            <line x1="58" y1="66" x2="58" y2="100" stroke="rgba(255,255,255,0.5)" strokeWidth="1.4" />
+            {/* boom + arm + bucket */}
+            <line x1="82" y1="72" x2="150" y2="45" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
+            <line x1="150" y1="45" x2="170" y2="80" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
+            <path d="M170 80 L188 82 L184 96 L168 94 Z" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinejoin="round" />
+            <circle cx="82" cy="72" r="3" fill="#8FE0D6" />
+            <circle cx="150" cy="45" r="3" fill="#8FE0D6" />
+          </svg>
+        </div>
       </div>
 
-      <h2 style={{ fontSize: 15, fontWeight: 700, color: NAVY, margin: "0 0 14px" }}>What it does</h2>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 14, marginBottom: 28 }}>
-        {capabilities.map(([title, desc]) => (
-          <div key={title} style={{ border: "1px solid #E2E6E3", borderRadius: 10, padding: "14px 16px", background: "#fff" }}>
+      {/* Live stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 26 }}>
+        {stats.map(([label, value, sub, Icon, navKey]) => (
+          <button
+            key={label}
+            onClick={() => onNavigate && navKey && onNavigate(navKey)}
+            style={{
+              textAlign: "left", background: "#fff", border: "1px solid #E2E6E3", borderRadius: 10,
+              padding: "14px 16px", cursor: onNavigate ? "pointer" : "default", font: "inherit",
+            }}
+          >
+            <Icon size={16} style={{ color: NAVY, marginBottom: 8 }} />
+            <p style={{ fontSize: 20, fontWeight: 700, margin: "0 0 2px", color: "#183642" }}>{value}</p>
+            <p style={{ fontSize: 11.5, fontWeight: 600, margin: "0 0 1px", color: "#4B5659" }}>{label}</p>
+            <p style={{ fontSize: 10.5, margin: 0, color: "#859195" }}>{sub}</p>
+          </button>
+        ))}
+      </div>
+
+      <h2 style={{ fontSize: 15, fontWeight: 700, color: NAVY, margin: "0 0 14px" }}>Main features</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 14, marginBottom: 28 }}>
+        {capabilities.map(([title, desc, Icon, navKey]) => (
+          <button
+            key={title}
+            onClick={() => onNavigate && onNavigate(navKey)}
+            style={{
+              textAlign: "left", border: "1px solid #E2E6E3", borderRadius: 10, padding: "14px 16px",
+              background: "#fff", cursor: onNavigate ? "pointer" : "default", font: "inherit",
+            }}
+          >
+            <Icon size={17} style={{ color: NAVY, marginBottom: 8 }} />
             <p style={{ fontSize: 13.5, fontWeight: 700, color: NAVY, margin: "0 0 6px" }}>{title}</p>
             <p style={{ fontSize: 13, color: "#4B5659", margin: 0, lineHeight: 1.5 }}>{desc}</p>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -8093,7 +8202,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
 
           <PageErrorBoundary key={active}>
             {active === "about" ? (
-              <AboutPage />
+              <AboutPage assets={assets} breakdowns={breakdowns} workOrders={workOrders} plannedMaintenance={plannedMaintenance} components={components} parts={parts} inspections={inspections} onNavigate={setActive} />
             ) : !canSeePage(active) ? (
               <div style={{ background: "#F6E2E0", border: "1px solid #DDB6B2", borderRadius: 10, padding: 28, textAlign: "center" }}>
                 <p style={{ fontWeight: 700, fontSize: 14, color: "#7A3330", margin: "0 0 6px" }}>Access restricted</p>

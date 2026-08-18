@@ -25,6 +25,7 @@ Then extract every part/price line item. Return ONLY a JSON object (no other tex
       "supplier": "the supplier/vendor company name as printed on the quote - keep company/brand names as printed, do not translate them",
       "part_no": "the part or item number/code for that line, as printed",
       "part_description": "ONLY the part name/type itself (e.g. \\"Alternator\\", \\"Hydraulic Filter\\"), translated into English if the original is in another language",
+      "currency": "the currency of the price, as a 3-letter ISO code if it can be determined (e.g. \\"ZAR\\", \\"USD\\", \\"SAR\\", \\"EUR\\") - infer it from a currency symbol, currency code, or country/company context printed on the quote; if genuinely undeterminable, use an empty string",
       "price": "the unit price as a plain number (no currency symbols, no commas) - if the line shows quantity and a line total, calculate and return the unit price, not the total"
     }
   ]
@@ -34,6 +35,7 @@ Rules:
 - Only include real part/price line items. Skip headers, page totals, subtotals, tax lines, delivery/discount lines, and terms & conditions.
 - part_description must contain ONLY the part's name/type - nothing else. Specifically exclude, even if printed directly next to or below the part name on the same line or cell: availability/lead-time notes (e.g. "one week from receiving date"), delivery or shipping terms, warranty text, packaging/quantity notes, remarks in parentheses or brackets, and any other annotation. If such text is mixed in with the part name, strip it out and keep only the part name.
 - Translate part_description into clear English regardless of the source language. Do not translate the supplier's company name or the part number/code - keep those exactly as printed.
+- Every line item on the same quote is normally the same currency - if you can determine it from any line (a symbol, code, or heading like "Prices in USD"), apply it consistently across all items unless a specific line clearly states otherwise.
 - If a text field can't be determined for a line, use an empty string. If price can't be determined, use null.
 - If you cannot find any part/price line items at all, return {"detected_language": "...", "items": []}.
 - Return ONLY the JSON object described above. Nothing before it, nothing after it.`;
