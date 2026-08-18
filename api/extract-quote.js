@@ -24,7 +24,7 @@ Then extract every part/price line item. Return ONLY a JSON object (no other tex
     {
       "supplier": "the supplier/vendor company name as printed on the quote - keep company/brand names as printed, do not translate them",
       "part_no": "the part or item number/code for that line, as printed",
-      "part_description": "a short description of the part, translated into English if the original is in another language",
+      "part_description": "ONLY the part name/type itself (e.g. \\"Alternator\\", \\"Hydraulic Filter\\"), translated into English if the original is in another language",
       "price": "the unit price as a plain number (no currency symbols, no commas) - if the line shows quantity and a line total, calculate and return the unit price, not the total"
     }
   ]
@@ -32,6 +32,7 @@ Then extract every part/price line item. Return ONLY a JSON object (no other tex
 
 Rules:
 - Only include real part/price line items. Skip headers, page totals, subtotals, tax lines, delivery/discount lines, and terms & conditions.
+- part_description must contain ONLY the part's name/type - nothing else. Specifically exclude, even if printed directly next to or below the part name on the same line or cell: availability/lead-time notes (e.g. "one week from receiving date"), delivery or shipping terms, warranty text, packaging/quantity notes, remarks in parentheses or brackets, and any other annotation. If such text is mixed in with the part name, strip it out and keep only the part name.
 - Translate part_description into clear English regardless of the source language. Do not translate the supplier's company name or the part number/code - keep those exactly as printed.
 - If a text field can't be determined for a line, use an empty string. If price can't be determined, use null.
 - If you cannot find any part/price line items at all, return {"detected_language": "...", "items": []}.
