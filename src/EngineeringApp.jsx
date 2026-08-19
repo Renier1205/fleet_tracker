@@ -591,6 +591,12 @@ function DailyHoursForm({ assets, dailyHours, existing, onClose, onSaved }) {
     : null;
   const exceedsShiftLimit = hoursRun != null && hoursRun > 12;
 
+  useEffect(() => {
+    if (existing?.id) {
+      logActivity("Daily Hours", existing.id, "viewed", `Opened ${existing.log_date || ""} ${existing.shift || ""} shift entry`.trim(), existing.asset_id);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (assets.length === 0) {
     return (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
@@ -630,11 +636,11 @@ function DailyHoursForm({ assets, dailyHours, existing, onClose, onSaved }) {
       if (isEdit) {
         const { error: dbError } = await supabase.from("daily_hours").update(payload).eq("id", existing.id);
         if (dbError) throw dbError;
-        logActivity("Daily Hours", existing.id, "updated", summary);
+        logActivity("Daily Hours", existing.id, "updated", summary, assetId);
       } else {
         const { data, error: dbError } = await supabase.from("daily_hours").insert(payload).select().single();
         if (dbError) throw dbError;
-        logActivity("Daily Hours", data?.id, "created", summary);
+        logActivity("Daily Hours", data?.id, "created", summary, assetId);
       }
       onSaved();
     } catch (err) {
@@ -839,7 +845,7 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
   };
 
   const handleDelete = async (reason) => {
-    await deleteWithReason("daily_hours", deleting.id, "id", reason, userEmail);
+    await deleteWithReason("daily_hours", deleting.id, "id", reason, userEmail, deleting.asset_id);
     setDeleting(null);
     onRefresh();
   };
@@ -1161,6 +1167,15 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
     }
   }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Records that this event was opened, not just changed - so the audit
+  // trail shows who looked at it, not only who edited it. Only fires for
+  // an event that already existed when this form opened, once per open.
+  useEffect(() => {
+    if (existing?.id) {
+      logActivity("Events", existing.id, "viewed", `Opened event ${existing.description ? `"${existing.description}"` : ""}`.trim(), existing.asset_id);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (assets.length === 0) {
     return (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
@@ -1261,7 +1276,7 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
         const { error: dbError } = await supabase.from("breakdown_log").update(payload).eq("id", currentId);
         if (dbError) throw dbError;
         setSavedRecord({ ...savedRecord, ...payload });
-        logActivity("Events", currentId, status === "Closed" ? "closed" : "updated", eventSummary);
+        logActivity("Events", currentId, status === "Closed" ? "closed" : "updated", eventSummary, assetId);
       } else {
         const { data, error: dbError } = await supabase.from("breakdown_log").insert(payload).select().single();
         if (dbError) throw dbError;
@@ -1269,7 +1284,7 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
         // is what lets a Work Order (and parts against it) be added right
         // away, in the same session, instead of having to reopen it.
         setSavedRecord(data);
-        logActivity("Events", data.id, "created", eventSummary);
+        logActivity("Events", data.id, "created", eventSummary, assetId);
 
         // This event was created by booking down a scheduled Planned
         // Maintenance job, not logged from scratch - link that same Work
@@ -1514,7 +1529,7 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, myFullName, 
   };
 
   const handleDelete = async (reason) => {
-    await deleteWithReason("breakdown_log", deleting.id, "id", reason, userEmail);
+    await deleteWithReason("breakdown_log", deleting.id, "id", reason, userEmail, deleting.asset_id);
     onRefresh();
     setDeleting(null);
   };
@@ -1726,6 +1741,14 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
     }
   }, [status]);
 
+  // Records that this work order was opened, not just changed - so the
+  // audit trail shows who looked at it, not only who edited it.
+  useEffect(() => {
+    if (existing?.id) {
+      logActivity("Work Orders", existing.id, "viewed", `Opened Work Order ${existing.wo_no || ""}`.trim(), existing.asset_id);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (assets.length === 0) {
     return (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
@@ -1791,7 +1814,7 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
         ? await supabase.from("work_orders").update(payload).eq("id", existing.id).select().single()
         : await supabase.from("work_orders").insert(payload).select().single();
       if (dbError) throw dbError;
-      logActivity("Work Orders", (isEdit ? existing.id : data?.id), status === "Closed" ? "closed" : (isEdit ? "updated" : "created"), woSummary);
+      logActivity("Work Orders", (isEdit ? existing.id : data?.id), status === "Closed" ? "closed" : (isEdit ? "updated" : "created"), woSummary, assetId);
       onSaved();
     } catch (err) {
       setError(err.message || String(err));
@@ -1948,10 +1971,11 @@ function PartUsedForm({ parts, workOrder, event, onClose, onSaved }) {
       if (stockErr) throw stockErr;
 
       logActivity(
-        "Events",
+        event ? "Events" : "Work Orders",
         event?.id ?? workOrder?.id ?? null,
         "updated",
-        `Pulled ${qtyNum} × ${selectedPart?.part_no || "part"} - ${selectedPart?.description || ""}${workOrder ? ` against Work Order ${workOrder.wo_no}` : " directly from inventory"}`
+        `Pulled ${qtyNum} × ${selectedPart?.part_no || "part"} - ${selectedPart?.description || ""}${workOrder ? ` against Work Order ${workOrder.wo_no}` : " directly from inventory"}`,
+        event?.asset_id ?? workOrder?.asset_id ?? null
       );
 
       onSaved();
@@ -2021,6 +2045,8 @@ function PartsUsedList({ workOrder, parts }) {
 
   const confirmRow = async (row) => {
     await supabase.from("parts_used").update({ status: "Confirmed", confirmed_at: new Date().toISOString() }).eq("id", row.id);
+    const p = partById[row.part_id];
+    logActivity("Work Orders", workOrder.id, "updated", `Confirmed ${row.qty_used} × ${p?.part_no || "part"} pulled against Work Order ${workOrder.wo_no}`, workOrder.asset_id);
     load();
   };
 
@@ -2082,6 +2108,8 @@ function EventPulledPartsPanel({ event, parts, onRefresh }) {
 
   const confirmRow = async (row) => {
     await supabase.from("parts_used").update({ status: "Confirmed", confirmed_at: new Date().toISOString() }).eq("id", row.id);
+    const p = partById[row.part_id];
+    logActivity("Events", event.id, "updated", `Confirmed ${row.qty_used} × ${p?.part_no || "part"} pulled from inventory`, event.asset_id);
     load();
   };
 
@@ -2303,7 +2331,9 @@ function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
           .job-card-print { position: absolute; top: 0; left: 0; width: 100%; }
           .job-card-modal-backdrop { position: static !important; background: none !important; padding: 0 !important; }
           .job-card-no-print { display: none !important; }
+          .print-footer { display: block !important; position: fixed; bottom: 8px; left: 0; right: 0; text-align: center; font-size: 10px; color: #666; }
         }
+        .print-footer { display: none; }
       `}</style>
       <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: 640, maxWidth: "100%", maxHeight: "92vh", overflowY: "auto" }}>
         <div className="job-card-no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
@@ -2363,6 +2393,8 @@ function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
               <div style={{ borderTop: "1px solid #183642", paddingTop: 6, fontSize: 12 }}>Supervisor Signature / Date</div>
             </div>
           </div>
+
+          <p className="print-footer">Printed: {new Date().toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" })}</p>
         </div>
 
         <div className="job-card-no-print" style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid #E2E6E3" }}>
@@ -2469,6 +2501,12 @@ function FuelLogForm({ assets, existing, userEmail, myFullName, dailyHours, onCl
     [assetId, hourMeter, fillDate, dailyHours]
   );
 
+  useEffect(() => {
+    if (existing?.id) {
+      logActivity("Fuel Log", existing.id, "viewed", `Opened fuel log entry from ${existing.fill_date || ""}`.trim(), existing.asset_id);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (assets.length === 0) {
     return (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
@@ -2496,11 +2534,11 @@ function FuelLogForm({ assets, existing, userEmail, myFullName, dailyHours, onCl
       if (isEdit) {
         const { error: dbError } = await supabase.from("fuel_log").update(payload).eq("id", existing.id);
         if (dbError) throw dbError;
-        logActivity("Fuel Log", existing.id, "updated", summary);
+        logActivity("Fuel Log", existing.id, "updated", summary, assetId);
       } else {
         const { data, error: dbError } = await supabase.from("fuel_log").insert(payload).select().single();
         if (dbError) throw dbError;
-        logActivity("Fuel Log", data?.id, "created", summary);
+        logActivity("Fuel Log", data?.id, "created", summary, assetId);
       }
       onSaved();
     } catch (err) {
@@ -2582,6 +2620,12 @@ function InspectionForm({ assets, existing, userEmail, myFullName, onClose, onSa
   const [error, setError] = useState("");
   const inspector = existing?.inspector || myFullName || userEmail || "";
 
+  useEffect(() => {
+    if (existing?.id) {
+      logActivity("Inspections", existing.id, "viewed", `Opened ${existing.inspection_type || ""} inspection from ${existing.log_date || ""}`.trim(), existing.asset_id);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (assets.length === 0) {
     return (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
@@ -2613,11 +2657,11 @@ function InspectionForm({ assets, existing, userEmail, myFullName, onClose, onSa
       if (isEdit) {
         const { error: dbError } = await supabase.from("inspections").update(payload).eq("id", existing.id);
         if (dbError) throw dbError;
-        logActivity("Inspections", existing.id, "updated", summary);
+        logActivity("Inspections", existing.id, "updated", summary, assetId);
       } else {
         const { data, error: dbError } = await supabase.from("inspections").insert(payload).select().single();
         if (dbError) throw dbError;
-        logActivity("Inspections", data?.id, "created", summary);
+        logActivity("Inspections", data?.id, "created", summary, assetId);
       }
       onSaved();
     } catch (err) {
@@ -2740,7 +2784,7 @@ function InspectionsPage({ assets, inspections, userEmail, myFullName, onRefresh
   }, [inspections, assets, query, selectedFleet, selectedAsset]);
 
   const handleDelete = async (reason) => {
-    await deleteWithReason("inspections", deleting.id, "id", reason, userEmail);
+    await deleteWithReason("inspections", deleting.id, "id", reason, userEmail, deleting.asset_id);
     onRefresh();
     setDeleting(null);
   };
@@ -2851,6 +2895,12 @@ function BacklogForm({ assets, workOrders, existing, userEmail, onClose, onSaved
     [workOrders, assetId]
   );
 
+  useEffect(() => {
+    if (existing?.id) {
+      logActivity("Backlogs", existing.id, "viewed", `Opened backlog item ${existing.description ? `"${existing.description}"` : ""}`.trim(), existing.asset_id);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (assets.length === 0) {
     return (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
@@ -2909,7 +2959,7 @@ function BacklogForm({ assets, workOrders, existing, userEmail, onClose, onSaved
       if (dbError) throw dbError;
       const backlogSummaryParts = [description.trim()];
       if (componentCode) backlogSummaryParts.push(`Component: ${componentCode}`);
-      logActivity("Backlogs", (isEdit ? existing.id : data?.id), status === "Closed" ? "closed" : (isEdit ? "updated" : "created"), backlogSummaryParts.join(" - "));
+      logActivity("Backlogs", (isEdit ? existing.id : data?.id), status === "Closed" ? "closed" : (isEdit ? "updated" : "created"), backlogSummaryParts.join(" - "), assetId);
       onSaved();
     } catch (err) {
       setError(err.message || String(err));
@@ -3013,7 +3063,7 @@ function BacklogsPage({ assets, backlogs, workOrders, userEmail, onRefresh }) {
   }, [backlogs, assets, query, sourceFilter, statusFilter, selectedFleet, selectedAsset]);
 
   const handleDelete = async (reason) => {
-    await deleteWithReason("backlogs", deleting.id, "id", reason, userEmail);
+    await deleteWithReason("backlogs", deleting.id, "id", reason, userEmail, deleting.asset_id);
     onRefresh();
     setDeleting(null);
   };
@@ -3513,7 +3563,7 @@ function FuelLogPage({ assets, fuelLog, userEmail, myFullName, dailyHours, onRef
   }, [fuelLog, assets, query, selectedFleet, selectedAsset]);
 
   const handleDelete = async (reason) => {
-    await deleteWithReason("fuel_log", deleting.id, "id", reason, userEmail);
+    await deleteWithReason("fuel_log", deleting.id, "id", reason, userEmail, deleting.asset_id);
     onRefresh();
     setDeleting(null);
   };
@@ -3624,6 +3674,12 @@ function OilConsumptionForm({ assets, existing, userEmail, myFullName, dailyHour
     [assetId, hourMeter, fillDate, dailyHours]
   );
 
+  useEffect(() => {
+    if (existing?.id) {
+      logActivity("Oil Consumption", existing.id, "viewed", `Opened oil consumption entry from ${existing.fill_date || ""}`.trim(), existing.asset_id);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (assets.length === 0) {
     return (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
@@ -3651,11 +3707,11 @@ function OilConsumptionForm({ assets, existing, userEmail, myFullName, dailyHour
       if (isEdit) {
         const { error: dbError } = await supabase.from("oil_consumption").update(payload).eq("id", existing.id);
         if (dbError) throw dbError;
-        logActivity("Oil Consumption", existing.id, "updated", summary);
+        logActivity("Oil Consumption", existing.id, "updated", summary, assetId);
       } else {
         const { data, error: dbError } = await supabase.from("oil_consumption").insert(payload).select().single();
         if (dbError) throw dbError;
-        logActivity("Oil Consumption", data?.id, "created", summary);
+        logActivity("Oil Consumption", data?.id, "created", summary, assetId);
       }
       onSaved();
     } catch (err) {
@@ -3753,7 +3809,7 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, myFullName, dai
   }, [oilConsumption, assets, query, selectedFleet, selectedAsset]);
 
   const handleDelete = async (reason) => {
-    await deleteWithReason("oil_consumption", deleting.id, "id", reason, userEmail);
+    await deleteWithReason("oil_consumption", deleting.id, "id", reason, userEmail, deleting.asset_id);
     onRefresh();
     setDeleting(null);
   };
@@ -4412,7 +4468,9 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
               .job-card-print { position: absolute; top: 0; left: 0; width: 100%; }
               .job-card-modal-backdrop { position: static !important; background: none !important; padding: 0 !important; }
               .job-card-no-print { display: none !important; }
+              .print-footer { display: block !important; position: fixed; bottom: 8px; left: 0; right: 0; text-align: center; font-size: 10px; color: #666; }
             }
+            .print-footer { display: none; }
           `}</style>
           <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: 900, maxWidth: "100%", maxHeight: "92vh", overflowY: "auto" }}>
             <div className="job-card-no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
@@ -4463,6 +4521,8 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
                   <p style={{ fontSize: 12, margin: 0 }}>Production (Signature): _______________________</p>
                 </div>
               </div>
+
+              <p className="print-footer">Printed: {new Date().toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" })}</p>
             </div>
           </div>
         </div>
@@ -4495,7 +4555,7 @@ function WorkOrdersPage({ assets, workOrders, userEmail, onRefresh }) {
   const handleSaved = () => { setShowForm(false); setEditing(null); onRefresh(); };
 
   const handleDelete = async (reason) => {
-    await deleteWithReason("work_orders", deleting.id, "id", reason, userEmail);
+    await deleteWithReason("work_orders", deleting.id, "id", reason, userEmail, deleting.asset_id);
     onRefresh();
     setDeleting(null);
   };
@@ -4857,7 +4917,7 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
   };
 
   const handleDeleteJob = async (reason) => {
-    await deleteWithReason("work_orders", deletingJob.id, "id", reason, userEmail);
+    await deleteWithReason("work_orders", deletingJob.id, "id", reason, userEmail, deletingJob.asset_id);
     onRefresh();
     setDeletingJob(null);
   };
@@ -5039,6 +5099,12 @@ function AssetForm({ existing, selectedSiteId, isAdmin, mySites = [], onClose, o
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    if (existing?.asset_id) {
+      logActivity("Assets", existing.asset_id, "viewed", `Opened equipment record ${existing.asset_id} - ${existing.asset_name || ""}`.trim(), existing.asset_id);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -5058,6 +5124,7 @@ function AssetForm({ existing, selectedSiteId, isAdmin, mySites = [], onClose, o
         ? await supabase.from("assets").update(payload).eq("asset_id", existing.asset_id)
         : await supabase.from("assets").insert(payload);
       if (dbError) throw dbError;
+      logActivity("Assets", assetId, isEdit ? "updated" : "created", `${assetId} - ${assetName}${status !== "Operating" ? ` (${status})` : ""}`, assetId);
       onSaved();
     } catch (err) {
       setError(err.message || String(err));
@@ -5744,14 +5811,34 @@ function PageAccessModal({ user, onClose }) {
 }
 
 const ACTIVITY_COLUMNS = [
-  ["created_at", "Date & Time"], ["table_name", "Tab"],
+  ["created_at", "Date & Time"], ["table_name", "Tab"], ["asset_id", "Machine #"],
   ["action", "Action"], ["summary", "Details"], ["user_name", "User"],
 ];
+
+// Groups an already-sorted (newest first) list of rows into buckets keyed
+// by calendar day, so the table can show a day heading instead of one long
+// undifferentiated list - this is what keeps a much busier audit trail
+// (now that views and part confirmations are logged too, not just
+// creates/edits) readable rather than an overwhelming wall of rows.
+function groupByDay(rows) {
+  const groups = [];
+  let current = null;
+  for (const r of rows) {
+    const dayKey = r.created_at ? new Date(r.created_at).toDateString() : "Unknown date";
+    if (!current || current.dayKey !== dayKey) {
+      current = { dayKey, label: r.created_at ? new Date(r.created_at).toLocaleDateString("en-ZA", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }) : "Unknown date", rows: [] };
+      groups.push(current);
+    }
+    current.rows.push(r);
+  }
+  return groups;
+}
 
 function AuditTrailPage({ activityLog, profiles, isAdmin }) {
   const [tableFilter, setTableFilter] = useState("");
   const [actionFilter, setActionFilter] = useState("");
   const [userFilter, setUserFilter] = useState("");
+  const [assetFilter, setAssetFilter] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [showPrint, setShowPrint] = useState(false);
@@ -5768,26 +5855,31 @@ function AuditTrailPage({ activityLog, profiles, isAdmin }) {
   const nameByUser = useMemo(() => new Map(profiles.map((p) => [p.user_id, p.full_name])), [profiles]);
   const tables = useMemo(() => [...new Set(activityLog.map((r) => r.table_name))].filter(Boolean).sort(), [activityLog]);
   const users = useMemo(() => [...new Set(activityLog.map((r) => nameByUser.get(r.user_id)))].filter(Boolean).sort(), [activityLog, nameByUser]);
+  const machines = useMemo(() => [...new Set(activityLog.map((r) => r.asset_id))].filter(Boolean).sort(), [activityLog]);
 
   const filtered = useMemo(() => {
     return activityLog.filter((r) => {
       if (tableFilter && r.table_name !== tableFilter) return false;
       if (actionFilter && r.action !== actionFilter) return false;
       if (userFilter && nameByUser.get(r.user_id) !== userFilter) return false;
+      if (assetFilter && r.asset_id !== assetFilter) return false;
       if (fromDate && new Date(r.created_at) < new Date(fromDate)) return false;
       if (toDate && new Date(r.created_at) > new Date(toDate + "T23:59:59")) return false;
       return true;
     });
-  }, [activityLog, tableFilter, actionFilter, userFilter, fromDate, toDate, nameByUser]);
+  }, [activityLog, tableFilter, actionFilter, userFilter, assetFilter, fromDate, toDate, nameByUser]);
+
+  const dayGroups = useMemo(() => groupByDay(filtered), [filtered]);
 
   const formatDT = (v) => v ? new Date(v).toLocaleString("en-ZA", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-";
+  const nowPrinted = () => new Date().toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
 
   const exportToExcel = () => {
     const now = new Date();
     const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
     const headerRow = ACTIVITY_COLUMNS.map((c) => c[1]);
     const dataRows = filtered.map((r) => [
-      formatDT(r.created_at), r.table_name, r.action, r.summary || "", nameByUser.get(r.user_id) || "-",
+      formatDT(r.created_at), r.table_name, r.asset_id || "-", r.action, r.summary || "", nameByUser.get(r.user_id) || "-",
     ]);
     const aoa = [["Audit Trail"], [`Exported: ${timestamp}`], [], headerRow, ...dataRows];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -5802,11 +5894,12 @@ function AuditTrailPage({ activityLog, profiles, isAdmin }) {
   };
 
   const selectStyle = { padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', background: "#fff" };
+  const dayHeaderStyle = { padding: "8px 12px", fontWeight: 700, fontSize: 12, color: NAVY, background: "#EFF3F2", textTransform: "uppercase", letterSpacing: 0.3 };
 
   return (
     <div>
       <p style={{ fontSize: 12.5, color: "#859195", margin: "0 0 14px" }}>
-        Covers Events, Work Orders, Backlogs, Daily Hours, Fuel Log, Oil Consumption, Inspections, Parts Inventory and the Quote Price List, plus every deletion anywhere in the app. Filter by tab, action, user or date range below, or export the current view to Excel.
+        Covers every create, edit, close and delete across Events, Work Orders, Backlogs, Daily Hours, Fuel Log, Oil Consumption, Inspections, Assets, Parts Inventory and the Quote Price List - plus every time someone opens an existing record to view it, and every part pulled or confirmed against an Event or Work Order. Filter by tab, action, user, machine or date range below, or export the current view to Excel.
       </p>
 
       <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
@@ -5816,6 +5909,7 @@ function AuditTrailPage({ activityLog, profiles, isAdmin }) {
         </select>
         <select value={actionFilter} onChange={(e) => setActionFilter(e.target.value)} style={selectStyle}>
           <option value="">All actions</option>
+          <option value="viewed">Viewed</option>
           <option value="created">Created</option>
           <option value="updated">Updated</option>
           <option value="closed">Closed</option>
@@ -5824,6 +5918,10 @@ function AuditTrailPage({ activityLog, profiles, isAdmin }) {
         <select value={userFilter} onChange={(e) => setUserFilter(e.target.value)} style={selectStyle}>
           <option value="">All users</option>
           {users.map((u) => <option key={u} value={u}>{u}</option>)}
+        </select>
+        <select value={assetFilter} onChange={(e) => setAssetFilter(e.target.value)} style={selectStyle}>
+          <option value="">All machines</option>
+          {machines.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
         <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={selectStyle} />
         <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={selectStyle} />
@@ -5853,14 +5951,22 @@ function AuditTrailPage({ activityLog, profiles, isAdmin }) {
           <tbody>
             {filtered.length === 0 ? (
               <tr><td colSpan={ACTIVITY_COLUMNS.length} style={{ padding: 24, textAlign: "center", color: "#859195" }}>No audit entries match your filters.</td></tr>
-            ) : filtered.map((r, i) => (
-              <tr key={r.id ?? i} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none" }}>
-                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{formatDT(r.created_at)}</td>
-                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.table_name || "-"}</td>
-                <td style={{ padding: "9px 12px", whiteSpace: "nowrap", textTransform: "capitalize" }}>{r.action || "-"}</td>
-                <td style={{ padding: "9px 12px" }}>{r.summary || "-"}</td>
-                <td style={{ padding: "9px 12px", whiteSpace: "nowrap", fontWeight: 600, color: "#183642" }}>{nameByUser.get(r.user_id) || "Unknown"}</td>
-              </tr>
+            ) : dayGroups.map((group) => (
+              <React.Fragment key={group.dayKey}>
+                <tr>
+                  <td colSpan={ACTIVITY_COLUMNS.length} style={dayHeaderStyle}>{group.label}</td>
+                </tr>
+                {group.rows.map((r, i) => (
+                  <tr key={r.id ?? i} style={{ borderBottom: i < group.rows.length - 1 ? "1px solid #EFEEE7" : "none" }}>
+                    <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{formatDT(r.created_at)}</td>
+                    <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.table_name || "-"}</td>
+                    <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.asset_id || "-"}</td>
+                    <td style={{ padding: "9px 12px", whiteSpace: "nowrap", textTransform: "capitalize" }}>{r.action || "-"}</td>
+                    <td style={{ padding: "9px 12px" }}>{r.summary || "-"}</td>
+                    <td style={{ padding: "9px 12px", whiteSpace: "nowrap", fontWeight: 600, color: "#183642" }}>{nameByUser.get(r.user_id) || "Unknown"}</td>
+                  </tr>
+                ))}
+              </React.Fragment>
             ))}
           </tbody>
         </table>
@@ -5875,7 +5981,9 @@ function AuditTrailPage({ activityLog, profiles, isAdmin }) {
               .job-card-print { position: absolute; top: 0; left: 0; width: 100%; }
               .job-card-modal-backdrop { position: static !important; background: none !important; padding: 0 !important; }
               .job-card-no-print { display: none !important; }
+              .print-footer { display: block !important; position: fixed; bottom: 8px; left: 0; right: 0; text-align: center; font-size: 10px; color: #666; }
             }
+            .print-footer { display: none; }
           `}</style>
           <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: 900, maxWidth: "100%", maxHeight: "92vh", overflowY: "auto" }}>
             <div className="job-card-no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
@@ -5891,29 +5999,37 @@ function AuditTrailPage({ activityLog, profiles, isAdmin }) {
             <div className="job-card-print">
               <p style={{ fontSize: 18, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>Audit Report</p>
               <p style={{ fontSize: 12.5, color: "#4B5659", margin: "0 0 16px" }}>
-                {fromDate || toDate ? `${fromDate || "earliest"} to ${toDate || "latest"}` : "All recorded activity"} · Generated {new Date().toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" })}
+                {fromDate || toDate ? `${fromDate || "earliest"} to ${toDate || "latest"}` : "All recorded activity"} · Generated {nowPrinted()}
               </p>
 
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5 }}>
-                <thead>
-                  <tr>
-                    {ACTIVITY_COLUMNS.map(([key, label]) => (
-                      <th key={key} style={{ textAlign: "left", padding: "6px 8px", border: "1px solid #ccc", background: "#F0F3F8" }}>{label}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((r, i) => (
-                    <tr key={r.id ?? i}>
-                      <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap" }}>{formatDT(r.created_at)}</td>
-                      <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap" }}>{r.table_name || "-"}</td>
-                      <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap", textTransform: "capitalize" }}>{r.action || "-"}</td>
-                      <td style={{ padding: "6px 8px", border: "1px solid #ccc" }}>{r.summary || "-"}</td>
-                      <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap", fontWeight: 700 }}>{nameByUser.get(r.user_id) || "Unknown"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {dayGroups.map((group) => (
+                <div key={group.dayKey} style={{ marginBottom: 14 }}>
+                  <p style={{ fontSize: 12.5, fontWeight: 700, color: NAVY, margin: "0 0 6px", textTransform: "uppercase", letterSpacing: 0.3 }}>{group.label}</p>
+                  <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 6, fontSize: 11.5 }}>
+                    <thead>
+                      <tr>
+                        {ACTIVITY_COLUMNS.map(([key, label]) => (
+                          <th key={key} style={{ textAlign: "left", padding: "6px 8px", border: "1px solid #ccc", background: "#F0F3F8" }}>{label}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {group.rows.map((r, i) => (
+                        <tr key={r.id ?? i}>
+                          <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap" }}>{formatDT(r.created_at)}</td>
+                          <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap" }}>{r.table_name || "-"}</td>
+                          <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap" }}>{r.asset_id || "-"}</td>
+                          <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap", textTransform: "capitalize" }}>{r.action || "-"}</td>
+                          <td style={{ padding: "6px 8px", border: "1px solid #ccc" }}>{r.summary || "-"}</td>
+                          <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap", fontWeight: 700 }}>{nameByUser.get(r.user_id) || "Unknown"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+
+              <p className="print-footer">Printed: {nowPrinted()}</p>
             </div>
           </div>
         </div>
@@ -7123,7 +7239,7 @@ function aggregateMetrics(kpiRows, assetIds) {
 // log write hiccupped. Every insert/update/delete flows through here
 // with a plain-English summary already built at the point it happens,
 // rather than trying to reconstruct one later from a raw row diff.
-async function logActivity(tableName, recordId, action, summary) {
+async function logActivity(tableName, recordId, action, summary, assetId) {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     await supabase.from("activity_log").insert({
@@ -7131,20 +7247,21 @@ async function logActivity(tableName, recordId, action, summary) {
       record_id: recordId != null ? String(recordId) : null,
       action, summary,
       user_id: user?.id ?? null,
+      asset_id: assetId ?? null,
     });
   } catch (err) {
     console.error("Activity log write failed:", err);
   }
 }
 
-async function deleteWithReason(tableName, recordId, idColumn, reason, userEmail) {
+async function deleteWithReason(tableName, recordId, idColumn, reason, userEmail, assetId) {
   const { error: logError } = await supabase.from("deletion_log").insert({
     table_name: tableName, record_id: String(recordId), reason, deleted_by_email: userEmail || null,
   });
   if (logError) throw logError;
   const { error: deleteError } = await supabase.from(tableName).delete().eq(idColumn, recordId);
   if (deleteError) throw deleteError;
-  logActivity(TABLE_NAME_LABELS[tableName] || tableName, recordId, "deleted", reason);
+  logActivity(TABLE_NAME_LABELS[tableName] || tableName, recordId, "deleted", reason, assetId);
 }
 
 function DeleteConfirmModal({ itemLabel, userEmail, onCancel, onConfirm }) {
@@ -8322,7 +8439,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
     const { data: auditData, error: auditError } = await supabase.from("audit_report").select("*").limit(200);
     if (!auditError) setAuditLog(auditData || []);
 
-    const { data: activityData, error: activityError } = await supabase.from("activity_log").select("*").order("created_at", { ascending: false }).limit(500);
+    const { data: activityData, error: activityError } = await supabase.from("activity_log").select("*").order("created_at", { ascending: false }).limit(1500);
     if (!activityError) setActivityLog(activityData || []);
 
     // Everyone's names, not just the current user's - needed to show who
