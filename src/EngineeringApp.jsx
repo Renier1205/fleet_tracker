@@ -5023,7 +5023,7 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
   );
 }
 
-function AssetForm({ existing, selectedSiteId, onClose, onSaved }) {
+function AssetForm({ existing, selectedSiteId, isAdmin, mySites = [], onClose, onSaved }) {
   const isEdit = !!existing;
   const [assetId, setAssetId] = useState(existing?.asset_id || "");
   const [assetName, setAssetName] = useState(existing?.asset_name || "");
@@ -5033,6 +5033,7 @@ function AssetForm({ existing, selectedSiteId, onClose, onSaved }) {
   const [serialNumber, setSerialNumber] = useState(existing?.serial_number || "");
   const [status, setStatus] = useState(existing?.status || "Operating");
   const [siteLocation, setSiteLocation] = useState(existing?.site_location || "");
+  const [siteId, setSiteId] = useState(existing?.site_id || selectedSiteId || "");
   const [openingHours, setOpeningHours] = useState(existing?.opening_hours ?? "");
   const [notes, setNotes] = useState(existing?.notes || "");
   const [saving, setSaving] = useState(false);
@@ -5048,8 +5049,9 @@ function AssetForm({ existing, selectedSiteId, onClose, onSaved }) {
       serial_number: serialNumber || null, status, site_location: siteLocation || null,
       opening_hours: openingHours === "" ? null : Number(openingHours),
       notes: notes || null,
-      ...(isEdit ? {} : { site_id: selectedSiteId }),
+      site_id: isAdmin ? (siteId || null) : (isEdit ? undefined : selectedSiteId),
     };
+    if (payload.site_id === undefined) delete payload.site_id;
 
     try {
       const { error: dbError } = isEdit
@@ -5115,10 +5117,22 @@ function AssetForm({ existing, selectedSiteId, onClose, onSaved }) {
             </select>
           </div>
           <div>
-            <label style={labelStyle}>Site / Location</label>
+            <label style={labelStyle}>Location (e.g. Yard, Pit)</label>
             <input type="text" value={siteLocation} onChange={(e) => setSiteLocation(e.target.value)} style={fieldStyle} />
           </div>
         </div>
+
+        {isAdmin && mySites.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <label style={labelStyle}>Site</label>
+            <select value={siteId} onChange={(e) => setSiteId(e.target.value)} style={fieldStyle}>
+              {mySites.map((s) => <option key={s.id} value={s.id}>{s.site_name}</option>)}
+            </select>
+            <p style={{ fontSize: 11.5, color: "#859195", margin: "4px 0 0" }}>
+              Which site this equipment belongs to - only that site's users will see it. Change this to move equipment between sites.
+            </p>
+          </div>
+        )}
 
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Current Hours (at intake)</label>
@@ -6870,7 +6884,7 @@ function ComponentsPage({ assets, components, breakdowns, workOrders, dailyHours
   );
 }
 
-function AssetsPage({ assets, selectedSiteId, onRefresh }) {
+function AssetsPage({ assets, selectedSiteId, onRefresh, isAdmin, mySites = [] }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState("");
@@ -6973,6 +6987,8 @@ function AssetsPage({ assets, selectedSiteId, onRefresh }) {
         <AssetForm
           existing={editing}
           selectedSiteId={selectedSiteId}
+          isAdmin={isAdmin}
+          mySites={mySites}
           onClose={() => { setShowForm(false); setEditing(null); }}
           onSaved={handleSaved}
         />
@@ -8259,31 +8275,31 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
   // whole view with no error boundary to catch it.
   const pageTitle = active === "about" ? "About" : NAV.find((n) => n.key === active)?.label || activeConfig?.title || "";
 
-  // Defense in depth: if an operator's active tab is ever something
-  // they're not supposed to see (role changed mid-session, a stale
-  // value, anything), redirect them rather than silently rendering a
-  // manager-level page. The nav already hides these, this is the
+  // Per-user page visibility is now the single source of truth for what
+  // shows in the sidebar - it used to be layered on top of a separate,
+  // hidden Operator-role restriction that silently overrode it, which is
+  // exactly what caused Manage Pages to look like it wasn't working. An
+  // empty myPageAccess means this person has no explicit restrictions and
+  // sees everything; admins are never restricted by this, however their
+  // own access list looks.
+  const canSeePage = (key) => isAdmin || myPageAccess.length === 0 || myPageAccess.includes(key);
+
+  // Defense in depth: if a non-admin's active tab is ever something
+  // they're not supposed to see (their access was changed mid-session, a
+  // stale value, anything), redirect them rather than silently rendering
+  // a page they shouldn't have. The nav already hides these, this is the
   // backstop for if it's reached some other way.
   useEffect(() => {
-    if (myRole !== "operator") return;
-    const navItem = NAV.find((n) => n.key === active);
-    if (navItem && !navItem.operatorVisible) {
-      setActive("daily_hours");
+    if (isAdmin || active === "about") return;
+    if (!canSeePage(active)) {
+      setActive(myPageAccess[0] || "about");
     }
-  }, [myRole, active]);
+  }, [isAdmin, active, myPageAccess]);
 
   const handleNavClick = (key) => {
     setActive(key);
     if (isMobile) setSidebarOpen(false);
   };
-
-  // Per-user page visibility, layered on top of the role system rather
-  // than replacing it - an empty myPageAccess means this person has no
-  // explicit restrictions, so their normal role-based access applies
-  // unchanged. The moment an admin has ticked/unticked anything for
-  // them, that list becomes their full, explicit allow-list. Admins are
-  // never restricted by this, however their own access list looks.
-  const canSeePage = (key) => isAdmin || myPageAccess.length === 0 || myPageAccess.includes(key);
 
   const sidebarWidth = isMobile ? 240 : (sidebarOpen ? 220 : 56);
 
@@ -8379,7 +8395,6 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
           {(engineeringExpanded || !sidebarOpen) && NAV.filter((n) =>
             !n.group &&
             ((n.key !== "audit" && n.key !== "site_management" && n.key !== "component_codes") || isAdmin) &&
-            (myRole !== "operator" || n.operatorVisible) &&
             canSeePage(n.key)
           ).map(({ key, label, icon: Icon }) => (
             <button
@@ -8417,7 +8432,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
                 </button>
               ) : null}
               {(backlogsExpanded || !sidebarOpen) && NAV.filter((n) =>
-                n.group === "backlogs" && (myRole !== "operator" || n.operatorVisible) && canSeePage(n.key)
+                n.group === "backlogs" && canSeePage(n.key)
               ).map(({ key, label, icon: Icon }) => (
                 <button
                   key={key}
@@ -8515,7 +8530,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
             ) : active === "breakdowns" ? (
               <BreakdownsPage assets={assets} breakdowns={breakdowns} workOrders={workOrders} parts={parts} componentCodes={componentCodes} onRefresh={() => { loadCoreData(); loadRestOfData(); }} userEmail={userEmail} myFullName={myFullName} />
             ) : active === "assets" ? (
-              <AssetsPage assets={assets} selectedSiteId={selectedSiteId} onRefresh={loadCoreData} />
+              <AssetsPage assets={assets} selectedSiteId={selectedSiteId} onRefresh={loadCoreData} isAdmin={isAdmin} mySites={mySites} />
             ) : active === "daily_hours" ? (
               <DailyHoursPage assets={assets} dailyHours={dailyHours} userEmail={userEmail} onRefresh={loadCoreData} />
             ) : active === "planned_maintenance" ? (
