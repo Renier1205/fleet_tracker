@@ -5658,7 +5658,9 @@ function SiteManagementPage({ isAdmin, onSitesChanged, onNameSaved }) {
 }
 
 function PageAccessModal({ user, onClose }) {
-  const tickablePages = NAV.filter((n) => !n.group && n.key !== "audit" && n.key !== "site_management" && n.key !== "component_codes");
+  const tickablePages = NAV
+    .filter((n) => n.key !== "audit" && n.key !== "site_management" && n.key !== "component_codes")
+    .map((n) => n.group === "backlogs" ? { ...n, label: `Backlogs - ${n.label}` } : n);
   const [checked, setChecked] = useState(new Set(tickablePages.map((p) => p.key))); // default: everything ticked, until we know otherwise
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
