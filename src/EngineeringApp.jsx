@@ -2453,7 +2453,7 @@ const DOWNTIME_SUMMARY_COLUMNS = [
   ["downtime_hours", "Downtime (hrs)"], ["status", "Status"],
 ];
 
-function FuelLogForm({ assets, existing, userEmail, dailyHours, onClose, onSaved }) {
+function FuelLogForm({ assets, existing, userEmail, myFullName, dailyHours, onClose, onSaved }) {
   const isEdit = !!existing;
   const [assetId, setAssetId] = useState(existing?.asset_id || assets[0]?.asset_id || "");
   const [fillDate, setFillDate] = useState(existing?.fill_date || todayForInput());
@@ -2462,7 +2462,7 @@ function FuelLogForm({ assets, existing, userEmail, dailyHours, onClose, onSaved
   const [notes, setNotes] = useState(existing?.notes || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const recordedBy = existing?.recorded_by || userEmail || "";
+  const recordedBy = existing?.recorded_by || myFullName || userEmail || "";
 
   const hourMeterWarning = useMemo(
     () => checkHourMeterPlausibility(assetId, hourMeter, fillDate, dailyHours),
@@ -2566,7 +2566,7 @@ const INSPECTION_TYPES = ["Pre-Start", "Daily", "Weekly", "Monthly", "Statutory"
 const INSPECTION_RESULTS = ["Pass", "Fail", "Pass with Defects"];
 const RISK_RATINGS = ["Low", "Medium", "High", "Critical"];
 
-function InspectionForm({ assets, existing, userEmail, onClose, onSaved }) {
+function InspectionForm({ assets, existing, userEmail, myFullName, onClose, onSaved }) {
   const isEdit = !!existing;
   const [assetId, setAssetId] = useState(existing?.asset_id || assets[0]?.asset_id || "");
   const [logDate, setLogDate] = useState(existing?.log_date || todayForInput());
@@ -2580,7 +2580,7 @@ function InspectionForm({ assets, existing, userEmail, onClose, onSaved }) {
   const [signedOff, setSignedOff] = useState(existing?.signed_off || false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const inspector = existing?.inspector || userEmail || "";
+  const inspector = existing?.inspector || myFullName || userEmail || "";
 
   if (assets.length === 0) {
     return (
@@ -2718,7 +2718,7 @@ function InspectionForm({ assets, existing, userEmail, onClose, onSaved }) {
   );
 }
 
-function InspectionsPage({ assets, inspections, userEmail, onRefresh }) {
+function InspectionsPage({ assets, inspections, userEmail, myFullName, onRefresh }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
@@ -2804,7 +2804,7 @@ function InspectionsPage({ assets, inspections, userEmail, onRefresh }) {
         </table>
       </div>
       {showForm && (
-        <InspectionForm assets={assets} existing={editing} userEmail={userEmail}
+        <InspectionForm assets={assets} existing={editing} userEmail={userEmail} myFullName={myFullName}
           onClose={() => { setShowForm(false); setEditing(null); }}
           onSaved={() => { setShowForm(false); setEditing(null); onRefresh(); }} />
       )}
@@ -3198,10 +3198,10 @@ function analyzeImageQuality(file) {
 
 const PHOTO_QUALITY_LABEL = { ok: "Looks clear", blurry: "May be blurry", dark: "May be too dark", unchecked: "Not checked" };
 
-function DailyServiceForm({ assets, defaultAssetId, defaultDate, existing, userEmail, onClose, onSaved }) {
+function DailyServiceForm({ assets, defaultAssetId, defaultDate, existing, userEmail, myFullName, onClose, onSaved }) {
   const [assetId, setAssetId] = useState(existing?.asset_id || defaultAssetId || assets[0]?.asset_id || "");
   const [serviceDate, setServiceDate] = useState(existing?.service_date || defaultDate || todayForInput());
-  const [completedBy, setCompletedBy] = useState(existing?.completed_by || userEmail || "");
+  const [completedBy, setCompletedBy] = useState(existing?.completed_by || myFullName || userEmail || "");
   const [notes, setNotes] = useState(existing?.notes || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -3378,7 +3378,7 @@ function dailyServiceStatus(assetId, dateStr, checklistByKey, breakdowns, dailyH
   return null; // gap
 }
 
-function DailyServicePage({ assets, dailyServiceChecklist, breakdowns, dailyHours, userEmail, onRefresh }) {
+function DailyServicePage({ assets, dailyServiceChecklist, breakdowns, dailyHours, userEmail, myFullName, onRefresh }) {
   const [monthValue, setMonthValue] = useState(() => todayForInput().slice(0, 7)); // "YYYY-MM"
   const [showForm, setShowForm] = useState(false);
   const [formDefaults, setFormDefaults] = useState({ assetId: "", date: "" });
@@ -3482,6 +3482,7 @@ function DailyServicePage({ assets, dailyServiceChecklist, breakdowns, dailyHour
           defaultDate={formDefaults.date}
           existing={checklistByKey.get(`${formDefaults.assetId}|${formDefaults.date}`) || null}
           userEmail={userEmail}
+          myFullName={myFullName}
           onClose={() => setShowForm(false)}
           onSaved={() => { setShowForm(false); onRefresh(); }}
         />
@@ -3490,7 +3491,7 @@ function DailyServicePage({ assets, dailyServiceChecklist, breakdowns, dailyHour
   );
 }
 
-function FuelLogPage({ assets, fuelLog, userEmail, dailyHours, onRefresh }) {
+function FuelLogPage({ assets, fuelLog, userEmail, myFullName, dailyHours, onRefresh }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
@@ -3586,7 +3587,7 @@ function FuelLogPage({ assets, fuelLog, userEmail, dailyHours, onRefresh }) {
         </table>
       </div>
       {showForm && (
-        <FuelLogForm assets={assets} existing={editing} userEmail={userEmail} dailyHours={dailyHours}
+        <FuelLogForm assets={assets} existing={editing} userEmail={userEmail} myFullName={myFullName} dailyHours={dailyHours}
           onClose={() => { setShowForm(false); setEditing(null); }}
           onSaved={() => { setShowForm(false); setEditing(null); onRefresh(); }} />
       )}
@@ -3605,7 +3606,7 @@ function FuelLogPage({ assets, fuelLog, userEmail, dailyHours, onRefresh }) {
 const OIL_TYPES = ["Engine Oil 15W-40", "Hydraulic Oil", "Transmission Oil", "Gear Oil", "Other"];
 const OIL_FILL_REASONS = ["Scheduled Change", "Top-Up", "Leak Repair"];
 
-function OilConsumptionForm({ assets, existing, userEmail, dailyHours, onClose, onSaved }) {
+function OilConsumptionForm({ assets, existing, userEmail, myFullName, dailyHours, onClose, onSaved }) {
   const isEdit = !!existing;
   const [assetId, setAssetId] = useState(existing?.asset_id || assets[0]?.asset_id || "");
   const [fillDate, setFillDate] = useState(existing?.fill_date || todayForInput());
@@ -3616,7 +3617,7 @@ function OilConsumptionForm({ assets, existing, userEmail, dailyHours, onClose, 
   const [notes, setNotes] = useState(existing?.notes || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const recordedBy = existing?.recorded_by || userEmail || "";
+  const recordedBy = existing?.recorded_by || myFullName || userEmail || "";
 
   const hourMeterWarning = useMemo(
     () => checkHourMeterPlausibility(assetId, hourMeter, fillDate, dailyHours),
@@ -3730,7 +3731,7 @@ function OilConsumptionForm({ assets, existing, userEmail, dailyHours, onClose, 
   );
 }
 
-function OilConsumptionPage({ assets, oilConsumption, userEmail, dailyHours, onRefresh }) {
+function OilConsumptionPage({ assets, oilConsumption, userEmail, myFullName, dailyHours, onRefresh }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
@@ -3828,7 +3829,7 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, dailyHours, onR
         </table>
       </div>
       {showForm && (
-        <OilConsumptionForm assets={assets} existing={editing} userEmail={userEmail} dailyHours={dailyHours}
+        <OilConsumptionForm assets={assets} existing={editing} userEmail={userEmail} myFullName={myFullName} dailyHours={dailyHours}
           onClose={() => { setShowForm(false); setEditing(null); }}
           onSaved={() => { setShowForm(false); setEditing(null); onRefresh(); }} />
       )}
@@ -7027,7 +7028,13 @@ function aggregateMetrics(kpiRows, assetIds) {
 // rather than trying to reconstruct one later from a raw row diff.
 async function logActivity(tableName, recordId, action, summary) {
   try {
-    await supabase.from("activity_log").insert({ table_name: tableName, record_id: recordId != null ? String(recordId) : null, action, summary });
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from("activity_log").insert({
+      table_name: tableName,
+      record_id: recordId != null ? String(recordId) : null,
+      action, summary,
+      user_id: user?.id ?? null,
+    });
   } catch (err) {
     console.error("Activity log write failed:", err);
   }
@@ -8520,15 +8527,15 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
             ) : active === "mtbf_mttr" ? (
               <MtbfMttrReportPage assets={assets} />
             ) : active === "fuel_log" ? (
-              <FuelLogPage assets={assets} fuelLog={fuelLog} userEmail={userEmail} dailyHours={dailyHours} onRefresh={loadRestOfData} />
+              <FuelLogPage assets={assets} fuelLog={fuelLog} userEmail={userEmail} myFullName={myFullName} dailyHours={dailyHours} onRefresh={loadRestOfData} />
             ) : active === "oil_consumption" ? (
-              <OilConsumptionPage assets={assets} oilConsumption={oilConsumption} userEmail={userEmail} dailyHours={dailyHours} onRefresh={loadRestOfData} />
+              <OilConsumptionPage assets={assets} oilConsumption={oilConsumption} userEmail={userEmail} myFullName={myFullName} dailyHours={dailyHours} onRefresh={loadRestOfData} />
             ) : active === "inspections" ? (
-              <InspectionsPage assets={assets} inspections={inspections} userEmail={userEmail} onRefresh={loadRestOfData} />
+              <InspectionsPage assets={assets} inspections={inspections} userEmail={userEmail} myFullName={myFullName} onRefresh={loadRestOfData} />
             ) : active === "backlog_report" ? (
               <BacklogsPage assets={assets} backlogs={backlogs} workOrders={workOrders} userEmail={userEmail} onRefresh={loadRestOfData} />
             ) : active === "daily_service" ? (
-              <DailyServicePage assets={assets} dailyServiceChecklist={dailyServiceChecklist} breakdowns={breakdowns} dailyHours={dailyHours} userEmail={userEmail} onRefresh={loadRestOfData} />
+              <DailyServicePage assets={assets} dailyServiceChecklist={dailyServiceChecklist} breakdowns={breakdowns} dailyHours={dailyHours} userEmail={userEmail} myFullName={myFullName} onRefresh={loadRestOfData} />
             ) : active === "components" ? (
               <ComponentsPage assets={assets} components={components} breakdowns={breakdowns} workOrders={workOrders} dailyHours={dailyHours} userEmail={userEmail} onRefresh={loadRestOfData} />
             ) : active === "parts" ? (
