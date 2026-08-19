@@ -3905,7 +3905,7 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, myFullName, dai
 const MTBF_MTTR_COLUMNS = [
   ["asset_id", "Equipment #"], ["asset_name", "Name"], ["fleet", "Fleet"],
   ["num_unplanned_events", "Breakdowns"], ["mtbf", "MTBF (hrs)"], ["mttr", "MTTR (hrs)"],
-  ["availability", "Availability"], ["availability_24h", "Availability (Last 24h)"], ["availability_mtd", "Availability (MTD)"],
+  ["availability_24h", "Availability (Last 24h)"], ["availability_mtd", "Availability (MTD)"],
 ];
 
 function MtbfMttrReportPage({ assets }) {
@@ -3988,6 +3988,22 @@ function MtbfMttrReportPage({ assets }) {
     });
   }, [kpiData, selectedFleet, selectedAsset, sortKey, sortDir]);
 
+  // One row per fleet, same pattern as the Dashboard's KPI charts - used
+  // for the three charts below whenever no fleet/equipment is selected,
+  // so they show 5 readable bars instead of 30+.
+  const fleetKpiData = useMemo(() => {
+    const byFleet = {};
+    kpiData.forEach((r) => {
+      if (!r.fleet) return;
+      if (!byFleet[r.fleet]) byFleet[r.fleet] = [];
+      byFleet[r.fleet].push(r);
+    });
+    return Object.keys(byFleet).sort().map((fleet) => ({
+      fleet,
+      ...aggregateMetrics(byFleet[fleet], byFleet[fleet].map((r) => r.asset_id)),
+    }));
+  }, [kpiData]);
+
   const handleSort = (key) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortKey(key); setSortDir("desc"); }
@@ -4031,29 +4047,55 @@ function MtbfMttrReportPage({ assets }) {
 
       {!loading && rows.length > 0 && (() => {
         const mtbfTarget = 40, mttrTarget = 4, utilTarget = 85;
-        const mtbfMax = Math.max(mtbfTarget, ...rows.map((r) => r.mtbf || 0)) * 1.15;
-        const mttrMax = Math.max(mttrTarget, ...rows.map((r) => r.mttr || 0)) * 1.15;
-        const utilRows = rows.map((r) => ({ ...r, utilisationPct: r.utilisation != null ? Math.round(r.utilisation * 100) : null }));
+        // No fleet/equipment picked -> chart by fleet (5 readable bars).
+        // Fleet picked -> chart by individual machine within that fleet.
+        // Equipment picked -> rows is just that one machine either way.
+        const showByFleet = !selectedFleet && !selectedAsset;
+        const chartData = showByFleet ? fleetKpiData : rows;
+        const chartXKey = showByFleet ? "fleet" : "asset_id";
+        const mtbfMax = Math.max(mtbfTarget, ...chartData.map((r) => r.mtbf || 0)) * 1.15;
+        const mttrMax = Math.max(mttrTarget, ...chartData.map((r) => r.mttr || 0)) * 1.15;
+        const utilRows = chartData.map((r) => ({ ...r, utilisationPct: r.utilisation != null ? Math.round(r.utilisation * 100) : null }));
+        const handleBarClick = (row) => {
+          if (showByFleet) setSelectedFleet(row.fleet);
+          else if (!selectedAsset) setSelectedAsset(row.asset_id);
+        };
         return (
         <div style={{ marginBottom: 8 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, margin: "0 0 12px" }}>
+            <p style={{ fontSize: 13, color: "#4B5659", margin: 0 }}>
+              {showByFleet ? "Click a fleet to see individual machines." : `Showing ${selectedAsset || selectedFleet}.`}
+            </p>
+            {!showByFleet && (
+              <button
+                onClick={() => { setSelectedFleet(""); setSelectedAsset(""); }}
+                style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: NAVY, fontSize: 12.5, fontWeight: 600, textDecoration: "underline" }}
+              >
+                ← back to all fleets
+              </button>
+            )}
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16, marginBottom: 8 }}>
             <KpiBarChart
-              title="MTBF by equipment (hrs)" data={rows} xKey="asset_id" dataKey="mtbf"
+              title={showByFleet ? "MTBF by fleet (hrs)" : "MTBF by equipment (hrs)"} data={chartData} xKey={chartXKey} dataKey="mtbf"
               target={mtbfTarget} domainMax={mtbfMax} unitSuffix="h"
               valueFormatter={(v) => Number(v).toFixed(1)}
               meetsTarget={(r) => (r.mtbf || 0) >= mtbfTarget}
+              onBarClick={handleBarClick}
             />
             <KpiBarChart
-              title="MTTR by equipment (hrs)" data={rows} xKey="asset_id" dataKey="mttr"
+              title={showByFleet ? "MTTR by fleet (hrs)" : "MTTR by equipment (hrs)"} data={chartData} xKey={chartXKey} dataKey="mttr"
               target={mttrTarget} domainMax={mttrMax} unitSuffix="h"
               valueFormatter={(v) => Number(v).toFixed(1)}
               meetsTarget={(r) => (r.mttr || 0) <= mttrTarget}
+              onBarClick={handleBarClick}
             />
             <KpiBarChart
-              title="Utilisation by equipment" data={utilRows} xKey="asset_id" dataKey="utilisationPct"
+              title={showByFleet ? "Utilisation by fleet" : "Utilisation by equipment"} data={utilRows} xKey={chartXKey} dataKey="utilisationPct"
               target={utilTarget} domainMax={100} unitSuffix="%"
               valueFormatter={(v) => `${v}%`}
               meetsTarget={(r) => (r.utilisationPct || 0) >= utilTarget}
+              onBarClick={handleBarClick}
             />
           </div>
           <KpiLegend targetLabel="Target" />
