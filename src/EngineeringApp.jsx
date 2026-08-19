@@ -3905,7 +3905,7 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, myFullName, dai
 const MTBF_MTTR_COLUMNS = [
   ["asset_id", "Equipment #"], ["asset_name", "Name"], ["fleet", "Fleet"],
   ["num_unplanned_events", "Breakdowns"], ["mtbf", "MTBF (hrs)"], ["mttr", "MTTR (hrs)"],
-  ["availability", "Availability"], ["availability_index", "Availability Index"],
+  ["availability", "Availability"], ["availability_24h", "Availability (Last 24h)"], ["availability_mtd", "Availability (MTD)"],
 ];
 
 function MtbfMttrReportPage({ assets }) {
@@ -3924,13 +3924,49 @@ function MtbfMttrReportPage({ assets }) {
     async function load() {
       setLoading(true);
       setError(null);
-      const { data, error: rpcError } = await supabase.rpc("plant_performance_kpi", {
-        period_start: new Date(fromDateTime).toISOString(),
-        period_end: new Date(toDateTime).toISOString(),
-      });
+
+      // "Last 24h" always trails the end of the selected date range (not
+      // "now") - e.g. range ending 19 Aug 18:00 means last-24h is 18 Aug
+      // 18:00 -> 19 Aug 18:00. "Month to date" is the 1st of that same
+      // end date's month, through the end of the selected range.
+      const periodEnd = new Date(toDateTime);
+      const last24Start = new Date(periodEnd.getTime() - 24 * 60 * 60 * 1000);
+      const mtdStart = new Date(periodEnd.getFullYear(), periodEnd.getMonth(), 1);
+
+      const [mainRes, last24Res, mtdRes] = await Promise.all([
+        supabase.rpc("plant_performance_kpi", {
+          period_start: new Date(fromDateTime).toISOString(),
+          period_end: periodEnd.toISOString(),
+        }),
+        supabase.rpc("plant_performance_kpi", {
+          period_start: last24Start.toISOString(),
+          period_end: periodEnd.toISOString(),
+        }),
+        supabase.rpc("plant_performance_kpi", {
+          period_start: mtdStart.toISOString(),
+          period_end: periodEnd.toISOString(),
+        }),
+      ]);
       if (cancelled) return;
-      if (rpcError) setError(rpcError.message);
-      else setKpiData(data || []);
+
+      const rpcError = mainRes.error || last24Res.error || mtdRes.error;
+      if (rpcError) {
+        setError(rpcError.message);
+        setLoading(false);
+        return;
+      }
+
+      const availByAsset = (rows) => Object.fromEntries((rows || []).map((r) => [r.asset_id, r.availability]));
+      const last24ByAsset = availByAsset(last24Res.data);
+      const mtdByAsset = availByAsset(mtdRes.data);
+
+      const merged = (mainRes.data || []).map((r) => ({
+        ...r,
+        availability_24h: last24ByAsset[r.asset_id] ?? null,
+        availability_mtd: mtdByAsset[r.asset_id] ?? null,
+      }));
+
+      setKpiData(merged);
       setLoading(false);
     }
     load();
@@ -3959,8 +3995,7 @@ function MtbfMttrReportPage({ assets }) {
 
   const fmt = (key, val) => {
     if (val == null) return "-";
-    if (key === "availability") return `${Math.round(val * 100)}%`;
-    if (key === "availability_index") return `${Number(val).toFixed(1)}%`;
+    if (key === "availability" || key === "availability_24h" || key === "availability_mtd") return `${Math.round(val * 100)}%`;
     if (key === "mtbf" || key === "mttr") return Number(val).toFixed(1);
     return val;
   };
@@ -7624,7 +7659,7 @@ function niceDomainMax(value) {
   return niceNormalized * magnitude;
 }
 
-function KpiBarChart({ title, data, xKey, dataKey, target, domainMax, valueFormatter, meetsTarget, unitSuffix, onClick }) {
+function KpiBarChart({ title, data, xKey, dataKey, target, domainMax, valueFormatter, meetsTarget, unitSuffix, onClick, onBarClick }) {
   const gradGreen = `grad-green-${dataKey}`;
   const gradRed = `grad-red-${dataKey}`;
   const niceMax = domainMax === 100 ? 100 : niceDomainMax(domainMax);
@@ -7646,7 +7681,7 @@ function KpiBarChart({ title, data, xKey, dataKey, target, domainMax, valueForma
   return (
     <div>
       {title && <p style={{ fontSize: 12.5, fontWeight: 600, margin: "0 0 6px", color: "#4B5659" }}>{title}</p>}
-      <div onClick={onClick} style={{ height: chartHeight, background: "#292929", border: "1px solid #1C1C1C", borderRadius: 10, padding: narrow ? "10px 10px 10px 4px" : "18px 8px 4px", cursor: onClick ? "pointer" : "default" }}>
+      <div onClick={onBarClick ? undefined : onClick} style={{ height: chartHeight, background: "#292929", border: "1px solid #1C1C1C", borderRadius: 10, padding: narrow ? "10px 10px 10px 4px" : "18px 8px 4px", cursor: (onClick || onBarClick) ? "pointer" : "default" }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} layout={narrow ? "vertical" : "horizontal"} margin={narrow ? { top: 4, right: 30, left: 4, bottom: 4 } : { top: 20, right: 8, left: 0, bottom: 20 }}>
             <defs>
@@ -7672,7 +7707,7 @@ function KpiBarChart({ title, data, xKey, dataKey, target, domainMax, valueForma
               </>
             )}
             <Tooltip formatter={(v) => `${Number(v).toFixed(1)}${unitSuffix || ""}`} contentStyle={{ background: "#1F1F1F", border: "1px solid #444", borderRadius: 8 }} labelStyle={{ color: "#fff" }} itemStyle={{ color: "#fff" }} />
-            <Bar dataKey={dataKey} radius={narrow ? [0, 3, 3, 0] : [3, 3, 0, 0]} cursor={onClick ? "pointer" : "default"}>
+            <Bar dataKey={dataKey} radius={narrow ? [0, 3, 3, 0] : [3, 3, 0, 0]} cursor={(onClick || onBarClick) ? "pointer" : "default"} onClick={onBarClick ? (row) => onBarClick(row) : undefined}>
               {data.map((row, i) => <Cell key={i} fill={meetsTarget(row) ? `url(#${gradGreen})` : `url(#${gradRed})`} />)}
               <LabelList dataKey={dataKey} position={narrow ? "right" : "top"} formatter={valueFormatter} fill="#fff" fontSize={11} fontWeight={700} />
             </Bar>
@@ -8031,6 +8066,24 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
   const filteredComponents = useMemo(() => components.filter((c) => filteredAssetIds.has(c.asset_id)), [components, filteredAssetIds]);
   const filteredInspections = useMemo(() => inspections.filter((i) => filteredAssetIds.has(i.asset_id)), [inspections, filteredAssetIds]);
   const filteredMonthKpi = useMemo(() => monthKpi.filter((r) => filteredAssetIds.has(r.asset_id)), [monthKpi, filteredAssetIds]);
+  // One row per fleet (Excavators, Dump Trucks, etc.) instead of one row
+  // per machine - this is what the MTBF/MTTR/Utilisation charts show by
+  // default, since 30+ individual equipment bars in one chart isn't
+  // readable. Clicking a fleet's bar drills into that fleet by reusing
+  // the same selectedFleet filter the dropdown above already uses, so
+  // the whole Dashboard (not just the chart) narrows to that fleet.
+  const fleetMonthKpi = useMemo(() => {
+    const byFleet = {};
+    monthKpi.forEach((r) => {
+      if (!r.fleet) return;
+      if (!byFleet[r.fleet]) byFleet[r.fleet] = [];
+      byFleet[r.fleet].push(r);
+    });
+    return Object.keys(byFleet).sort().map((fleet) => ({
+      fleet,
+      ...aggregateMetrics(byFleet[fleet], byFleet[fleet].map((r) => r.asset_id)),
+    }));
+  }, [monthKpi]);
   // Parts Inventory isn't tied to a specific asset/fleet in this schema -
   // stays unfiltered regardless of fleet selection.
 
@@ -8286,34 +8339,53 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
 
         {!monthKpiLoading && filteredMonthKpi.length > 0 && (() => {
           const mtbfTarget = 40, mttrTarget = 4, utilTarget = 85;
-          const mtbfMax = Math.max(mtbfTarget, ...filteredMonthKpi.map((r) => r.mtbf || 0)) * 1.15;
-          const mttrMax = Math.max(mttrTarget, ...filteredMonthKpi.map((r) => r.mttr || 0)) * 1.15;
-          const utilData = filteredMonthKpi.map((r) => ({ ...r, utilisationPct: r.utilisation != null ? Math.round(r.utilisation * 100) : null }));
+          // With no fleet chosen, chart by fleet (one bar per fleet - readable
+          // at any fleet size). Once a fleet is selected (dropdown above, or
+          // by clicking a fleet's bar below), chart by individual machine
+          // within just that fleet.
+          const chartData = selectedFleet ? filteredMonthKpi : fleetMonthKpi;
+          const chartXKey = selectedFleet ? "asset_id" : "fleet";
+          const mtbfMax = Math.max(mtbfTarget, ...chartData.map((r) => r.mtbf || 0)) * 1.15;
+          const mttrMax = Math.max(mttrTarget, ...chartData.map((r) => r.mttr || 0)) * 1.15;
+          const utilData = chartData.map((r) => ({ ...r, utilisationPct: r.utilisation != null ? Math.round(r.utilisation * 100) : null }));
+          const handleBarClick = (row) => {
+            if (!selectedFleet) setSelectedFleet(row.fleet);
+            else onNavigate?.("mtbf_mttr");
+          };
           return (
           <div style={{ marginBottom: 8 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 12px", color: NAVY }}>MTBF, MTTR & Utilisation, this month</h3>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, margin: "0 0 12px" }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: NAVY }}>MTBF, MTTR & Utilisation, this month{selectedFleet ? ` - ${selectedFleet}` : ""}</h3>
+              {selectedFleet ? (
+                <button onClick={() => setSelectedFleet("")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: NAVY, fontSize: 12.5, fontWeight: 600, textDecoration: "underline" }}>
+                  ← back to all fleets
+                </button>
+              ) : (
+                <span style={{ fontSize: 12, color: "#859195" }}>click a fleet to see individual machines</span>
+              )}
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 16, marginBottom: 8 }}>
               <KpiBarChart
-                title="MTBF by equipment (hrs)" data={filteredMonthKpi} xKey="asset_id" dataKey="mtbf"
+                title={selectedFleet ? "MTBF by equipment (hrs)" : "MTBF by fleet (hrs)"} data={chartData} xKey={chartXKey} dataKey="mtbf"
                 target={mtbfTarget} domainMax={mtbfMax} unitSuffix="h"
                 valueFormatter={(v) => Number(v).toFixed(1)}
                 meetsTarget={(r) => (r.mtbf || 0) >= mtbfTarget}
-                onClick={() => onNavigate?.("mtbf_mttr")}
+                onBarClick={handleBarClick}
               />
               <KpiBarChart
-                title="MTTR by equipment (hrs)" data={filteredMonthKpi} xKey="asset_id" dataKey="mttr"
+                title={selectedFleet ? "MTTR by equipment (hrs)" : "MTTR by fleet (hrs)"} data={chartData} xKey={chartXKey} dataKey="mttr"
                 target={mttrTarget} domainMax={mttrMax} unitSuffix="h"
                 valueFormatter={(v) => Number(v).toFixed(1)}
                 // Lower is better for MTTR, so "meets target" means at or below it.
                 meetsTarget={(r) => (r.mttr || 0) <= mttrTarget}
-                onClick={() => onNavigate?.("mtbf_mttr")}
+                onBarClick={handleBarClick}
               />
               <KpiBarChart
-                title="Utilisation by equipment" data={utilData} xKey="asset_id" dataKey="utilisationPct"
+                title={selectedFleet ? "Utilisation by equipment" : "Utilisation by fleet"} data={utilData} xKey={chartXKey} dataKey="utilisationPct"
                 target={utilTarget} domainMax={100} unitSuffix="%"
                 valueFormatter={(v) => `${v}%`}
                 meetsTarget={(r) => (r.utilisationPct || 0) >= utilTarget}
-                onClick={() => onNavigate?.("mtbf_mttr")}
+                onBarClick={handleBarClick}
               />
             </div>
             <KpiLegend targetLabel="Target" />
