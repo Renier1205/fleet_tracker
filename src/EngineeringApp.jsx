@@ -7936,7 +7936,7 @@ function AboutPage({ assets, breakdowns, workOrders, plannedMaintenance, compone
             <div
               key={title}
               className="ft-card"
-              onClick={nav ? () => onNavigate(nav) : undefined}
+              
               style={{ ...card, cursor: nav ? "pointer" : "default" }}
             >
               <span style={iconTile}><Icon size={19} strokeWidth={1.9} color={TEAL} /></span>
