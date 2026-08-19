@@ -1,0 +1,413 @@
+From 3c85577464caacfe539b97a7838170934d93591b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 19 Aug 2026 19:09:22 +0000
+Subject: [PATCH] Redesign AboutPage as the Fleet Tracker homepage
+
+Brand-led hero with Datavera Analytics lockup and a parallaxing SVG
+mining survey graphic, an "Explore the platform" module grid, a
+Platform modules roadmap panel, a Why Datavera section, and a
+Datavera brand + footer panel. Same props signature and NAV keys as
+before, so routing, Supabase logic, site context and permissions are
+unchanged.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+---
+ src/EngineeringApp.jsx | 359 +++++++++++++++++++++++++++++------------
+ 1 file changed, 256 insertions(+), 103 deletions(-)
+
+diff --git a/src/EngineeringApp.jsx b/src/EngineeringApp.jsx
+index 30999e2..3e78569 100644
+--- a/src/EngineeringApp.jsx
++++ b/src/EngineeringApp.jsx
+@@ -4,7 +4,8 @@ import {
+   LayoutDashboard, Truck, Clock, AlertTriangle, ClipboardList,
+   CalendarClock, ShieldCheck, CircleDot, Package, FileText,
+   DollarSign, History, Factory, Download, Search, Menu, X,
+-  Layers, ChevronRight, GitCompare, Fuel, Droplet, LogOut, Upload, Trash2, Printer, FileBarChart, ChevronDown, Activity, MapPin
++  Layers, ChevronRight, GitCompare, Fuel, Droplet, LogOut, Upload, Trash2, Printer, FileBarChart, ChevronDown, Activity, MapPin,
++  Wrench, BarChart3, ShoppingCart, Users, TrendingUp, Boxes
+ } from "lucide-react";
+ import { supabase } from "./lib/supabaseClient";
+ import {
+@@ -7737,125 +7738,277 @@ function UserMenu({ myFullName, isAdmin, myRole }) {
+ }
+ 
+ function AboutPage({ assets, breakdowns, workOrders, plannedMaintenance, components, parts, inspections, onNavigate }) {
+-  const capabilities = [
+-    ["Equipment & Events", "A live register of every machine, with breakdowns and planned jobs tracked as Events - each with its own linked Work Orders, parts used, and full downtime history.", Truck, "breakdowns"],
+-    ["Daily Operations", "Daily Hours, Fuel Log, Oil Consumption and Daily Service compliance, all tied back to the equipment they belong to.", Clock, "daily_hours"],
+-    ["Maintenance & Backlogs", "Work Orders, Planned Maintenance schedules, and a Backlog Report that tracks outstanding items back to where they came from - a daily service, a monthly inspection, or a scanned service card.", ClipboardList, "work_orders"],
+-    ["Parts & Pricing", "Parts Inventory with reorder alerts, and a Quote Price List that reads scanned supplier quotes and keeps a running history of what's been quoted, by whom, and when.", Package, "parts"],
+-    ["Reporting", "Availability, MTBF, MTTR and Utilisation, calculated from the same underlying data as everything else in the system - no separate spreadsheet to keep in sync.", FileBarChart, "mtbf_mttr"],
+-    ["Accountability", "Every insert, update and deletion is captured in an Audit Trail, with required reasons for anything removed.", ShieldCheck, "audit"],
++  const TEAL = "#1F6668";
++  const MINT = "#8FE0D6";
++  const INK = "#183642";
++  const BODY = "#4B5659";
++  const MUTED = "#859195";
++  const LINE = "#E5EBEC";
++
++  const heroRef = React.useRef(null);
++
++  const onHeroMove = (e) => {
++    const host = heroRef.current;
++    if (!host) return;
++    const b = host.getBoundingClientRect();
++    const dx = (e.clientX - b.left) / b.width - 0.5;
++    const dy = (e.clientY - b.top) / b.height - 0.5;
++    host.querySelectorAll("[data-depth]").forEach((el) => {
++      const d = parseFloat(el.getAttribute("data-depth")) || 0;
++      el.style.transform = `translate(${(-dx * 30 * d).toFixed(2)}px,${(-dy * 20 * d).toFixed(2)}px)`;
++    });
++  };
++  const onHeroLeave = () => {
++    const host = heroRef.current;
++    if (!host) return;
++    host.querySelectorAll("[data-depth]").forEach((el) => { el.style.transform = ""; });
++  };
++
++  const PIT = "430,180 520,92 660,72 800,140 850,262 780,400 630,460 490,392";
++  const ring = (s, o, w) => (
++    <polygon
++      points={PIT}
++      transform={s === 1 ? undefined : `translate(640,266) scale(${s}) translate(-640,-266)`}
++      strokeOpacity={o}
++      strokeWidth={w}
++    />
++  );
++
++  const valueProps = [
++    { label: "Live data", text: "Always up to date", dot: true },
++    { label: "One system", text: "Everything connected", Icon: Boxes },
++    { label: "Built for mining", text: "Reliable. Scalable. Secure.", Icon: ShieldCheck },
+   ];
+ 
+-  const totalAssets = assets.length;
+-  const operatingPct = totalAssets
+-    ? Math.round((assets.filter((a) => a.status === "Operating").length / totalAssets) * 100)
+-    : null;
+-  const openWorkOrders = workOrders.filter((w) => w.status !== "Closed").length;
+-  const maintenanceDue = plannedMaintenance.filter((p) => p.status !== "OK").length;
+-  const partsBelowReorder = parts.filter((p) => p.reorder_status === "REORDER").length;
+-
+-  const stats = [
+-    ["Total Assets", totalAssets, "Active equipment", Truck, "assets"],
+-    ["Operating Now", operatingPct != null ? `${operatingPct}%` : "-", "Live snapshot", Activity, "assets"],
+-    ["Open Work Orders", openWorkOrders, "In progress or pending", ClipboardList, "work_orders"],
+-    ["Planned Maint. Due", maintenanceDue, "Requires attention", CalendarClock, "planned_maintenance"],
+-    ["Parts Below Reorder", partsBelowReorder, "Needs restocking", Package, "parts"],
++  const features = [
++    { Icon: Truck, title: "Equipment & Events", text: "Track every asset, breakdown and planned event with full linked work-order history.", nav: "assets" },
++    { Icon: Clock, title: "Daily Operations", text: "Manage operating hours, fuel, oil consumption and daily service compliance.", nav: "daily_hours" },
++    { Icon: Wrench, title: "Maintenance & Backlogs", text: "Control work orders, planned maintenance and outstanding maintenance backlog.", nav: "planned_maintenance" },
++    { Icon: Package, title: "Parts & Pricing", text: "Monitor inventory, reorder levels and supplier pricing from one connected system.", nav: "parts" },
++    { Icon: BarChart3, title: "Reporting & Reliability", text: "Live Availability, Utilisation, MTBF and MTTR reporting from the same underlying data.", nav: "mtbf_mttr" },
++    { Icon: ShieldCheck, title: "Accountability", text: "Every critical action is traceable through a complete audit history.", nav: "audit" },
++  ];
++
++  const platform = [
++    { Icon: Wrench, name: "Engineering & Maintenance", sub: "Equipment, work orders, reliability" },
++    { Icon: BarChart3, name: "Production", sub: "Underground and open pit reporting" },
++    { Icon: ShoppingCart, name: "Procurement", sub: "Requisitions, orders and suppliers" },
++    { Icon: Users, name: "Workforce", sub: "Time & attendance, rosters" },
++    { Icon: TrendingUp, name: "Budget & Forecasting", sub: "Cost tracking against plan" },
++    { Icon: ShieldCheck, name: "Safety & HSE", sub: "Incidents, inspections, compliance" },
++  ];
++
++  const benefits = [
++    { Icon: Wrench, title: "CUSTOM BUILT", text: "Developed around the client's actual operational workflows." },
++    { Icon: Layers, title: "CONNECTED DATA", text: "Engineering, production, procurement and workforce information can operate from one platform." },
++    { Icon: TrendingUp, title: "DIRECT DEVELOPMENT", text: "The system can evolve as operational requirements change." },
++    { Icon: Factory, title: "MULTI-SITE READY", text: "Designed to support multiple mining operations with site-specific access and permissions." },
+   ];
+ 
++  const card = {
++    background: "#fff",
++    border: `1px solid ${LINE}`,
++    borderRadius: 12,
++    padding: "22px 22px 24px",
++    boxShadow: "0 1px 2px rgba(20,40,46,0.04)",
++    transition: "box-shadow .16s ease, border-color .16s ease, transform .16s ease",
++  };
++  const kicker = { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: TEAL };
++  const h2 = { margin: "12px 0 0", fontSize: 29, lineHeight: 1.14, letterSpacing: "-0.03em", fontWeight: 800, color: INK, maxWidth: "26ch" };
++  const iconTile = { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 38, height: 38, borderRadius: 10, background: "#EAF4F3", border: "1px solid #D6E7E6", flex: "0 0 auto" };
++
+   return (
+-    <div style={{ maxWidth: 980 }}>
+-      {/* Hero */}
+-      <div
++    <div style={{ maxWidth: 1240, margin: "0 auto", padding: "28px 32px 0" }}>
++      <style>{`
++        @keyframes ftGridDrift { from { transform: translate3d(0,0,0); } to { transform: translate3d(-60px,-30px,0); } }
++        @keyframes ftRingTurn { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
++        @keyframes ftScan { to { stroke-dashoffset: -320; } }
++        @keyframes ftPulse { 0%, 100% { opacity: .30; } 50% { opacity: .85; } }
++        .ft-card:hover { transform: translateY(-2px); border-color: #C9DBDC; box-shadow: 0 16px 32px -22px rgba(20,40,46,0.30), 0 1px 2px rgba(20,40,46,0.04); }
++        @media (prefers-reduced-motion: reduce) { .ft-hero * { animation: none !important; } }
++      `}</style>
++
++      {/* 1-2. BRAND AREA + HERO */}
++      <section
++        ref={heroRef}
++        className="ft-hero"
++        onMouseMove={onHeroMove}
++        onMouseLeave={onHeroLeave}
+         style={{
+-          position: "relative", overflow: "hidden", borderRadius: 14, padding: "30px 32px",
+-          marginBottom: 22, color: "#fff",
+-          background: "linear-gradient(135deg, #14282E 0%, #1F6668 100%)",
++          position: "relative",
++          overflow: "hidden",
++          borderRadius: 14,
++          background: "linear-gradient(122deg, #14282E 0%, #16323A 42%, #1F6668 100%)",
++          boxShadow: "0 20px 46px -26px rgba(20,40,46,0.55)",
+         }}
+       >
+-        <div style={{ position: "relative", zIndex: 2, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20, flexWrap: "wrap" }}>
+-          <div style={{ maxWidth: 560 }}>
+-            <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 18 }}>
+-              <span style={{
+-                width: 22, height: 22, background: "#fff", transform: "rotate(45deg)",
+-                display: "inline-block", borderRadius: 4, flexShrink: 0,
+-              }} />
+-              <span style={{ fontSize: 12.5, fontWeight: 700, letterSpacing: 1.2, color: "rgba(255,255,255,0.92)" }}>
+-                DATAVERA <span style={{ fontWeight: 400, opacity: 0.75 }}>ANALYTICS</span>
++        <svg viewBox="0 0 900 520" preserveAspectRatio="xMaxYMid slice" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.62, pointerEvents: "none" }} aria-hidden="true">
++          <defs>
++            <radialGradient id="ftFade" cx="74%" cy="46%" r="50%">
++              <stop offset="42%" stopColor="#fff" stopOpacity="1" />
++              <stop offset="100%" stopColor="#fff" stopOpacity="0" />
++            </radialGradient>
++            <mask id="ftMask"><rect x="0" y="0" width="900" height="520" fill="url(#ftFade)" /></mask>
++            <pattern id="ftDots" x="0" y="0" width="26" height="26" patternUnits="userSpaceOnUse">
++              <circle cx="1.2" cy="1.2" r="1.2" fill={MINT} fillOpacity="0.3" />
++            </pattern>
++          </defs>
++          <g mask="url(#ftMask)">
++            <g data-depth="0.35" style={{ transition: "transform .35s ease-out" }}>
++              <g style={{ animation: "ftGridDrift 34s ease-in-out infinite alternate" }}>
++                <rect x="-60" y="-40" width="1040" height="620" fill="url(#ftDots)" />
++                <g stroke={MINT} strokeOpacity="0.12" strokeWidth="1">
++                  <path d="M0 130H960M0 260H960M0 390H960" />
++                  <path d="M520 0V560M650 0V560M780 0V560M910 0V560" />
++                </g>
++              </g>
++            </g>
++            <g data-depth="0.7" style={{ transition: "transform .35s ease-out" }}>
++              <g style={{ animation: "ftRingTurn 320s linear infinite", transformOrigin: "640px 266px" }}>
++                <g fill="none" stroke={MINT} strokeLinejoin="round">
++                  {ring(1, 0.4, 1.5)}{ring(0.86, 0.34, 1.35)}{ring(0.72, 0.29, 1.25)}
++                  {ring(0.58, 0.24, 1.15)}{ring(0.44, 0.19, 1.1)}{ring(0.3, 0.15, 1)}{ring(0.17, 0.12, 1)}
++                </g>
++              </g>
++            </g>
++            <g data-depth="1" style={{ transition: "transform .35s ease-out" }}>
++              <path d="M812 150 C 744 196, 762 244, 700 268 C 640 292, 654 336, 606 350" fill="none" stroke={MINT} strokeOpacity="0.4" strokeWidth="1.5" strokeDasharray="10 10" strokeLinecap="round" style={{ animation: "ftScan 16s linear infinite" }} />
++              <g fill={MINT} fillOpacity="0.5">
++                <circle cx="606" cy="350" r="3" /><circle cx="566" cy="206" r="3" /><circle cx="742" cy="366" r="2.6" />
++              </g>
++              <circle cx="700" cy="268" r="3.8" fill={MINT} fillOpacity="0.8" />
++              <circle cx="700" cy="268" r="13" fill="none" stroke={MINT} strokeOpacity="0.34" strokeWidth="1.1" style={{ animation: "ftPulse 4.5s ease-in-out infinite" }} />
++              <circle cx="700" cy="268" r="24" fill="none" stroke={MINT} strokeOpacity="0.18" strokeWidth="1" style={{ animation: "ftPulse 4.5s ease-in-out infinite .6s" }} />
++            </g>
++            <g data-depth="0.5" style={{ transition: "transform .35s ease-out" }}>
++              <g fill="none" stroke={MINT} strokeOpacity="0.22" strokeWidth="1.2" strokeLinejoin="round">
++                <path d="M340 470 L430 470 L470 442 L556 442 L596 414 L688 414 L730 386 L900 386" />
++                <path d="M300 500 L470 500 L512 472 L604 472 L646 444 L760 444 L800 416 L900 416" />
++              </g>
++            </g>
++          </g>
++        </svg>
++
++        <div style={{ position: "relative", padding: "42px 44px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(316px, 1fr))", gap: 44, alignItems: "center" }}>
++          <div>
++            <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
++              <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
++                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
++                  <rect x="1.6" y="1.6" width="20.8" height="20.8" rx="6" stroke={MINT} strokeOpacity="0.6" strokeWidth="1.4" />
++                  <path d="M6.5 15.5 L10 9 L13.2 13.2 L15.4 10.4 L17.6 15.5" stroke={MINT} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
++                </svg>
++                <div>
++                  <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12.5, fontWeight: 600, letterSpacing: "0.21em", textTransform: "uppercase", color: "#fff" }}>Datavera Analytics</div>
++                  <div style={{ marginTop: 3, fontSize: 12.5, fontWeight: 500, color: "rgba(143,224,214,0.88)" }}>Mining Operations Management Platform</div>
++                </div>
++              </div>
++              <span style={{ width: 1, height: 30, background: "rgba(255,255,255,0.14)" }} />
++              <span style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 13px", borderRadius: 999, border: "1px solid rgba(143,224,214,0.30)", background: "rgba(143,224,214,0.07)", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10.5, letterSpacing: "0.16em", textTransform: "uppercase", color: MINT }}>
++                <Truck size={13} strokeWidth={2} /> Engineering &amp; Fleet module
+               </span>
+             </div>
+ 
+-            <h1 style={{ fontSize: 30, fontWeight: 700, margin: "0 0 8px", letterSpacing: -0.3 }}>Fleet Tracker</h1>
+-            <p style={{ fontSize: 15, fontWeight: 600, margin: "0 0 12px", color: "#8FE0D6" }}>
+-              Complete visibility. Better decisions. Maximum uptime.
+-            </p>
+-            <p style={{ fontSize: 13.5, lineHeight: 1.6, margin: 0, color: "rgba(255,255,255,0.82)" }}>
+-              One live system that follows your fleet from mobilisation to breakdown to repair - equipment, parts, and reporting all tied together.
+-              No more spreadsheets to reconcile, no more guessing what's actually happening on site.
+-            </p>
++            <h1 style={{ margin: "30px 0 0", fontSize: 56, lineHeight: 1.02, letterSpacing: "-0.035em", fontWeight: 800, color: "#fff" }}>Fleet Tracker</h1>
++            <p style={{ margin: "15px 0 0", fontSize: 22, lineHeight: 1.32, fontWeight: 700, letterSpacing: "-0.015em", color: MINT, maxWidth: "34ch" }}>Complete visibility. Better decisions. Maximum uptime.</p>
++            <p style={{ margin: "15px 0 0", fontSize: 16, lineHeight: 1.6, color: "rgba(255,255,255,0.68)", maxWidth: "54ch" }}>A connected mining operations platform designed to manage equipment, maintenance, availability, parts, production and operational reporting from one live source of truth.</p>
+           </div>
+ 
+-          {/* Line-art equipment illustration */}
+-          <svg width="220" height="150" viewBox="0 0 220 150" style={{ flexShrink: 0, opacity: 0.85 }} aria-hidden="true">
+-            <ellipse cx="110" cy="128" rx="95" ry="8" fill="rgba(255,255,255,0.06)" />
+-            {/* tracks */}
+-            <rect x="30" y="100" width="90" height="20" rx="10" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
+-            <circle cx="45" cy="110" r="4" fill="rgba(255,255,255,0.5)" />
+-            <circle cx="65" cy="110" r="4" fill="rgba(255,255,255,0.5)" />
+-            <circle cx="85" cy="110" r="4" fill="rgba(255,255,255,0.5)" />
+-            <circle cx="105" cy="110" r="4" fill="rgba(255,255,255,0.5)" />
+-            {/* cab */}
+-            <rect x="50" y="66" width="34" height="34" rx="3" fill="none" stroke="#fff" strokeWidth="2.2" />
+-            <line x1="58" y1="66" x2="58" y2="100" stroke="rgba(255,255,255,0.5)" strokeWidth="1.4" />
+-            {/* boom + arm + bucket */}
+-            <line x1="82" y1="72" x2="150" y2="45" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
+-            <line x1="150" y1="45" x2="170" y2="80" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
+-            <path d="M170 80 L188 82 L184 96 L168 94 Z" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinejoin="round" />
+-            <circle cx="82" cy="72" r="3" fill="#8FE0D6" />
+-            <circle cx="150" cy="45" r="3" fill="#8FE0D6" />
+-          </svg>
++          <div style={{ display: "grid", gap: 1, background: "rgba(255,255,255,0.10)", borderRadius: 12, overflow: "hidden", border: "1px solid rgba(255,255,255,0.10)" }}>
++            {valueProps.map(({ label, text, dot, Icon }) => (
++              <div key={label} style={{ background: "rgba(20,40,46,0.35)", padding: "15px 18px" }}>
++                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
++                  {dot ? <span style={{ width: 6, height: 6, borderRadius: 999, background: MINT, boxShadow: "0 0 0 3px rgba(143,224,214,0.18)" }} /> : <Icon size={14} strokeWidth={2} color={MINT} />}
++                  <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10.5, letterSpacing: "0.16em", textTransform: "uppercase", color: MINT }}>{label}</span>
++                </div>
++                <div style={{ marginTop: 7, fontSize: 13.5, color: "rgba(255,255,255,0.72)" }}>{text}</div>
++              </div>
++            ))}
++          </div>
+         </div>
+-      </div>
++      </section>
++
++      {/* 3. EXPLORE THE PLATFORM */}
++      <section style={{ padding: "54px 0 0" }}>
++        <div style={kicker}>Explore the platform</div>
++        <h2 style={h2}>Every module works from the same record</h2>
++        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))", gap: 14, marginTop: 26 }}>
++                    {features.map(({ Icon, title, text, nav }) => (
+            <div
+              key={title}
+              className="ft-card"
+              style={{ ...card, cursor: "default" }}
+            >
++              <span style={iconTile}><Icon size={19} strokeWidth={1.9} color={TEAL} /></span>
++              <h3 style={{ margin: "18px 0 0", fontSize: 17.5, fontWeight: 800, letterSpacing: "-0.02em", color: INK }}>{title}</h3>
++              <p style={{ margin: "9px 0 0", fontSize: 14.5, lineHeight: 1.6, color: BODY }}>{text}</p>
++            </div>
++          ))}
++        </div>
++      </section>
+ 
+-      {/* Live stats */}
+-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 26 }}>
+-        {stats.map(([label, value, sub, Icon, navKey]) => (
+-          <button
+-            key={label}
+-            onClick={() => onNavigate && navKey && onNavigate(navKey)}
+-            style={{
+-              textAlign: "left", background: "#fff", border: "1px solid #E2E6E3", borderRadius: 10,
+-              padding: "14px 16px", cursor: onNavigate ? "pointer" : "default", font: "inherit",
+-            }}
+-          >
+-            <Icon size={16} style={{ color: NAVY, marginBottom: 8 }} />
+-            <p style={{ fontSize: 20, fontWeight: 700, margin: "0 0 2px", color: "#183642" }}>{value}</p>
+-            <p style={{ fontSize: 11.5, fontWeight: 600, margin: "0 0 1px", color: "#4B5659" }}>{label}</p>
+-            <p style={{ fontSize: 10.5, margin: 0, color: "#859195" }}>{sub}</p>
+-          </button>
+-        ))}
+-      </div>
++      {/* 4. PLATFORM MODULES */}
++      <section style={{ padding: "54px 0 0" }}>
++        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: "8px 24px" }}>
++          <div>
++            <div style={kicker}>Platform modules</div>
++            <h2 style={h2}>One platform, extended as you need it</h2>
++          </div>
++          <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: MUTED, maxWidth: "42ch" }}>Fleet Tracker covers engineering and maintenance. Datavera can scope, develop and connect any of the operational areas below on the same platform as your requirements grow.</p>
++        </div>
++        <div style={{ marginTop: 24, border: `1px solid ${LINE}`, borderRadius: 12, background: "#fff", boxShadow: "0 1px 2px rgba(20,40,46,0.04)", overflow: "hidden" }}>
++          {platform.map(({ Icon, name, sub }, i) => (
++            <div key={name} style={{ display: "flex", alignItems: "center", gap: 14, padding: "18px 22px", borderBottom: i < platform.length - 1 ? "1px solid #EFF3F3" : "none" }}>
++              <span style={{ ...iconTile, width: 34, height: 34, borderRadius: 9 }}><Icon size={17} strokeWidth={1.9} color={TEAL} /></span>
++              <div style={{ flex: "1 1 auto", minWidth: 0 }}>
++                <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-0.01em", color: INK }}>{name}</div>
++                <div style={{ marginTop: 2, fontSize: 12.5, color: MUTED }}>{sub}</div>
++              </div>
++            </div>
++          ))}
++        </div>
++        <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "#A6AFB1" }}>Each area can be scoped and delivered on request, on the same data and permissions model as Fleet Tracker.</p>
++      </section>
++
++      {/* 5. WHY DATAVERA */}
++      <section style={{ padding: "54px 0 0" }}>
++        <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 28, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(216px, 1fr))", gap: "24px 30px" }}>
++          <div style={{ gridColumn: "1 / -1", ...kicker }}>Why Datavera</div>
++          {benefits.map(({ Icon, title, text }) => (
++            <div key={title}>
++              <Icon size={20} strokeWidth={1.8} color={TEAL} />
++              <div style={{ marginTop: 12, fontSize: 14, fontWeight: 800, letterSpacing: "0.02em", color: INK }}>{title}</div>
++              <p style={{ margin: "7px 0 0", fontSize: 14, lineHeight: 1.58, color: BODY }}>{text}</p>
++            </div>
++          ))}
++        </div>
++      </section>
+ 
+-      <h2 style={{ fontSize: 15, fontWeight: 700, color: NAVY, margin: "0 0 14px" }}>Main features</h2>
+-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 14, marginBottom: 28 }}>
+-        {capabilities.map(([title, desc, Icon, navKey]) => (
+-          <button
+-            key={title}
+-            onClick={() => onNavigate && onNavigate(navKey)}
+-            style={{
+-              textAlign: "left", border: "1px solid #E2E6E3", borderRadius: 10, padding: "14px 16px",
+-              background: "#fff", cursor: onNavigate ? "pointer" : "default", font: "inherit",
+-            }}
+-          >
+-            <Icon size={17} style={{ color: NAVY, marginBottom: 8 }} />
+-            <p style={{ fontSize: 13.5, fontWeight: 700, color: NAVY, margin: "0 0 6px" }}>{title}</p>
+-            <p style={{ fontSize: 13, color: "#4B5659", margin: 0, lineHeight: 1.5 }}>{desc}</p>
+-          </button>
+-        ))}
+-      </div>
++      {/* 6. DATAVERA BRAND SECTION */}
++      <section style={{ margin: "54px 0 0", background: "#EDF4F4", border: "1px solid #DCE8E8", borderRadius: 12, padding: "38px" }}>
++        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))", gap: "26px 44px", alignItems: "start" }}>
++          <div>
++            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
++              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
++                <rect x="1.6" y="1.6" width="20.8" height="20.8" rx="6" stroke={TEAL} strokeOpacity="0.45" strokeWidth="1.4" />
++                <path d="M6.5 15.5 L10 9 L13.2 13.2 L15.4 10.4 L17.6 15.5" stroke={TEAL} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
++              </svg>
++              <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase", color: TEAL }}>Datavera Analytics</span>
++            </div>
++            <p style={{ margin: "20px 0 0", fontSize: 25, lineHeight: 1.28, fontWeight: 800, letterSpacing: "-0.025em", color: INK, maxWidth: "26ch" }}>Mining software built around the way your operation works.</p>
++          </div>
++          <div>
++            <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.64, color: BODY, maxWidth: "56ch" }}>Datavera Analytics develops custom operational systems that connect mining data, maintenance workflows and management reporting into one integrated platform.</p>
++            <div style={{ marginTop: 22, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 11.5, letterSpacing: "0.18em", textTransform: "uppercase", color: TEAL }}>Measure. Monitor. Improve.</div>
++          </div>
++        </div>
++      </section>
+ 
+-      <div style={{ borderTop: "1px solid #E2E6E3", paddingTop: 16 }}>
+-        <p style={{ fontSize: 12.5, color: "#859195", margin: 0 }}>Built by Datavera Analytics.</p>
+-      </div>
++      {/* 7. FOOTER */}
++      <footer style={{ marginTop: 22, borderTop: `1px solid ${LINE}`, padding: "18px 0 26px", display: "flex", flexWrap: "wrap", gap: "10px 24px", alignItems: "center", justifyContent: "space-between" }}>
++        <span style={{ fontSize: 13, color: MUTED }}>Built and maintained by Datavera Analytics.</span>
++        <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 11, letterSpacing: "0.14em", color: MUTED }}>© {new Date().getFullYear()}</span>
++      </footer>
+     </div>
+   );
+ }
+-- 
+2.43.0
+
