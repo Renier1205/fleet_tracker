@@ -5345,6 +5345,11 @@ function SiteManagementPage({ isAdmin, onSitesChanged, onNameSaved }) {
   const [editingNameFor, setEditingNameFor] = useState(null);
   const [nameInput, setNameInput] = useState("");
   const [savingName, setSavingName] = useState(false);
+  const [editingSite, setEditingSite] = useState(null);
+  const [editSiteName, setEditSiteName] = useState("");
+  const [editSiteLocation, setEditSiteLocation] = useState("");
+  const [editSiteActive, setEditSiteActive] = useState(true);
+  const [savingEditSite, setSavingEditSite] = useState(false);
 
   const loadAll = React.useCallback(async () => {
     setLoading(true);
@@ -5392,6 +5397,33 @@ function SiteManagementPage({ isAdmin, onSitesChanged, onNameSaved }) {
   };
 
   const hasAccess = (userId, siteId) => access.some((a) => a.user_id === userId && a.site_id === siteId);
+
+  const openEditSite = (site) => {
+    setEditingSite(site);
+    setEditSiteName(site.site_name || "");
+    setEditSiteLocation(site.location || "");
+    setEditSiteActive(site.active !== false);
+  };
+
+  const handleSaveSite = async (e) => {
+    e.preventDefault();
+    if (!editSiteName.trim()) return;
+    setSavingEditSite(true);
+    const { error } = await supabase.from("sites").update({
+      site_name: editSiteName.trim(),
+      location: editSiteLocation.trim() || null,
+      active: editSiteActive,
+    }).eq("id", editingSite.id);
+    setSavingEditSite(false);
+    if (error) {
+      setMessage({ type: "error", text: error.message });
+    } else {
+      setEditingSite(null);
+      setMessage({ type: "success", text: `"${editSiteName.trim()}" updated.` });
+      loadAll();
+      onSitesChanged?.();
+    }
+  };
 
   const toggleAccess = async (userId, siteId) => {
     if (hasAccess(userId, siteId)) {
@@ -5466,6 +5498,7 @@ function SiteManagementPage({ isAdmin, onSitesChanged, onNameSaved }) {
               <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3" }}>Site</th>
               <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3" }}>Location</th>
               <th style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3" }}>Status</th>
+              <th style={{ borderBottom: "1px solid #E2E6E3" }}></th>
             </tr>
           </thead>
           <tbody>
@@ -5474,10 +5507,15 @@ function SiteManagementPage({ isAdmin, onSitesChanged, onNameSaved }) {
                 <td style={{ padding: "9px 12px", fontWeight: 600 }}>{s.site_name}</td>
                 <td style={{ padding: "9px 12px" }}>{s.location || <span style={{ color: "#B4B2A9" }}>-</span>}</td>
                 <td style={{ padding: "9px 12px" }}><Badge value={s.active ? "Active" : "Inactive"} /></td>
+                <td style={{ padding: "9px 12px" }}>
+                  <button type="button" onClick={() => openEditSite(s)} style={{ background: "none", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 6, cursor: "pointer" }}>
+                    Edit
+                  </button>
+                </td>
               </tr>
             ))}
             {sites.length === 0 && !loading && (
-              <tr><td colSpan={3} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No sites yet - add one above.</td></tr>
+              <tr><td colSpan={4} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No sites yet - add one above.</td></tr>
             )}
           </tbody>
         </table>
@@ -5573,6 +5611,47 @@ function SiteManagementPage({ isAdmin, onSitesChanged, onNameSaved }) {
 
       {managingUser && (
         <PageAccessModal user={managingUser} onClose={() => setManagingUser(null)} />
+      )}
+
+      {editingSite && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 16 }}>
+          <form onSubmit={handleSaveSite} style={{ background: "#fff", borderRadius: 12, padding: 24, width: 380, maxWidth: "100%" }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 16px" }}>Edit Site</h3>
+
+            <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" }}>Site Name</label>
+            <input
+              type="text" value={editSiteName} onChange={(e) => setEditSiteName(e.target.value)} required
+              style={{ width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", marginBottom: 12 }}
+            />
+
+            <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" }}>Location</label>
+            <input
+              type="text" value={editSiteLocation} onChange={(e) => setEditSiteLocation(e.target.value)} placeholder="Optional"
+              style={{ width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", marginBottom: 12 }}
+            />
+
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#183642", cursor: "pointer", marginBottom: 16 }}>
+              <input type="checkbox" checked={editSiteActive} onChange={(e) => setEditSiteActive(e.target.checked)} />
+              Site is active
+            </label>
+            <p style={{ fontSize: 11.5, color: "#859195", margin: "-10px 0 16px" }}>
+              Marking a site inactive doesn't delete anything or remove anyone's access - it's just a status flag so you can tell which sites are actually operating at a glance.
+            </p>
+
+            {message?.type === "error" && (
+              <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 12px" }}>{message.text}</p>
+            )}
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button type="button" onClick={() => setEditingSite(null)} disabled={savingEditSite} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>
+                Cancel
+              </button>
+              <button type="submit" disabled={savingEditSite} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: savingEditSite ? "default" : "pointer", opacity: savingEditSite ? 0.7 : 1 }}>
+                {savingEditSite ? "Saving…" : "Save Changes"}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
     </div>
   );
