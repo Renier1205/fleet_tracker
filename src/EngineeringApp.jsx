@@ -402,7 +402,10 @@ function MetricCard({ label, value, icon: Icon, accentColor, onClick }) {
         <Icon size={20} style={{ color }} />
       </div>
       <div style={{ minWidth: 0 }}>
-        <p style={{ fontSize: 12, color: "#4B5659", margin: "0 0 2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</p>
+        {/* No nowrap/ellipsis here on purpose - on a narrow phone card,
+            two-line wrapped text ("Services due soon /\noverdue") is
+            readable; a single truncated line ("Servi...") isn't. */}
+        <p style={{ fontSize: 12, color: "#4B5659", margin: "0 0 2px", lineHeight: 1.3 }}>{label}</p>
         <p style={{ fontSize: 21, fontWeight: 700, margin: 0, color: "#183642" }}>{value}</p>
       </div>
       {onClick && <ChevronRight size={16} style={{ color: "#B4B2A9", flexShrink: 0 }} />}
@@ -738,22 +741,29 @@ function DailyHoursForm({ assets, dailyHours, existing, onClose, onSaved }) {
   );
 }
 
-function ScheduledHoursForm({ fleets, existing, onClose, onSaved }) {
-  const [fleet, setFleet] = useState(existing?.fleet || fleets[0] || "");
+function ScheduledHoursForm({ assets, fleets, existing, onClose, onSaved }) {
+  const [fleetFilter, setFleetFilter] = useState(existing?.fleet || fleets[0] || "");
+  const assetsInFleet = useMemo(() => assets.filter((a) => a.fleet === fleetFilter), [assets, fleetFilter]);
+  const [assetId, setAssetId] = useState(existing?.asset_id || assetsInFleet[0]?.asset_id || "");
   const [scheduledHours, setScheduledHours] = useState(existing?.scheduled_hours ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!assetsInFleet.some((a) => a.asset_id === assetId)) setAssetId(assetsInFleet[0]?.asset_id || "");
+  }, [fleetFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const monthStart = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-01`;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    if (!assetId) { setError("Choose a machine."); return; }
     if (scheduledHours === "") { setError("Enter a scheduled hours value."); return; }
     setSaving(true);
     try {
-      const { error: dbError } = await supabase.from("scheduled_hours")
-        .upsert({ fleet, month: monthStart, scheduled_hours: Number(scheduledHours) }, { onConflict: "fleet,month" });
+      const { error: dbError } = await supabase.from("asset_scheduled_hours")
+        .upsert({ asset_id: assetId, month: monthStart, scheduled_hours: Number(scheduledHours) }, { onConflict: "asset_id,month" });
       if (dbError) throw dbError;
       onSaved();
     } catch (err) {
@@ -769,11 +779,18 @@ function ScheduledHoursForm({ fleets, existing, onClose, onSaved }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
       <form onSubmit={handleSubmit} style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%" }}>
-        <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 16px" }}>Set Monthly Scheduled Hours</h3>
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>Set Monthly Scheduled Hours</h3>
+        <p style={{ fontSize: 12, color: "#859195", margin: "0 0 16px" }}>Each machine is scheduled individually - a fleet's total is the sum of its machines.</p>
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Fleet</label>
-          <select value={fleet} onChange={(e) => setFleet(e.target.value)} style={fieldStyle}>
+          <select value={fleetFilter} onChange={(e) => setFleetFilter(e.target.value)} style={fieldStyle}>
             {fleets.map((f) => <option key={f} value={f}>{f}</option>)}
+          </select>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Machine</label>
+          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} style={fieldStyle}>
+            {assetsInFleet.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
           </select>
         </div>
         <div style={{ marginBottom: 18 }}>
@@ -797,9 +814,9 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
   const [editing, setEditing] = useState(null);
   const [showBudgetForm, setShowBudgetForm] = useState(false);
   const [query, setQuery] = useState("");
-  const [budget, setBudget] = useState([]);
   const [budgetLoading, setBudgetLoading] = useState(true);
   const [deleting, setDeleting] = useState(null);
+  const [drillFleet, setDrillFleet] = useState(null);
   const [templateMonth, setTemplateMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -810,15 +827,63 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
 
   const fleets = useMemo(() => [...new Set(assets.map((a) => a.fleet))], [assets]);
 
+  const [assetScheduled, setAssetScheduled] = useState({}); // asset_id -> scheduled_hours, this month
+
   const loadBudget = React.useCallback(async () => {
     setBudgetLoading(true);
     const monthStart = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-01`;
-    const { data, error } = await supabase.rpc("monthly_hours_vs_scheduled", { target_month: monthStart });
-    if (!error) setBudget(data || []);
+    const { data, error } = await supabase.from("asset_scheduled_hours").select("asset_id, scheduled_hours").eq("month", monthStart);
+    if (!error) {
+      setAssetScheduled(Object.fromEntries((data || []).map((r) => [r.asset_id, Number(r.scheduled_hours)])));
+    }
     setBudgetLoading(false);
   }, []);
 
   useEffect(() => { loadBudget(); }, [loadBudget]);
+
+  // Per-equipment hours for the current month, for the drill-down under
+  // each fleet's total - so machines that are barely running (versus
+  // ones running flat out) are visible for budgeting, not just hidden
+  // inside a single fleet-wide average.
+  const assetMonthHours = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth();
+    const totals = {};
+    dailyHours.forEach((r) => {
+      if (!r.log_date) return;
+      const d = new Date(r.log_date + "T00:00:00");
+      if (d.getFullYear() !== y || d.getMonth() !== m) return;
+      totals[r.asset_id] = (totals[r.asset_id] || 0) + (Number(r.hours_run) || 0);
+    });
+    return totals;
+  }, [dailyHours]);
+
+  // Fleet-level budget rows, built by summing each fleet's own machines -
+  // there's no separate "fleet total" set anywhere; it's always derived
+  // from what's been scheduled per machine.
+  const budget = useMemo(() => {
+    return fleets.map((fleet) => {
+      const fleetAssets = assets.filter((a) => a.fleet === fleet);
+      const actual_hours = fleetAssets.reduce((sum, a) => sum + (assetMonthHours[a.asset_id] || 0), 0);
+      const anyScheduled = fleetAssets.some((a) => assetScheduled[a.asset_id] != null);
+      const scheduled_hours = anyScheduled ? fleetAssets.reduce((sum, a) => sum + (assetScheduled[a.asset_id] || 0), 0) : null;
+      const status = scheduled_hours == null ? null : (actual_hours > scheduled_hours ? "Over Scheduled Hours" : "OK");
+      return { fleet, actual_hours, scheduled_hours, status };
+    });
+  }, [fleets, assets, assetMonthHours, assetScheduled]);
+
+  const drillFleetAssets = useMemo(() => {
+    if (!drillFleet) return [];
+    return assets
+      .filter((a) => a.fleet === drillFleet)
+      .map((a) => ({
+        asset_id: a.asset_id,
+        asset_name: a.asset_name,
+        hours: assetMonthHours[a.asset_id] || 0,
+        scheduled: assetScheduled[a.asset_id] ?? null,
+      }))
+      .sort((a, b) => b.hours - a.hours);
+  }, [drillFleet, assets, assetMonthHours, assetScheduled]);
 
   const columns = [
     ["log_date", "Date"], ["shift", "Shift"], ["asset_id", "Equipment #"],
@@ -995,11 +1060,31 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
       ) : (
         <div style={{ border: "1px solid #E2E6E3", borderRadius: 10, overflow: "hidden", marginBottom: 20 }}>
           {budget.map((row, i) => (
-            <div key={row.fleet} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderTop: i > 0 ? "1px solid #EFEEE7" : "none" }}>
-              <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600 }}>{row.fleet}</span>
-              <span style={{ fontSize: 13 }}>{Number(row.actual_hours).toFixed(1)} / {row.scheduled_hours != null ? Number(row.scheduled_hours).toFixed(0) : "-"} hrs</span>
-              <Badge value={row.status} />
-            </div>
+            <React.Fragment key={row.fleet}>
+              <div
+                onClick={() => setDrillFleet(drillFleet === row.fleet ? null : row.fleet)}
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderTop: i > 0 ? "1px solid #EFEEE7" : "none", cursor: "pointer", background: drillFleet === row.fleet ? "#F7F8F6" : "transparent" }}
+              >
+                <ChevronRight size={14} style={{ transform: drillFleet === row.fleet ? "rotate(90deg)" : "none", transition: "transform 0.15s", color: "#859195", flexShrink: 0 }} />
+                <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600 }}>{row.fleet}</span>
+                <span style={{ fontSize: 13 }}>{Number(row.actual_hours).toFixed(1)} / {row.scheduled_hours != null ? Number(row.scheduled_hours).toFixed(0) : "-"} hrs</span>
+                <Badge value={row.status} />
+              </div>
+              {drillFleet === row.fleet && (
+                <div style={{ background: "#FBFBF9", borderTop: "1px solid #EFEEE7" }}>
+                  {drillFleetAssets.length === 0 ? (
+                    <p style={{ padding: "10px 14px 10px 40px", fontSize: 12.5, color: "#859195", margin: 0 }}>No equipment in this fleet.</p>
+                  ) : (
+                    drillFleetAssets.map((a) => (
+                      <div key={a.asset_id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 14px 7px 40px", fontSize: 12.5 }}>
+                        <span style={{ flex: 1, color: "#4B5659" }}>{a.asset_id} - {a.asset_name}</span>
+                        <span style={{ fontWeight: 600, color: "#183642" }}>{a.hours.toFixed(1)} / {a.scheduled != null ? a.scheduled.toFixed(0) : "-"} hrs</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </React.Fragment>
           ))}
           {budget.length === 0 && <p style={{ padding: 14, fontSize: 13, color: "#859195" }}>No fleets yet.</p>}
         </div>
@@ -1114,7 +1199,7 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
         />
       )}
       {showBudgetForm && (
-        <ScheduledHoursForm fleets={fleets} onClose={() => setShowBudgetForm(false)} onSaved={handleBudgetSaved} />
+        <ScheduledHoursForm assets={assets} fleets={fleets} onClose={() => setShowBudgetForm(false)} onSaved={handleBudgetSaved} />
       )}
     </div>
   );
@@ -3960,18 +4045,26 @@ function MtbfMttrReportPage({ assets }) {
       const last24ByAsset = availByAsset(last24Res.data);
       const mtdByAsset = availByAsset(mtdRes.data);
 
-      const merged = (mainRes.data || []).map((r) => ({
-        ...r,
-        availability_24h: last24ByAsset[r.asset_id] ?? null,
-        availability_mtd: mtdByAsset[r.asset_id] ?? null,
-      }));
+      // plant_performance_kpi() returns every asset across every site (it
+      // has no site filter of its own) - scope it down to just the assets
+      // belonging to the currently selected site before anything else
+      // touches this data, so another site's real equipment never shows
+      // up here.
+      const siteAssetIds = new Set(assets.map((a) => a.asset_id));
+      const merged = (mainRes.data || [])
+        .filter((r) => siteAssetIds.has(r.asset_id))
+        .map((r) => ({
+          ...r,
+          availability_24h: last24ByAsset[r.asset_id] ?? null,
+          availability_mtd: mtdByAsset[r.asset_id] ?? null,
+        }));
 
       setKpiData(merged);
       setLoading(false);
     }
     load();
     return () => { cancelled = true; };
-  }, [fromDateTime, toDateTime]);
+  }, [fromDateTime, toDateTime, assets]);
 
   const rows = useMemo(() => {
     let r = kpiData;
@@ -4185,6 +4278,11 @@ function GanttTooltip({ active, payload }) {
 // BarChart using the standard technique for faking a Gantt with a
 // generic bar library - a transparent "offset" segment positions each
 // bar's start, stacked with a visible "duration" segment for its length.
+function truncateLabel(s, max) {
+  if (!s || s.length <= max) return s;
+  return s.slice(0, max - 1).trimEnd() + "…";
+}
+
 function EventTimeline({ breakdowns, workOrders, fromDateTime, toDateTime }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [nowTick, setNowTick] = useState(() => new Date());
@@ -4276,8 +4374,15 @@ function EventTimeline({ breakdowns, workOrders, fromDateTime, toDateTime }) {
         continuationHrs: 0,
       }));
 
-    return [...actual, ...scheduled].sort((a, b) => a.offsetHrs - b.offsetHrs);
-  }, [breakdowns, workOrders, statusFilter, nowTick, windowStart, windowEnd, windowHrs]);
+    return [...actual, ...scheduled].sort((a, b) => a.offsetHrs - b.offsetHrs)
+      // Y-axis labels render as one unbroken line of SVG text with no
+      // wrapping - a long "asset - problem scope" label overflows its
+      // row and overlaps the rows above/below it, worst on a narrow
+      // phone-width chart. Truncate what's shown on the axis; the full
+      // label is still available via the tooltip and is already shown
+      // in full in the list above this chart.
+      .map((e) => ({ ...e, shortLabel: truncateLabel(e.label, narrow ? 20 : 34) }));
+  }, [breakdowns, workOrders, statusFilter, nowTick, windowStart, windowEnd, windowHrs, narrow]);
 
   const nowOffsetHrs = (nowTick.getTime() - windowStart.getTime()) / 3600000;
   const formatTick = (h) => new Date(windowStart.getTime() + h * 3600000).toLocaleString("en-ZA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -4333,7 +4438,7 @@ function EventTimeline({ breakdowns, workOrders, fromDateTime, toDateTime }) {
             <BarChart data={events} layout="vertical" margin={{ left: 4, right: 12, top: 6, bottom: 6 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" horizontal={false} />
               <XAxis type="number" domain={[0, windowHrs]} ticks={ticks} tickFormatter={formatTick} tick={{ fontSize: narrow ? 9.5 : 11, fill: "#4B5659" }} axisLine={{ stroke: "#E2E6E3" }} tickLine={false} />
-              <YAxis type="category" dataKey="label" width={narrow ? 110 : 220} tick={{ fontSize: narrow ? 9.5 : 11, fill: "#183642" }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="shortLabel" width={narrow ? 110 : 220} tick={{ fontSize: narrow ? 9.5 : 11, fill: "#183642" }} axisLine={false} tickLine={false} />
               <Tooltip content={<GanttTooltip />} />
               {nowInWindow && (
                 <ReferenceLine x={nowOffsetHrs} stroke="#B85450" strokeWidth={1.5} strokeDasharray="4 4" label={{ value: "Now", position: "top", fill: "#B85450", fontSize: 11, fontWeight: 700 }} />
@@ -6379,10 +6484,10 @@ function PartsPage({ parts, selectedSiteId, onRefresh, userEmail, isAdmin }) {
         </div>
       </div>
       <p style={{ fontSize: 11.5, color: "#859195", margin: "-6px 0 16px" }}>
-        Export the current list, edit it in Excel (add rows, change quantities), then Upload the same file - existing Part Nos get updated, new ones get added. Nothing gets deleted by an upload.
+        Export the current list, edit it in Excel (add rows, change quantities), then Upload the same file - existing Part Nr get updated, new ones get added. Nothing gets deleted by an upload.
       </p>
 
-      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10, WebkitOverflowScrolling: "touch" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
             <tr style={{ background: "#F7F8F6" }}>
@@ -6395,11 +6500,11 @@ function PartsPage({ parts, selectedSiteId, onRefresh, userEmail, isAdmin }) {
             {filtered.map((row, i) => (
               <tr key={row.part_no ?? i} onClick={() => { setEditing(row); setShowForm(true); }}
                 style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none", cursor: "pointer" }}>
-                <td style={{ padding: "9px 12px" }}>{row.part_no}</td>
-                <td style={{ padding: "9px 12px" }}>{row.description}</td>
-                <td style={{ padding: "9px 12px" }}>{row.qty_in_stock}</td>
-                <td style={{ padding: "9px 12px" }}>{row.minimum_qty}</td>
-                <td style={{ padding: "9px 12px" }}><Badge value={row.reorder_status} /></td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{row.part_no}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{row.description}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{row.qty_in_stock}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{row.minimum_qty}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}><Badge value={row.reorder_status} /></td>
               </tr>
             ))}
             {filtered.length === 0 && (
@@ -6410,6 +6515,7 @@ function PartsPage({ parts, selectedSiteId, onRefresh, userEmail, isAdmin }) {
           </tbody>
         </table>
       </div>
+      <p style={{ fontSize: 11.5, color: "#859195", margin: "8px 2px 0" }}>Swipe the table sideways to see every column, including Status.</p>
 
       {showForm && (
         <PartForm existing={editing} selectedSiteId={selectedSiteId} onClose={() => { setShowForm(false); setEditing(null); }}
@@ -7740,11 +7846,11 @@ function KpiBarChart({ title, data, xKey, dataKey, target, domainMax, valueForma
             {narrow ? (
               <>
                 <XAxis type="number" domain={[0, niceMax]} tick={{ fontSize: 10, fill: "#CFCFCF" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}${unitSuffix || ""}`} />
-                <YAxis type="category" dataKey={xKey} width={82} tick={{ fontSize: 10, fill: "#CFCFCF" }} axisLine={{ stroke: "#4A4A4A" }} tickLine={false} />
+                <YAxis type="category" dataKey={xKey} width={82} tick={{ fontSize: 10, fill: "#CFCFCF" }} axisLine={{ stroke: "#4A4A4A" }} tickLine={false} tickFormatter={(v) => truncateLabel(v, 13)} />
               </>
             ) : (
               <>
-                <XAxis dataKey={xKey} interval={0} angle={-30} textAnchor="end" height={44} tick={{ fontSize: 10, fill: "#CFCFCF" }} axisLine={{ stroke: "#4A4A4A" }} tickLine={false} />
+                <XAxis dataKey={xKey} interval={0} angle={-30} textAnchor="end" height={44} tick={{ fontSize: 10, fill: "#CFCFCF" }} axisLine={{ stroke: "#4A4A4A" }} tickLine={false} tickFormatter={(v) => truncateLabel(v, 14)} />
                 <YAxis domain={[0, niceMax]} tick={{ fontSize: 11, fill: "#CFCFCF" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}${unitSuffix || ""}`} />
               </>
             )}
@@ -8116,7 +8222,11 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
   // the whole Dashboard (not just the chart) narrows to that fleet.
   const fleetMonthKpi = useMemo(() => {
     const byFleet = {};
-    monthKpi.forEach((r) => {
+    // Use the already site-scoped filteredMonthKpi here, not the raw
+    // monthKpi - plant_performance_kpi() itself returns every asset across
+    // every site, so aggregating the unfiltered data would mix in other
+    // sites' real equipment.
+    filteredMonthKpi.forEach((r) => {
       if (!r.fleet) return;
       if (!byFleet[r.fleet]) byFleet[r.fleet] = [];
       byFleet[r.fleet].push(r);
@@ -8125,7 +8235,7 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
       fleet,
       ...aggregateMetrics(byFleet[fleet], byFleet[fleet].map((r) => r.asset_id)),
     }));
-  }, [monthKpi]);
+  }, [filteredMonthKpi]);
   // Parts Inventory isn't tied to a specific asset/fleet in this schema -
   // stays unfiltered regardless of fleet selection.
 
