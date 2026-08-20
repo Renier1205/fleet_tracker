@@ -4670,28 +4670,30 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
               <p style={{ fontSize: 18, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>Shift Downtime Summary</p>
               <p style={{ fontSize: 12.5, color: "#4B5659", margin: "0 0 16px" }}>Date Range: {formatRangeForDisplay(fromDateTime, toDateTime)}</p>
 
-              <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 30, fontSize: 11.5 }}>
-                <thead>
-                  <tr>
-                    {DOWNTIME_SUMMARY_COLUMNS.map(([key, label]) => (
-                      <th key={key} style={{ textAlign: "left", padding: "5px 8px", border: "1px solid #ccc", background: "#F2F1EA" }}>{label}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r, i) => (
-                    <tr key={i}>
-                      {DOWNTIME_SUMMARY_COLUMNS.map(([key]) => (
-                        <td key={key} style={{ padding: "5px 8px", border: "1px solid #ccc" }}>
-                          {key === "downtime_start" || key === "downtime_end" ? formatDT(r[key])
-                            : key === "downtime_hours" ? (r[key] != null ? Number(r[key]).toFixed(2) : "-")
-                            : (r[key] ?? "-")}
-                        </td>
+              <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 30, fontSize: 11.5 }}>
+                  <thead>
+                    <tr>
+                      {DOWNTIME_SUMMARY_COLUMNS.map(([key, label]) => (
+                        <th key={key} style={{ textAlign: "left", padding: "5px 8px", border: "1px solid #ccc", background: "#F2F1EA" }}>{label}</th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {rows.map((r, i) => (
+                      <tr key={i}>
+                        {DOWNTIME_SUMMARY_COLUMNS.map(([key]) => (
+                          <td key={key} style={{ padding: "5px 8px", border: "1px solid #ccc" }}>
+                            {key === "downtime_start" || key === "downtime_end" ? formatDT(r[key])
+                              : key === "downtime_hours" ? (r[key] != null ? Number(r[key]).toFixed(2) : "-")
+                              : (r[key] ?? "-")}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
               <p style={{ fontSize: 14, fontWeight: 700, color: "#183642", margin: "0 0 20px" }}>Sign Off</p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40 }}>
@@ -6188,27 +6190,29 @@ function AuditTrailPage({ activityLog, profiles, isAdmin }) {
               {dayGroups.map((group) => (
                 <div key={group.dayKey} style={{ marginBottom: 14 }}>
                   <p style={{ fontSize: 12.5, fontWeight: 700, color: NAVY, margin: "0 0 6px", textTransform: "uppercase", letterSpacing: 0.3 }}>{group.label}</p>
-                  <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 6, fontSize: 11.5 }}>
-                    <thead>
-                      <tr>
-                        {ACTIVITY_COLUMNS.map(([key, label]) => (
-                          <th key={key} style={{ textAlign: "left", padding: "6px 8px", border: "1px solid #ccc", background: "#F0F3F8" }}>{label}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {group.rows.map((r, i) => (
-                        <tr key={r.id ?? i}>
-                          <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap" }}>{formatDT(r.created_at)}</td>
-                          <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap" }}>{r.table_name || "-"}</td>
-                          <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap" }}>{r.asset_id || "-"}</td>
-                          <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap", textTransform: "capitalize" }}>{r.action || "-"}</td>
-                          <td style={{ padding: "6px 8px", border: "1px solid #ccc" }}>{r.summary || "-"}</td>
-                          <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap", fontWeight: 700 }}>{nameByUser.get(r.user_id) || "Unknown"}</td>
+                  <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 6, fontSize: 11.5 }}>
+                      <thead>
+                        <tr>
+                          {ACTIVITY_COLUMNS.map(([key, label]) => (
+                            <th key={key} style={{ textAlign: "left", padding: "6px 8px", border: "1px solid #ccc", background: "#F0F3F8" }}>{label}</th>
+                          ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {group.rows.map((r, i) => (
+                          <tr key={r.id ?? i}>
+                            <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap" }}>{formatDT(r.created_at)}</td>
+                            <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap" }}>{r.table_name || "-"}</td>
+                            <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap" }}>{r.asset_id || "-"}</td>
+                            <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap", textTransform: "capitalize" }}>{r.action || "-"}</td>
+                            <td style={{ padding: "6px 8px", border: "1px solid #ccc" }}>{r.summary || "-"}</td>
+                            <td style={{ padding: "6px 8px", border: "1px solid #ccc", whiteSpace: "nowrap", fontWeight: 700 }}>{nameByUser.get(r.user_id) || "Unknown"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               ))}
 
@@ -6979,36 +6983,38 @@ function DeletedQuotesPanel({ selectedSiteId, userEmail, onRestored }) {
           {error}
         </div>
       )}
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-        <thead>
-          <tr style={{ background: "#F7F8F6" }}>
-            {["Supplier", "Part", "Price", "Deleted", "Deleted by", "Reason", ""].map((h) => (
-              <th key={h} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {loading ? (
-            <tr><td colSpan={7} style={{ padding: 20, textAlign: "center", color: "#859195" }}>Loading…</td></tr>
-          ) : rows.length === 0 ? (
-            <tr><td colSpan={7} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No deleted quotes on record.</td></tr>
-          ) : rows.map((row, i) => (
-            <tr key={row.id} style={{ borderBottom: i < rows.length - 1 ? "1px solid #EFEEE7" : "none" }}>
-              <td style={{ padding: "9px 12px" }}>{row.supplier || "-"}</td>
-              <td style={{ padding: "9px 12px" }}>{row.part_description || row.part_no || "-"}</td>
-              <td style={{ padding: "9px 12px" }}>{row.price != null ? formatMoney(row.price) : "-"}</td>
-              <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{row.deleted_at ? new Date(row.deleted_at).toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" }) : "-"}</td>
-              <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{row.deleted_by_email || "-"}</td>
-              <td style={{ padding: "9px 12px" }}>{row.deletion_reason || "-"}</td>
-              <td style={{ padding: "9px 12px" }}>
-                <button type="button" onClick={() => restore(row)} disabled={restoringId === row.id} style={{ background: "none", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 6, cursor: restoringId === row.id ? "default" : "pointer" }}>
-                  {restoringId === row.id ? "Restoring…" : "Restore"}
-                </button>
-              </td>
+      <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: "#F7F8F6" }}>
+              {["Supplier", "Part", "Price", "Deleted", "Deleted by", "Reason", ""].map((h) => (
+                <th key={h} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{h}</th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={7} style={{ padding: 20, textAlign: "center", color: "#859195" }}>Loading…</td></tr>
+            ) : rows.length === 0 ? (
+              <tr><td colSpan={7} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No deleted quotes on record.</td></tr>
+            ) : rows.map((row, i) => (
+              <tr key={row.id} style={{ borderBottom: i < rows.length - 1 ? "1px solid #EFEEE7" : "none" }}>
+                <td style={{ padding: "9px 12px" }}>{row.supplier || "-"}</td>
+                <td style={{ padding: "9px 12px" }}>{row.part_description || row.part_no || "-"}</td>
+                <td style={{ padding: "9px 12px" }}>{row.price != null ? formatMoney(row.price) : "-"}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{row.deleted_at ? new Date(row.deleted_at).toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" }) : "-"}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{row.deleted_by_email || "-"}</td>
+                <td style={{ padding: "9px 12px" }}>{row.deletion_reason || "-"}</td>
+                <td style={{ padding: "9px 12px" }}>
+                  <button type="button" onClick={() => restore(row)} disabled={restoringId === row.id} style={{ background: "none", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 6, cursor: restoringId === row.id ? "default" : "pointer" }}>
+                    {restoringId === row.id ? "Restoring…" : "Restore"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -7812,57 +7818,49 @@ function KpiBarChart({ title, data, xKey, dataKey, target, domainMax, valueForma
   const gradRed = `grad-red-${dataKey}`;
   const niceMax = domainMax === 100 ? 100 : niceDomainMax(domainMax);
 
-  // On a phone-width screen, side-by-side columns with rotated labels
-  // just don't have room for names like "LIEBHERR EXCAVATOR" - they
-  // collide into unreadable text. Stacking equipment one per row instead
-  // (each with its own line for its name) fixes that at any label length,
-  // same fix already used for the Event Timeline further up this page.
-  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.innerWidth < 560);
-  useEffect(() => {
-    const onResize = () => setNarrow(window.innerWidth < 560);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  const chartHeight = narrow ? Math.max(180, data.length * 40 + 30) : 240;
+  // Bars are always upright columns now, never sideways - on a phone,
+  // a chart with many machines (e.g. 17 dump trucks) scrolls
+  // horizontally instead, keeping each bar wide enough to read rather
+  // than switching orientation.
+  const isMobile = useIsMobile();
+  const minBarWidth = isMobile ? 62 : 46;
+  const needsScroll = isMobile && data.length > 6;
+  const chartWidth = needsScroll ? Math.max(data.length * minBarWidth, 320) : "100%";
 
   return (
     <div>
       {title && <p style={{ fontSize: 12.5, fontWeight: 600, margin: "0 0 6px", color: "#4B5659" }}>{title}</p>}
-      <div onClick={onBarClick ? undefined : onClick} style={{ height: chartHeight, background: "#292929", border: "1px solid #1C1C1C", borderRadius: 10, padding: narrow ? "10px 10px 10px 4px" : "18px 8px 4px", cursor: (onClick || onBarClick) ? "pointer" : "default" }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} layout={narrow ? "vertical" : "horizontal"} margin={narrow ? { top: 4, right: 30, left: 4, bottom: 4 } : { top: 20, right: 8, left: 0, bottom: 20 }}>
-            <defs>
-              <linearGradient id={gradGreen} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#8FE8B4" />
-                <stop offset="100%" stopColor="#2F9E63" />
-              </linearGradient>
-              <linearGradient id={gradRed} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#F3998A" />
-                <stop offset="100%" stopColor="#A62A1E" />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#3D3D3D" vertical={narrow} horizontal={!narrow} />
-            {narrow ? (
-              <>
-                <XAxis type="number" domain={[0, niceMax]} tick={{ fontSize: 10, fill: "#CFCFCF" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}${unitSuffix || ""}`} />
-                <YAxis type="category" dataKey={xKey} width={82} tick={{ fontSize: 10, fill: "#CFCFCF" }} axisLine={{ stroke: "#4A4A4A" }} tickLine={false} tickFormatter={(v) => truncateLabel(v, 13)} />
-              </>
-            ) : (
-              <>
-                <XAxis dataKey={xKey} interval={0} angle={-30} textAnchor="end" height={44} tick={{ fontSize: 10, fill: "#CFCFCF" }} axisLine={{ stroke: "#4A4A4A" }} tickLine={false} tickFormatter={(v) => truncateLabel(v, 14)} />
-                <YAxis domain={[0, niceMax]} tick={{ fontSize: 11, fill: "#CFCFCF" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}${unitSuffix || ""}`} />
-              </>
-            )}
-            <Tooltip formatter={(v) => `${Number(v).toFixed(1)}${unitSuffix || ""}`} contentStyle={{ background: "#1F1F1F", border: "1px solid #444", borderRadius: 8 }} labelStyle={{ color: "#fff" }} itemStyle={{ color: "#fff" }} />
-            <Bar dataKey={dataKey} radius={narrow ? [0, 3, 3, 0] : [3, 3, 0, 0]} cursor={(onClick || onBarClick) ? "pointer" : "default"} onClick={onBarClick ? (row) => onBarClick(row) : undefined}>
-              {data.map((row, i) => <Cell key={i} fill={meetsTarget(row) ? `url(#${gradGreen})` : `url(#${gradRed})`} />)}
-              <LabelList dataKey={dataKey} position={narrow ? "right" : "top"} formatter={valueFormatter} fill="#fff" fontSize={11} fontWeight={700} />
-            </Bar>
-            <ReferenceLine {...(narrow ? { x: target } : { y: target })} stroke="#F5C518" strokeWidth={2.5} />
-          </BarChart>
-        </ResponsiveContainer>
+      <div
+        onClick={onBarClick ? undefined : onClick}
+        style={{ height: 240, background: "#292929", border: "1px solid #1C1C1C", borderRadius: 10, padding: "18px 8px 4px", cursor: (onClick || onBarClick) ? "pointer" : "default", overflowX: needsScroll ? "auto" : "hidden", WebkitOverflowScrolling: "touch" }}
+      >
+        <div style={{ width: chartWidth, height: "100%" }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} margin={{ top: 20, right: 8, left: 0, bottom: isMobile ? 34 : 20 }}>
+              <defs>
+                <linearGradient id={gradGreen} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#8FE8B4" />
+                  <stop offset="100%" stopColor="#2F9E63" />
+                </linearGradient>
+                <linearGradient id={gradRed} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#F3998A" />
+                  <stop offset="100%" stopColor="#A62A1E" />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#3D3D3D" vertical={false} />
+              <XAxis dataKey={xKey} interval={0} angle={-40} textAnchor="end" height={isMobile ? 54 : 44} tick={{ fontSize: 10, fill: "#CFCFCF" }} axisLine={{ stroke: "#4A4A4A" }} tickLine={false} tickFormatter={(v) => truncateLabel(v, isMobile ? 12 : 14)} />
+              <YAxis domain={[0, niceMax]} tick={{ fontSize: 11, fill: "#CFCFCF" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}${unitSuffix || ""}`} />
+              <Tooltip formatter={(v) => `${Number(v).toFixed(1)}${unitSuffix || ""}`} contentStyle={{ background: "#1F1F1F", border: "1px solid #444", borderRadius: 8 }} labelStyle={{ color: "#fff" }} itemStyle={{ color: "#fff" }} />
+              <Bar dataKey={dataKey} radius={[3, 3, 0, 0]} cursor={(onClick || onBarClick) ? "pointer" : "default"} onClick={onBarClick ? (row) => onBarClick(row) : undefined}>
+                {data.map((row, i) => <Cell key={i} fill={meetsTarget(row) ? `url(#${gradGreen})` : `url(#${gradRed})`} />)}
+                <LabelList dataKey={dataKey} position="top" formatter={valueFormatter} fill="#fff" fontSize={11} fontWeight={700} />
+              </Bar>
+              <ReferenceLine y={target} stroke="#F5C518" strokeWidth={2.5} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </div>
+      {needsScroll && <p style={{ fontSize: 11, color: "#859195", margin: "6px 2px 0" }}>Swipe sideways to see every machine.</p>}
     </div>
   );
 }
