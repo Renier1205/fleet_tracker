@@ -8657,7 +8657,7 @@ function buildTableConfig(assets, dailyHours, breakdowns, fuelLog, oilConsumptio
 }
 
 export default function App({ userEmail, isAdmin, myRole = "manager", mySites = [], myPageAccess = [], myFullName, onNameSaved }) {
-  const [active, setActive] = useState(() => (myRole === "operator" ? "daily_hours" : "dashboard"));
+  const [active, setActive] = useState(() => (myRole === "operator" ? "daily_hours" : "about"));
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [engineeringExpanded, setEngineeringExpanded] = useState(true);
   const [backlogsExpanded, setBacklogsExpanded] = useState(true);
