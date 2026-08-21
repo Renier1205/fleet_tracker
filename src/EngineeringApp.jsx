@@ -8198,6 +8198,7 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
   const [monthKpi, setMonthKpi] = useState([]);
   const [monthKpiLoading, setMonthKpiLoading] = useState(true);
   const [selectedFleet, setSelectedFleet] = useState("");
+  const isMobile = useIsMobile();
 
   const fleets = useMemo(() => [...new Set(assets.map((a) => a.fleet))].filter(Boolean).sort(), [assets]);
   const filteredAssets = useMemo(
