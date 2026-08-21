@@ -7925,6 +7925,7 @@ function AboutPage({ assets, breakdowns, workOrders, plannedMaintenance, compone
   const BODY = "#4B5659";
   const MUTED = "#859195";
   const LINE = "#E5EBEC";
+  const isMobile = useIsMobile();
 
   const heroRef = React.useRef(null);
 
@@ -8018,9 +8019,10 @@ function AboutPage({ assets, breakdowns, workOrders, plannedMaintenance, compone
         style={{
           position: "relative",
           overflow: "hidden",
-          borderRadius: 14,
+          borderRadius: isMobile ? 0 : 14,
+          margin: isMobile ? "-28px -32px 0" : 0,
           background: "linear-gradient(122deg, #14282E 0%, #16323A 42%, #1F6668 100%)",
-          boxShadow: "0 20px 46px -26px rgba(20,40,46,0.55)",
+          boxShadow: isMobile ? "none" : "0 20px 46px -26px rgba(20,40,46,0.55)",
         }}
       >
         <svg viewBox="0 0 900 520" preserveAspectRatio="xMaxYMid slice" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.62, pointerEvents: "none" }} aria-hidden="true">
@@ -8070,7 +8072,7 @@ function AboutPage({ assets, breakdowns, workOrders, plannedMaintenance, compone
           </g>
         </svg>
 
-        <div style={{ position: "relative", padding: "42px 44px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(316px,100%),1fr))", gap: 44, alignItems: "center" }}>
+        <div style={{ position: "relative", padding: isMobile ? "32px 24px" : "42px 44px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(316px,100%),1fr))", gap: 44, alignItems: "center" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
