@@ -4168,7 +4168,7 @@ function MtbfMttrReportPage({ assets }) {
               </button>
             )}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16, marginBottom: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(280px,100%),1fr))", gap: 16, marginBottom: 8 }}>
             <KpiBarChart
               title={showByFleet ? "MTBF by fleet (hrs)" : "MTBF by equipment (hrs)"} data={chartData} xKey={chartXKey} dataKey="mtbf"
               target={mtbfTarget} domainMax={mtbfMax} unitSuffix="h"
@@ -7387,7 +7387,7 @@ function AssetsPage({ assets, selectedSiteId, onRefresh, isAdmin, mySites = [] }
 
 function KpiRow({ metrics }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 12, marginBottom: 20 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(120px,100%),1fr))", gap: 12, marginBottom: 20 }}>
       {METRIC_DEFS.map((m) => (
         <MetricCard key={m.key} label={m.label} value={metrics[m.key] != null ? m.fmt(metrics[m.key]) : "-"} />
       ))}
@@ -7661,7 +7661,7 @@ function FleetPerformance({ assets, breakdowns }) {
     content = (
       <div>
         <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 16px" }}>Select a fleet to see its performance, then drill into an individual machine. Figures below are for {rangeLabel}.</p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(200px,100%),1fr))", gap: 14 }}>
           {fleets.map((f) => (
             <button
               key={f.fleet}
@@ -8070,7 +8070,7 @@ function AboutPage({ assets, breakdowns, workOrders, plannedMaintenance, compone
           </g>
         </svg>
 
-        <div style={{ position: "relative", padding: "42px 44px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(316px, 1fr))", gap: 44, alignItems: "center" }}>
+        <div style={{ position: "relative", padding: "42px 44px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(316px,100%),1fr))", gap: 44, alignItems: "center" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
@@ -8153,7 +8153,7 @@ function AboutPage({ assets, breakdowns, workOrders, plannedMaintenance, compone
 
       {/* 5. WHY DATAVERA */}
       <section style={{ padding: "54px 0 0" }}>
-        <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 28, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(216px, 1fr))", gap: "24px 30px" }}>
+        <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 28, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(216px,100%),1fr))", gap: "24px 30px" }}>
           <div style={{ gridColumn: "1 / -1", ...kicker }}>Why Datavera</div>
           {benefits.map(({ Icon, title, text }) => (
             <div key={title}>
@@ -8167,7 +8167,7 @@ function AboutPage({ assets, breakdowns, workOrders, plannedMaintenance, compone
 
       {/* 6. DATAVERA BRAND SECTION */}
       <section style={{ margin: "54px 0 0", background: "#EDF4F4", border: "1px solid #DCE8E8", borderRadius: 12, padding: "38px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))", gap: "26px 44px", alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(290px,100%),1fr))", gap: "26px 44px", alignItems: "start" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -8415,7 +8415,7 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
           {selectedFleet && <span style={{ fontSize: 12, color: "#859195", marginLeft: 10 }}>Everything below is filtered to {selectedFleet}</span>}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 14, marginBottom: 24 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(160px,100%),1fr))", gap: 14, marginBottom: 24 }}>
           <MetricCard label="Total assets" value={filteredAssets.length} icon={Truck} accentColor={NAVY} onClick={() => onNavigate?.("assets")} />
           <MetricCard label="Open work orders" value={filteredWorkOrders.filter((w) => w.status !== "Closed").length} icon={ClipboardList} accentColor="#8B5CF6" onClick={() => onNavigate?.("work_orders")} />
           <MetricCard label="Open breakdowns" value={openBreakdownCount} icon={AlertTriangle} accentColor="#B85450" onClick={() => onNavigate?.("breakdowns")} />
@@ -8426,7 +8426,7 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
           <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: NAVY }}>Currently in progress</h3>
           <span style={{ fontSize: 11.5, color: "#859195" }}>Live as of {nowTick.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })} - updates automatically</span>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 20, marginBottom: 24 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(280px,100%),1fr))", gap: 20, marginBottom: 24 }}>
           <div style={{ border: "1px solid #E2E6E3", borderRadius: 12, background: "#fff", overflow: "hidden" }}>
             <div onClick={() => onNavigate?.("breakdowns")} style={{ padding: "10px 14px", background: "#F6E2E0", fontSize: 12.5, fontWeight: 700, color: "#7A3330", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span>Events - {inProgressBreakdowns.length} in progress</span>
@@ -8514,7 +8514,7 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
                 <span style={{ fontSize: 12, color: "#859195" }}>click a fleet to see individual machines</span>
               )}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 16, marginBottom: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(260px,100%),1fr))", gap: 16, marginBottom: 8 }}>
               <KpiBarChart
                 title={selectedFleet ? "MTBF by equipment (hrs)" : "MTBF by fleet (hrs)"} data={chartData} xKey={chartXKey} dataKey="mtbf"
                 target={mtbfTarget} domainMax={mtbfMax} unitSuffix="h"
@@ -8543,7 +8543,7 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
           );
         })()}
 
-        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 20, marginBottom: 24, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.3fr 1fr", gap: 20, marginBottom: 24, alignItems: "start" }}>
           <div>
             <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 12px", color: NAVY }}>Availability by fleet, this month</h3>
             {monthKpiLoading ? (
@@ -8582,7 +8582,7 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20, marginBottom: 8 }}>
           <div>
             <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 12px", color: NAVY }}>Alerts</h3>
             <div style={{ border: "1px solid #E2E6E3", borderRadius: 12, overflow: "hidden", background: "#fff" }}>
