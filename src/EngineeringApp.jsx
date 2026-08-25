@@ -362,6 +362,10 @@ function DataTable({ columns, rows, exportName }) {
                 {columns.map((c) => {
                   const val = row[c.key];
                   const display = STATUS_FIELDS.has(c.key) ? <Badge value={val} />
+                    : c.key === "consumption_rate" && (val == null)
+                      ? <span title="Can't calculate a rate - this hour meter reading matches (or is lower than) the previous fill for this machine. Check the hour meter value on this entry." style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "#A65A1E", fontWeight: 600 }}>
+                          <AlertTriangle size={13} /> Check reading
+                        </span>
                     : typeof val === "number" && !Number.isInteger(val) ? val.toFixed(2)
                     : (val ?? <span style={{ color: "#B4B2A9" }}>-</span>);
                   return (
