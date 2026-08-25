@@ -5,7 +5,7 @@ import {
   CalendarClock, ShieldCheck, CircleDot, Package, FileText,
   DollarSign, History, Factory, Download, Search, Menu, X,
   Layers, ChevronRight, GitCompare, Fuel, Droplet, LogOut, Upload, Trash2, Printer, FileBarChart, ChevronDown, Activity, MapPin,
-  Wrench, BarChart3, ShoppingCart, Users, TrendingUp, Boxes
+  Wrench, BarChart3, ShoppingCart, Users, TrendingUp, Boxes, FilePlus, ShieldAlert
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient";
 import {
@@ -204,6 +204,8 @@ const NAV = [
   { key: "fuel_log", label: "Fuel Log", icon: Fuel, operatorVisible: true },
   { key: "oil_consumption", label: "Oil Consumption", icon: Droplet, operatorVisible: true },
   { key: "breakdowns", label: "Events", icon: AlertTriangle, operatorVisible: true },
+  { key: "work_requests", label: "Work Requests", icon: FilePlus, operatorVisible: true },
+  { key: "defects", label: "Defect Register", icon: ShieldAlert, operatorVisible: true },
   { key: "work_orders", label: "Work Orders", icon: ClipboardList, operatorVisible: true },
   { key: "downtime_summary", label: "Downtime Summary", icon: FileBarChart },
   { key: "mtbf_mttr", label: "MTBF / MTTR Report", icon: Activity },
@@ -230,11 +232,11 @@ const NAV = [
 
 function statusColor(status) {
   const s = (status || "").toUpperCase();
-  if (["OVERDUE", "CRITICAL", "CHANGE OUT", "REORDER", "REPLACE NOW", "EXPIRED", "FAIL", "OPEN", "OVER SCHEDULED HOURS"].includes(s))
+  if (["OVERDUE", "CRITICAL", "CHANGE OUT", "REORDER", "REPLACE NOW", "EXPIRED", "FAIL", "OPEN", "OVER SCHEDULED HOURS", "REJECTED"].includes(s))
     return { bg: "#F6E2E0", text: "#7A3330" };
-  if (["DUE SOON", "PLAN CHANGE", "EXPIRING SOON", "MEDIUM", "PLANNED", "APPROACHING LIMIT"].includes(s))
+  if (["DUE SOON", "PLAN CHANGE", "EXPIRING SOON", "MEDIUM", "PLANNED", "APPROACHING LIMIT", "WORK ORDER CREATED", "IN PROGRESS", "AWAITING PARTS"].includes(s))
     return { bg: "#F5E9D8", text: "#7A5320" };
-  if (["OK", "CLOSED", "PASS", "ACTIVE", "VALID"].includes(s))
+  if (["OK", "CLOSED", "PASS", "ACTIVE", "VALID", "APPROVED", "CONVERTED", "MERGED", "COMPLETED", "VERIFIED"].includes(s))
     return { bg: "#E2EFE9", text: "#2C5646" };
   return { bg: "#F1EFE8", text: "#444441" };
 }
@@ -1805,6 +1807,571 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, myFullName, 
 const WORK_ORDER_TYPES = ["Corrective", "Preventive"];
 const WORK_ORDER_PRIORITIES = ["Low", "Medium", "High", "Critical"];
 const WORK_ORDER_STATUSES = ["Open", "Planned", "In Progress", "Awaiting Parts", "Closed"];
+
+// Generic "type a reason, then confirm" modal - same shape as
+// DeleteConfirmModal, reused for Reject/Merge actions elsewhere so
+// every place that needs a reason looks and behaves the same way.
+function ReasonPromptModal({ title, message, confirmLabel, confirmColor, reasonRequired = true, onCancel, onConfirm }) {
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const handleConfirm = async () => {
+    if (reasonRequired && !reason.trim()) { setError("A reason is required."); return; }
+    setError("");
+    setBusy(true);
+    try {
+      await onConfirm(reason.trim());
+    } catch (err) {
+      setError(err.message || String(err));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 55, padding: 16 }}>
+      <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 400, maxWidth: "100%" }}>
+        <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>{title}</p>
+        {message && <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 14px" }}>{message}</p>}
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={2}
+          autoFocus
+          placeholder={reasonRequired ? "Reason (required)" : "Notes (optional)"}
+          style={{ width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", resize: "vertical", fontFamily: "inherit" }}
+        />
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "8px 0 0" }}>{error}</p>}
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
+          <button onClick={onCancel} disabled={busy} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button onClick={handleConfirm} disabled={busy} style={{ background: confirmColor || NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>
+            {busy ? "Saving…" : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const WORK_REQUEST_SOURCES = ["Operator Report", "Pre-Start Inspection", "Breakdown", "Maintenance Inspection", "Planner", "Supervisor", "Condition Monitoring", "Scheduled Maintenance", "Reliability Finding"];
+
+function WorkRequestForm({ assets, onClose, onSaved, userEmail, myFullName }) {
+  const [assetId, setAssetId] = useState(assets[0]?.asset_id || "");
+  const [description, setDescription] = useState("");
+  const [priority, setPriority] = useState("Medium");
+  const [source, setSource] = useState(WORK_REQUEST_SOURCES[0]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const reportedBy = myFullName || userEmail || "";
+
+  if (assets.length === 0) {
+    return (
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
+        <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
+          <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
+          <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
+        </div>
+      </div>
+    );
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!description.trim()) { setError("Describe the problem."); return; }
+    setSaving(true);
+    const payload = {
+      asset_id: assetId, description: description.trim(), priority, source,
+      reported_by: reportedBy || null, status: "Open",
+    };
+    try {
+      const assetName = assets.find((a) => a.asset_id === assetId)?.asset_name || assetId;
+      const { data, error: dbError } = await supabase.from("work_requests").insert(payload).select().single();
+      if (dbError) throw dbError;
+      logActivity("Work Request", data?.id, "created", `${assetName} - ${description.trim()}`, assetId);
+      onSaved();
+    } catch (err) {
+      setError(err.message || String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", fontFamily: "inherit" };
+  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
+      <form onSubmit={handleSubmit} style={{ background: "#fff", borderRadius: 12, padding: 24, width: 440, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto" }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>Report a Problem</h3>
+        <p style={{ fontSize: 12.5, color: "#859195", margin: "0 0 16px" }}>Quick report - a planner or supervisor will review it and either create a Work Order or let you know why not.</p>
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Equipment</label>
+          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required style={fieldStyle}>
+            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
+          </select>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>What's wrong?</label>
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} required rows={3} autoFocus style={{ ...fieldStyle, resize: "vertical" }} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <div>
+            <label style={labelStyle}>Priority</label>
+            <select value={priority} onChange={(e) => setPriority(e.target.value)} style={fieldStyle}>
+              {SEVERITIES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Where did this come from?</label>
+            <select value={source} onChange={(e) => setSource(e.target.value)} style={fieldStyle}>
+              {WORK_REQUEST_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{ marginBottom: 18 }}>
+          <label style={labelStyle}>Reported By</label>
+          <input type="text" value={reportedBy} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#4B5659" }} />
+        </div>
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
+            {saving ? "Submitting…" : "Submit"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function WorkRequestsPage({ assets, workRequests, workOrders, userEmail, myFullName, onRefresh }) {
+  const [showForm, setShowForm] = useState(false);
+  const [query, setQuery] = useState("");
+  const [selectedFleet, setSelectedFleet] = useState("");
+  const [selectedAsset, setSelectedAsset] = useState("");
+  const [statusFilter, setStatusFilter] = useState("Open");
+  const [rejecting, setRejecting] = useState(null);
+  const [merging, setMerging] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+  const [error, setError] = useState("");
+
+  const filtered = useMemo(() => {
+    let rows = workRequests;
+    if (selectedAsset) rows = rows.filter((r) => r.asset_id === selectedAsset);
+    else if (selectedFleet) rows = rows.filter((r) => { const a = assets.find((x) => x.asset_id === r.asset_id); return a && a.fleet === selectedFleet; });
+    if (statusFilter !== "All") rows = rows.filter((r) => r.status === statusFilter);
+    if (query.trim()) { const q = query.toLowerCase(); rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q))); }
+    return [...rows].sort((a, b) => (b.reported_at || "").localeCompare(a.reported_at || ""));
+  }, [workRequests, assets, query, selectedFleet, selectedAsset, statusFilter]);
+
+  const formatDateTime = (iso) => iso
+    ? new Date(iso).toLocaleString("en-ZA", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })
+    : "-";
+
+  const handleApprove = async (req) => {
+    setBusyId(req.id);
+    setError("");
+    try {
+      const assetName = assets.find((a) => a.asset_id === req.asset_id)?.asset_name || req.asset_id;
+      const { data: wo, error: woErr } = await supabase.from("work_orders").insert({
+        asset_id: req.asset_id, work_type: "Corrective", priority: req.priority,
+        problem_scope: req.description, status: "Open", request_date: (req.reported_at || "").slice(0, 10),
+        work_request_id: req.id,
+      }).select().single();
+      if (woErr) throw woErr;
+      const { error: reqErr } = await supabase.from("work_requests").update({
+        status: "Converted", converted_work_order_id: wo.id, reviewed_by: myFullName || userEmail || null, reviewed_at: new Date().toISOString(),
+      }).eq("id", req.id);
+      if (reqErr) throw reqErr;
+      logActivity("Work Request", req.id, "updated", `Approved and converted to Work Order ${wo.wo_no || wo.id} - ${assetName}`, req.asset_id);
+      onRefresh();
+    } catch (err) {
+      setError(err.message || String(err));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleReject = async (reason) => {
+    const req = rejecting;
+    const { error: dbError } = await supabase.from("work_requests").update({
+      status: "Rejected", rejection_reason: reason, reviewed_by: myFullName || userEmail || null, reviewed_at: new Date().toISOString(),
+    }).eq("id", req.id);
+    if (dbError) throw dbError;
+    logActivity("Work Request", req.id, "updated", `Rejected: ${reason}`, req.asset_id);
+    setRejecting(null);
+    onRefresh();
+  };
+
+  const openWorkOrdersForAsset = (assetId) => workOrders.filter((w) => w.asset_id === assetId && w.status !== "Closed");
+
+  return (
+    <div>
+      <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", flex: 1 }}>
+          <div style={{ position: "relative", maxWidth: 260, flex: 1 }}>
+            <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search work requests" style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none", boxSizing: "border-box" }} />
+          </div>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8 }}>
+            {["Open", "Converted", "Rejected", "Merged", "All"].map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <button onClick={() => setShowForm(true)} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+          + Report a Problem
+        </button>
+      </div>
+      {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "10px 0 0" }}>{error}</p>}
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10, marginTop: 12, WebkitOverflowScrolling: "touch" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: "#F7F8F6" }}>
+              {["Reported", "Equipment #", "Description", "Priority", "Source", "Reported By", "Status", ""].map((h) => (
+                <th key={h} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r, i) => (
+              <tr key={r.id} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none" }}>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{formatDateTime(r.reported_at)}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.asset_id}</td>
+                <td style={{ padding: "9px 12px", maxWidth: 260 }}>{r.description}</td>
+                <td style={{ padding: "9px 12px" }}><Badge value={r.priority} /></td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.source || "-"}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.reported_by || "-"}</td>
+                <td style={{ padding: "9px 12px" }}><Badge value={r.status} /></td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
+                  {r.status === "Open" && (
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => handleApprove(r)} disabled={busyId === r.id} title="Approve & Create Work Order" style={{ background: "#2C5646", border: "none", color: "#fff", padding: "5px 9px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: busyId === r.id ? "default" : "pointer" }}>
+                        {busyId === r.id ? "…" : "Approve"}
+                      </button>
+                      {openWorkOrdersForAsset(r.asset_id).length > 0 && (
+                        <button onClick={() => setMerging(r)} title="Merge into an existing Work Order" style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, padding: "5px 9px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          Merge
+                        </button>
+                      )}
+                      <button onClick={() => setRejecting(r)} title="Reject" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4 }}>
+                        <X size={16} />
+                      </button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr><td colSpan={8} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
+                {workRequests.length === 0 ? "No work requests yet." : "Nothing matches your filters."}
+              </td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {showForm && (
+        <WorkRequestForm assets={assets} userEmail={userEmail} myFullName={myFullName}
+          onClose={() => setShowForm(false)}
+          onSaved={() => { setShowForm(false); onRefresh(); }} />
+      )}
+      {rejecting && (
+        <ReasonPromptModal
+          title={`Reject request for ${rejecting.asset_id}?`}
+          message="This closes the request without creating a Work Order. The reason is kept for the record."
+          confirmLabel="Reject" confirmColor="#B85450"
+          onCancel={() => setRejecting(null)}
+          onConfirm={handleReject}
+        />
+      )}
+      {merging && (
+        <MergeWorkRequestModal
+          request={merging}
+          candidateWorkOrders={openWorkOrdersForAsset(merging.asset_id)}
+          userEmail={userEmail} myFullName={myFullName}
+          onCancel={() => setMerging(null)}
+          onMerged={() => { setMerging(null); onRefresh(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function MergeWorkRequestModal({ request, candidateWorkOrders, userEmail, myFullName, onCancel, onMerged }) {
+  const [woId, setWoId] = useState(candidateWorkOrders[0]?.id || "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleConfirm = async () => {
+    if (!woId) return;
+    setSaving(true);
+    setError("");
+    try {
+      const { error: dbError } = await supabase.from("work_requests").update({
+        status: "Merged", merged_into_work_order_id: Number(woId), reviewed_by: myFullName || userEmail || null, reviewed_at: new Date().toISOString(),
+      }).eq("id", request.id);
+      if (dbError) throw dbError;
+      const wo = candidateWorkOrders.find((w) => String(w.id) === String(woId));
+      logActivity("Work Request", request.id, "updated", `Merged into existing Work Order ${wo?.wo_no || woId}`, request.asset_id);
+      onMerged();
+    } catch (err) {
+      setError(err.message || String(err));
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 55, padding: 16 }}>
+      <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 420, maxWidth: "100%" }}>
+        <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>Merge into an existing Work Order</p>
+        <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 14px" }}>
+          Use this when the problem is already being handled by another job on {request.asset_id}, so this doesn't create a duplicate.
+        </p>
+        <select value={woId} onChange={(e) => setWoId(e.target.value)} style={{ width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box" }}>
+          {candidateWorkOrders.map((w) => <option key={w.id} value={w.id}>{w.wo_no || `WO-${w.id}`} - {w.problem_scope || w.work_type} ({w.status})</option>)}
+        </select>
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "8px 0 0" }}>{error}</p>}
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
+          <button onClick={onCancel} disabled={saving} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button onClick={handleConfirm} disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
+            {saving ? "Merging…" : "Merge"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DefectForm({ assets, onClose, onSaved, userEmail, myFullName }) {
+  const [assetId, setAssetId] = useState(assets[0]?.asset_id || "");
+  const [description, setDescription] = useState("");
+  const [riskRating, setRiskRating] = useState("Medium");
+  const [responsiblePerson, setResponsiblePerson] = useState("");
+  const [targetCompletion, setTargetCompletion] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const reportedBy = myFullName || userEmail || "";
+
+  if (assets.length === 0) {
+    return (
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
+        <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
+          <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
+          <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
+        </div>
+      </div>
+    );
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!description.trim()) { setError("Describe the defect."); return; }
+    setSaving(true);
+    const payload = {
+      asset_id: assetId, description: description.trim(), risk_rating: riskRating,
+      is_critical: riskRating === "Critical" || riskRating === "High",
+      reported_by: reportedBy || null, status: "Open",
+      responsible_person: responsiblePerson || null, target_completion: targetCompletion || null,
+    };
+    try {
+      const assetName = assets.find((a) => a.asset_id === assetId)?.asset_name || assetId;
+      const { data, error: dbError } = await supabase.from("defects").insert(payload).select().single();
+      if (dbError) throw dbError;
+      logActivity("Defect", data?.id, "created", `${assetName} - ${description.trim()}`, assetId);
+      onSaved();
+    } catch (err) {
+      setError(err.message || String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const fieldStyle = { width: "100%", padding: "8px 10px", fontSize: 13.5, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box", fontFamily: "inherit" };
+  const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#183642", margin: "0 0 4px" };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
+      <form onSubmit={handleSubmit} style={{ background: "#fff", borderRadius: 12, padding: 24, width: 440, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto" }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 16px" }}>Report Defect</h3>
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Equipment</label>
+          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required style={fieldStyle}>
+            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
+          </select>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Defect Description</label>
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} required rows={3} autoFocus style={{ ...fieldStyle, resize: "vertical" }} />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Risk Rating</label>
+          <select value={riskRating} onChange={(e) => setRiskRating(e.target.value)} style={fieldStyle}>
+            {SEVERITIES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          {(riskRating === "High" || riskRating === "Critical") && (
+            <p style={{ fontSize: 12, color: "#7A3330", margin: "6px 0 0", fontWeight: 600 }}>
+              ⚠ This will be flagged as critical - equipment should not return to service until it's cleared.
+            </p>
+          )}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 18 }}>
+          <div>
+            <label style={labelStyle}>Responsible Person (optional)</label>
+            <input type="text" value={responsiblePerson} onChange={(e) => setResponsiblePerson(e.target.value)} style={fieldStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Target Completion (optional)</label>
+            <input type="date" value={targetCompletion} onChange={(e) => setTargetCompletion(e.target.value)} style={fieldStyle} />
+          </div>
+        </div>
+        {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "0 0 14px" }}>{error}</p>}
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="submit" disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
+            {saving ? "Saving…" : "Report Defect"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function DefectsPage({ assets, defects, userEmail, myFullName, onRefresh }) {
+  const [showForm, setShowForm] = useState(false);
+  const [query, setQuery] = useState("");
+  const [selectedFleet, setSelectedFleet] = useState("");
+  const [selectedAsset, setSelectedAsset] = useState("");
+  const [statusFilter, setStatusFilter] = useState("Open");
+  const [busyId, setBusyId] = useState(null);
+  const [error, setError] = useState("");
+
+  const filtered = useMemo(() => {
+    let rows = defects;
+    if (selectedAsset) rows = rows.filter((r) => r.asset_id === selectedAsset);
+    else if (selectedFleet) rows = rows.filter((r) => { const a = assets.find((x) => x.asset_id === r.asset_id); return a && a.fleet === selectedFleet; });
+    if (statusFilter !== "All") rows = rows.filter((r) => r.status === statusFilter);
+    if (query.trim()) { const q = query.toLowerCase(); rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q))); }
+    return [...rows].sort((a, b) => (b.reported_date || "").localeCompare(a.reported_date || ""));
+  }, [defects, assets, query, selectedFleet, selectedAsset, statusFilter]);
+
+  const handleCreateWorkOrder = async (defect) => {
+    setBusyId(defect.id);
+    setError("");
+    try {
+      const assetName = assets.find((a) => a.asset_id === defect.asset_id)?.asset_name || defect.asset_id;
+      const { data: wo, error: woErr } = await supabase.from("work_orders").insert({
+        asset_id: defect.asset_id, work_type: "Corrective", priority: defect.risk_rating,
+        problem_scope: defect.description, status: "Open", request_date: defect.reported_date,
+        defect_id: defect.id,
+      }).select().single();
+      if (woErr) throw woErr;
+      const { error: defErr } = await supabase.from("defects").update({
+        status: "Work Order Created", linked_work_order_id: wo.id,
+      }).eq("id", defect.id);
+      if (defErr) throw defErr;
+      logActivity("Defect", defect.id, "updated", `Work Order ${wo.wo_no || wo.id} created for ${assetName}`, defect.asset_id);
+      onRefresh();
+    } catch (err) {
+      setError(err.message || String(err));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleVerify = async (defect) => {
+    setBusyId(defect.id);
+    setError("");
+    try {
+      const { error: dbError } = await supabase.from("defects").update({
+        status: "Verified", verified_by: myFullName || userEmail || null, verified_at: new Date().toISOString(),
+        actual_completion: defect.actual_completion || todayForInput(),
+      }).eq("id", defect.id);
+      if (dbError) throw dbError;
+      logActivity("Defect", defect.id, "updated", "Verified and closed", defect.asset_id);
+      onRefresh();
+    } catch (err) {
+      setError(err.message || String(err));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <div>
+      <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", flex: 1 }}>
+          <div style={{ position: "relative", maxWidth: 260, flex: 1 }}>
+            <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search defects" style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none", boxSizing: "border-box" }} />
+          </div>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8 }}>
+            {["Open", "Work Order Created", "Completed", "Verified", "All"].map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <button onClick={() => setShowForm(true)} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+          + Report Defect
+        </button>
+      </div>
+      {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "10px 0 0" }}>{error}</p>}
+      <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10, marginTop: 12, WebkitOverflowScrolling: "touch" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: "#F7F8F6" }}>
+              {["Date", "Equipment #", "Description", "Risk", "Responsible", "Status", ""].map((h) => (
+                <th key={h} style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r, i) => (
+              <tr key={r.id} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none" }}>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.reported_date || "-"}</td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.asset_id}</td>
+                <td style={{ padding: "9px 12px", maxWidth: 260 }}>
+                  {r.description}
+                  {r.is_critical && (
+                    <div style={{ marginTop: 4, display: "inline-flex", alignItems: "center", gap: 4, background: "#F6E2E0", color: "#7A3330", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6 }}>
+                      <AlertTriangle size={11} /> DO NOT OPERATE UNTIL CLEARED
+                    </div>
+                  )}
+                </td>
+                <td style={{ padding: "9px 12px" }}><Badge value={r.risk_rating} /></td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.responsible_person || "-"}</td>
+                <td style={{ padding: "9px 12px" }}><Badge value={r.status} /></td>
+                <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
+                  {r.status === "Open" && (
+                    <button onClick={() => handleCreateWorkOrder(r)} disabled={busyId === r.id} style={{ background: NAVY, border: "none", color: "#fff", padding: "5px 9px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: busyId === r.id ? "default" : "pointer" }}>
+                    {busyId === r.id ? "…" : "Create Work Order"}
+                    </button>
+                  )}
+                  {r.status === "Completed" && (
+                    <button onClick={() => handleVerify(r)} disabled={busyId === r.id} style={{ background: "#2C5646", border: "none", color: "#fff", padding: "5px 9px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: busyId === r.id ? "default" : "pointer" }}>
+                      {busyId === r.id ? "…" : "Verify & Close"}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr><td colSpan={7} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
+                {defects.length === 0 ? "No defects on record." : "Nothing matches your filters."}
+              </td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {showForm && (
+        <DefectForm assets={assets} userEmail={userEmail} myFullName={myFullName}
+          onClose={() => setShowForm(false)}
+          onSaved={() => { setShowForm(false); onRefresh(); }} />
+      )}
+    </div>
+  );
+}
 
 function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, eventId, onClose, onSaved }) {
   const isEdit = !!existing;
@@ -8673,6 +9240,8 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
   const [assets, setAssets] = useState([]);
   const [dailyHours, setDailyHours] = useState([]);
   const [breakdowns, setBreakdowns] = useState([]);
+  const [workRequests, setWorkRequests] = useState([]);
+  const [defects, setDefects] = useState([]);
   const [coreLoading, setCoreLoading] = useState(true);
   const [coreError, setCoreError] = useState(null);
 
@@ -8746,6 +9315,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
       const [
         siteAssetsRes, fuelRes, oilRes, woRes, serviceRes, inspRes,
         compRes, tyreRes, partsRes, warrRes, docRes, backlogsRes, dailyServiceRes, componentCodesRes,
+        workRequestsRes, defectsRes,
       ] = await Promise.all([
         supabase.from("assets").select("asset_id").eq("site_id", selectedSiteId),
         supabase.from("fuel_log_calc").select("*"),
@@ -8761,8 +9331,10 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
         supabase.from("backlogs").select("*"),
         supabase.from("daily_service_checklist").select("*"),
         supabase.from("component_codes").select("*").order("name"),
+        supabase.from("work_requests").select("*"),
+        supabase.from("defects").select("*"),
       ]);
-      const results = { siteAssetsRes, fuelRes, oilRes, woRes, serviceRes, inspRes, compRes, tyreRes, partsRes, warrRes, docRes, backlogsRes, dailyServiceRes, componentCodesRes };
+      const results = { siteAssetsRes, fuelRes, oilRes, woRes, serviceRes, inspRes, compRes, tyreRes, partsRes, warrRes, docRes, backlogsRes, dailyServiceRes, componentCodesRes, workRequestsRes, defectsRes };
       for (const [name, res] of Object.entries(results)) {
         if (res.error) throw new Error(`${name}: ${res.error.message}`);
       }
@@ -8806,6 +9378,8 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
       setBacklogs(bySite(backlogsRes.data));
       setDailyServiceChecklist(bySite(dailyServiceRes.data));
       setComponentCodes(componentCodesRes.data || []);
+      setWorkRequests(bySite(workRequestsRes.data));
+      setDefects(bySite(defectsRes.data));
     } catch (err) {
       setRestError(err.message || String(err));
     } finally {
@@ -9101,7 +9675,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
                 </p>
               </div>
             ) : (coreLoading && ["dashboard", "fleet_performance", "assets", "daily_hours", "breakdowns", "downtime_summary"].includes(active)) ||
-             (restLoading && ["dashboard", "fuel_log", "oil_consumption", "work_orders", "downtime_summary", "planned_maintenance", "inspections", "components", "tyres", "parts", "warranty_docs", "audit", "backlog_report", "daily_service", "breakdowns", "component_codes"].includes(active)) ? (
+             (restLoading && ["dashboard", "fuel_log", "oil_consumption", "work_orders", "downtime_summary", "planned_maintenance", "inspections", "components", "tyres", "parts", "warranty_docs", "audit", "backlog_report", "daily_service", "breakdowns", "component_codes", "work_requests", "defects"].includes(active)) ? (
               <p style={{ fontSize: 13, color: "#859195" }}>Loading…</p>
             ) : active === "dashboard" ? (
               <Dashboard assets={assets} breakdowns={breakdowns} workOrders={workOrders} plannedMaintenance={plannedMaintenance} components={components} parts={parts} inspections={inspections} onNavigate={setActive} />
@@ -9109,6 +9683,10 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
               <FleetPerformance assets={assets} breakdowns={breakdowns} />
             ) : active === "breakdowns" ? (
               <BreakdownsPage assets={assets} breakdowns={breakdowns} workOrders={workOrders} parts={parts} componentCodes={componentCodes} onRefresh={() => { loadCoreData(); loadRestOfData(); }} userEmail={userEmail} myFullName={myFullName} />
+            ) : active === "work_requests" ? (
+              <WorkRequestsPage assets={assets} workRequests={workRequests} workOrders={workOrders} userEmail={userEmail} myFullName={myFullName} onRefresh={loadRestOfData} />
+            ) : active === "defects" ? (
+              <DefectsPage assets={assets} defects={defects} userEmail={userEmail} myFullName={myFullName} onRefresh={loadRestOfData} />
             ) : active === "assets" ? (
               <AssetsPage assets={assets} selectedSiteId={selectedSiteId} onRefresh={loadCoreData} isAdmin={isAdmin} mySites={mySites} />
             ) : active === "daily_hours" ? (
