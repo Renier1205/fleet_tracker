@@ -298,7 +298,7 @@ function DataTable({ columns, rows, exportName }) {
     const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
 
     const headerRow = columns.map((c) => c.label);
-    const dataRows = filtered.map((row) => columns.map((c) => row[c.key] ?? ""));
+    const dataRows = visibleRows.map((row) => columns.map((c) => row[c.key] ?? ""));
 
     // Title + export timestamp on top, then a blank spacer row, then the
     // real header row using the same friendly labels shown on screen -
@@ -1205,8 +1205,6 @@ function DailyHoursPage({ assets, dailyHours, userEmail, selectedSiteId, onRefre
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [showBudgetForm, setShowBudgetForm] = useState(false);
-  const [query, setQuery] = useState("");
-  const [shiftFilter, setShiftFilter] = useState("");
   const [selectedFleet, setSelectedFleet] = useState("");
   const [selectedAsset, setSelectedAsset] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -1287,35 +1285,58 @@ function DailyHoursPage({ assets, dailyHours, userEmail, selectedSiteId, onRefre
 
   const fleetByAsset = useMemo(() => new Map(assets.map((a) => [a.asset_id, a.fleet])), [assets]);
 
-  const RECENT_DAYS_SHOWN = 2;
+  const RECENT_READINGS_PER_MACHINE = 2;
 
+  // Rows still get filtered flat here; the grouping into machines happens
+  // below, because the "latest N readings" window is per machine, not
+  // across the whole fleet. A machine that wasn't logged yesterday should
+  // still show its own last two readings rather than vanishing.
   const filtered = useMemo(() => {
     let rows = dailyHours;
-    if (shiftFilter) rows = rows.filter((r) => r.shift === shiftFilter);
     if (selectedAsset) rows = rows.filter((r) => r.asset_id === selectedAsset);
     else if (selectedFleet) rows = rows.filter((r) => fleetByAsset.get(r.asset_id) === selectedFleet);
-    if (query.trim()) {
-      const q = query.toLowerCase();
-      rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q)));
-    }
-
-    // With no date range set, show only the most recent couple of capture
-    // dates - a full month of every machine is unreadable. Applied after
-    // the other filters, so narrowing to one machine shows that machine's
-    // last two days rather than the fleet's.
     if (dateFrom) rows = rows.filter((r) => (r.log_date || "") >= dateFrom);
     if (dateTo) rows = rows.filter((r) => (r.log_date || "") <= dateTo);
-    if (!dateFrom && !dateTo) {
-      const recent = new Set(
-        [...new Set(rows.map((r) => r.log_date).filter(Boolean))].sort().reverse().slice(0, RECENT_DAYS_SHOWN)
-      );
-      rows = rows.filter((r) => recent.has(r.log_date));
+    return rows.map((r) => ({ ...r, fleet: fleetByAsset.get(r.asset_id) || "-" }));
+  }, [dailyHours, selectedFleet, selectedAsset, dateFrom, dateTo, fleetByAsset]);
+
+  const grouped = useMemo(() => {
+    const byAsset = new Map();
+    for (const r of filtered) {
+      if (!byAsset.has(r.asset_id)) byAsset.set(r.asset_id, []);
+      byAsset.get(r.asset_id).push(r);
     }
 
-    rows = rows.map((r) => ({ ...r, fleet: fleetByAsset.get(r.asset_id) || "-" }));
-    const byDate = [...rows].sort((a, b) => (b.log_date || "").localeCompare(a.log_date || "") || (a.shift || "").localeCompare(b.shift || ""));
-    return prefs.sortRows(byDate);
-  }, [dailyHours, query, shiftFilter, selectedFleet, selectedAsset, dateFrom, dateTo, fleetByAsset, prefs.sortRows]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Machine banners run A-Z, flipping to Z-A if Equipment # is the
+    // chosen sort column.
+    const ids = [...byAsset.keys()].sort((a, b) =>
+      prefs.sortKey === "asset_id" && prefs.sortDir === "desc"
+        ? String(b).localeCompare(String(a))
+        : String(a).localeCompare(String(b))
+    );
+
+    return ids.map((id) => {
+      // Pick the window FIRST, always from the newest end, then apply the
+      // user's sort to it. Otherwise clicking Date ascending would change
+      // which readings are shown rather than just their order.
+      const newestFirst = [...byAsset.get(id)].sort(
+        (a, b) => (b.log_date || "").localeCompare(a.log_date || "") || (b.shift || "").localeCompare(a.shift || "")
+      );
+      const windowed = (!dateFrom && !dateTo) ? newestFirst.slice(0, RECENT_READINGS_PER_MACHINE) : newestFirst;
+      const rows = (prefs.sortKey && prefs.sortKey !== "asset_id") ? prefs.sortRows(windowed) : windowed;
+      const asset = assets.find((a) => a.asset_id === id);
+      return {
+        assetId: id,
+        assetName: asset?.asset_name || "",
+        fleet: fleetByAsset.get(id) || "",
+        rows,
+        totalHours: rows.reduce((sum, r) => sum + (Number(r.hours_run) || 0), 0),
+      };
+    }).filter((g) => g.rows.length > 0);
+  }, [filtered, assets, fleetByAsset, dateFrom, dateTo, prefs.sortKey, prefs.sortDir, prefs.sortRows]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Flat list of what's on screen, for Export to Excel.
+  const visibleRows = useMemo(() => grouped.flatMap((g) => g.rows), [grouped]);
 
   const handleSaved = () => {
     setShowForm(false);
@@ -1557,24 +1578,14 @@ function DailyHoursPage({ assets, dailyHours, userEmail, selectedSiteId, onRefre
         {(dateFrom || dateTo) ? (
           <button onClick={() => { setDateFrom(""); setDateTo(""); }}
             style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12.5, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: "pointer" }}>
-            Back to latest {RECENT_DAYS_SHOWN} days
+            Back to latest {RECENT_READINGS_PER_MACHINE} readings
           </button>
         ) : (
-          <span style={{ color: "#859195" }}>Showing the latest {RECENT_DAYS_SHOWN} capture dates — pick a range to see more.</span>
+          <span style={{ color: "#859195" }}>Showing each machine's latest {RECENT_READINGS_PER_MACHINE} readings — pick a date range to see more.</span>
         )}
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
-        <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
-          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search daily hours"
-            style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }} />
-        </div>
-        <select value={shiftFilter} onChange={(e) => setShiftFilter(e.target.value)} style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8 }}>
-          <option value="">All Shifts</option>
-          <option value="Day">Day</option>
-          <option value="Night">Night</option>
-        </select>
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
             <Download size={14} /> Export to Excel
@@ -1590,22 +1601,20 @@ function DailyHoursPage({ assets, dailyHours, userEmail, selectedSiteId, onRefre
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <SmartTableHead prefs={prefs} />
           <tbody>
-            {filtered.map((row, i) => {
-              const prevDate = i > 0 ? filtered[i - 1].log_date : null;
-              // Date banners only make sense while the grid is in date
-              // order - a custom sort would put one above nearly every row.
-              const groupByDate = !prefs.sortKey || prefs.sortKey === "log_date";
-              const showHeader = groupByDate && row.log_date !== prevDate;
-              return (
-                <React.Fragment key={row.id ?? i}>
-                  {showHeader && (
-                    <tr>
-                      <td colSpan={columns.length + 1} style={{ padding: "8px 12px", background: "#F2F1EA", fontWeight: 700, fontSize: 12.5, color: NAVY, borderTop: i > 0 ? "1px solid #E2E6E3" : "none" }}>
-                        {row.log_date ? new Date(row.log_date + "T12:00:00").toLocaleDateString("en-ZA", { weekday: "long", day: "2-digit", month: "short", year: "numeric" }) : "No date"}
-                      </td>
-                    </tr>
-                  )}
-                  <tr style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none", background: row.exceeds_shift_limit ? "#F6E2E0" : "transparent" }}>
+            {grouped.map((g, gi) => (
+              <React.Fragment key={g.assetId}>
+                <tr>
+                  <td colSpan={columns.length + 1} style={{ padding: "8px 12px", background: "#F2F1EA", fontWeight: 700, fontSize: 12.5, color: NAVY, borderTop: gi > 0 ? "1px solid #E2E6E3" : "none" }}>
+                    {g.assetId}{g.assetName ? ` - ${g.assetName}` : ""}
+                    <span style={{ fontWeight: 500, color: "#4B5659" }}>
+                      {g.fleet && g.fleet !== "-" ? `  ·  ${g.fleet}` : ""}
+                      {`  ·  ${g.rows.length} reading${g.rows.length === 1 ? "" : "s"}`}
+                      {`  ·  ${g.totalHours.toFixed(1)} hrs`}
+                    </span>
+                  </td>
+                </tr>
+                {g.rows.map((row, i) => (
+                  <tr key={row.id ?? `${g.assetId}-${i}`} style={{ borderBottom: "1px solid #EFEEE7", background: row.exceeds_shift_limit ? "#F6E2E0" : "transparent" }}>
                     {columns.map((c) => (
                       <td key={c.key} onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>{row[c.key] ?? <span style={{ color: "#B4B2A9" }}>-</span>}</td>
                     ))}
@@ -1615,12 +1624,12 @@ function DailyHoursPage({ assets, dailyHours, userEmail, selectedSiteId, onRefre
                       </button>
                     </td>
                   </tr>
-                </React.Fragment>
-              );
-            })}
-            {filtered.length === 0 && (
+                ))}
+              </React.Fragment>
+            ))}
+            {grouped.length === 0 && (
               <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
-                {dailyHours.length === 0 ? "No hours logged yet." : "No entries match your search."}
+                {dailyHours.length === 0 ? "No hours logged yet." : "No entries match the current filters."}
               </td></tr>
             )}
           </tbody>
