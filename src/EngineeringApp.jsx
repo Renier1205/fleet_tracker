@@ -805,6 +805,110 @@ function ColumnsButton({ prefs }) {
   );
 }
 
+// ---------------------------------------------------------------------
+// Machine grouping, shared by the tabs that show per-machine sequences.
+//
+// buildMachineGroups always returns an array of groups. With grouping
+// switched off it returns a single unbannered group holding every row,
+// so the body renders a plain flat list - which is what you want before
+// an export.
+// ---------------------------------------------------------------------
+function buildMachineGroups(rows, assets, { enabled, dateKey, hoursKey, sortKey, sortDir, sortRows, limitPerMachine }) {
+  if (!enabled) {
+    return [{ key: "__all__", banner: null, rows: sortKey ? sortRows(rows) : rows }];
+  }
+
+  const byAsset = new Map();
+  for (const r of rows) {
+    if (!byAsset.has(r.asset_id)) byAsset.set(r.asset_id, []);
+    byAsset.get(r.asset_id).push(r);
+  }
+
+  const ids = [...byAsset.keys()].sort((a, b) =>
+    sortKey === "asset_id" && sortDir === "desc"
+      ? String(b).localeCompare(String(a))
+      : String(a).localeCompare(String(b))
+  );
+
+  return ids.map((id) => {
+    // Window from the newest end first, then sort - so changing the sort
+    // never changes which rows are on screen, only their order.
+    const newestFirst = [...byAsset.get(id)].sort((a, b) =>
+      String(b?.[dateKey] || "").localeCompare(String(a?.[dateKey] || ""))
+    );
+    const windowed = limitPerMachine ? newestFirst.slice(0, limitPerMachine) : newestFirst;
+    const finalRows = (sortKey && sortKey !== "asset_id") ? sortRows(windowed) : windowed;
+    const asset = assets.find((a) => a.asset_id === id);
+    return {
+      key: id,
+      assetId: id,
+      assetName: asset?.asset_name || "",
+      fleet: asset?.fleet || "",
+      total: hoursKey ? finalRows.reduce((sum, r) => sum + (Number(r?.[hoursKey]) || 0), 0) : null,
+      rows: finalRows,
+      banner: true,
+    };
+  }).filter((g) => g.rows.length > 0);
+}
+
+function MachineTableBody({ groups, columns, onRowClick, onDelete, emptyMessage, totalLabel = "hrs", countNoun = "entry", countNounPlural = "entries" }) {
+  const span = columns.length + 1;
+
+  if (!groups.some((g) => g.rows.length > 0)) {
+    return (
+      <tbody>
+        <tr><td colSpan={span} style={{ padding: 20, textAlign: "center", color: "#859195" }}>{emptyMessage}</td></tr>
+      </tbody>
+    );
+  }
+
+  return (
+    <tbody>
+      {groups.map((g, gi) => (
+        <React.Fragment key={g.key}>
+          {g.banner && (
+            <tr>
+              <td colSpan={span} style={{ padding: "8px 12px", background: "#F2F1EA", fontWeight: 700, fontSize: 12.5, color: NAVY, borderTop: gi > 0 ? "1px solid #E2E6E3" : "none" }}>
+                {g.assetId}{g.assetName ? ` - ${g.assetName}` : ""}
+                <span style={{ fontWeight: 500, color: "#4B5659" }}>
+                  {g.fleet ? `  ·  ${g.fleet}` : ""}
+                  {`  ·  ${g.rows.length} ${g.rows.length === 1 ? countNoun : countNounPlural}`}
+                  {g.total != null ? `  ·  ${g.total.toFixed(1)} ${totalLabel}` : ""}
+                </span>
+              </td>
+            </tr>
+          )}
+          {g.rows.map((row, i) => (
+            <tr key={row.id ?? `${g.key}-${i}`} style={{ borderBottom: "1px solid #EFEEE7", background: row.exceeds_shift_limit ? "#F6E2E0" : "transparent" }}>
+              {columns.map((c) => (
+                <td key={c.key} onClick={() => onRowClick && onRowClick(row)} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: onRowClick ? "pointer" : "default" }}>
+                  {row[c.key] ?? <span style={{ color: "#B4B2A9" }}>-</span>}
+                </td>
+              ))}
+              <td style={{ padding: "9px 12px" }}>
+                {onDelete && (
+                  <button onClick={() => onDelete(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </React.Fragment>
+      ))}
+    </tbody>
+  );
+}
+
+function GroupByMachineToggle({ value, onChange }) {
+  return (
+    <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, color: "#4B5659", cursor: "pointer", whiteSpace: "nowrap" }}>
+      <input type="checkbox" checked={value} onChange={(e) => onChange(e.target.checked)} style={{ cursor: "pointer" }} />
+      Group by machine
+    </label>
+  );
+}
+
 function todayForInput() {
   const d = new Date();
   const pad = (n) => String(n).padStart(2, "0");
@@ -1286,6 +1390,7 @@ function DailyHoursPage({ assets, dailyHours, userEmail, selectedSiteId, onRefre
   const fleetByAsset = useMemo(() => new Map(assets.map((a) => [a.asset_id, a.fleet])), [assets]);
 
   const RECENT_READINGS_PER_MACHINE = 2;
+  const [groupByMachine, setGroupByMachine] = useState(true);
 
   // Rows still get filtered flat here; the grouping into machines happens
   // below, because the "latest N readings" window is per machine, not
@@ -1300,40 +1405,11 @@ function DailyHoursPage({ assets, dailyHours, userEmail, selectedSiteId, onRefre
     return rows.map((r) => ({ ...r, fleet: fleetByAsset.get(r.asset_id) || "-" }));
   }, [dailyHours, selectedFleet, selectedAsset, dateFrom, dateTo, fleetByAsset]);
 
-  const grouped = useMemo(() => {
-    const byAsset = new Map();
-    for (const r of filtered) {
-      if (!byAsset.has(r.asset_id)) byAsset.set(r.asset_id, []);
-      byAsset.get(r.asset_id).push(r);
-    }
-
-    // Machine banners run A-Z, flipping to Z-A if Equipment # is the
-    // chosen sort column.
-    const ids = [...byAsset.keys()].sort((a, b) =>
-      prefs.sortKey === "asset_id" && prefs.sortDir === "desc"
-        ? String(b).localeCompare(String(a))
-        : String(a).localeCompare(String(b))
-    );
-
-    return ids.map((id) => {
-      // Pick the window FIRST, always from the newest end, then apply the
-      // user's sort to it. Otherwise clicking Date ascending would change
-      // which readings are shown rather than just their order.
-      const newestFirst = [...byAsset.get(id)].sort(
-        (a, b) => (b.log_date || "").localeCompare(a.log_date || "") || (b.shift || "").localeCompare(a.shift || "")
-      );
-      const windowed = (!dateFrom && !dateTo) ? newestFirst.slice(0, RECENT_READINGS_PER_MACHINE) : newestFirst;
-      const rows = (prefs.sortKey && prefs.sortKey !== "asset_id") ? prefs.sortRows(windowed) : windowed;
-      const asset = assets.find((a) => a.asset_id === id);
-      return {
-        assetId: id,
-        assetName: asset?.asset_name || "",
-        fleet: fleetByAsset.get(id) || "",
-        rows,
-        totalHours: rows.reduce((sum, r) => sum + (Number(r.hours_run) || 0), 0),
-      };
-    }).filter((g) => g.rows.length > 0);
-  }, [filtered, assets, fleetByAsset, dateFrom, dateTo, prefs.sortKey, prefs.sortDir, prefs.sortRows]); // eslint-disable-line react-hooks/exhaustive-deps
+  const grouped = useMemo(() => buildMachineGroups(filtered, assets, {
+    enabled: groupByMachine, dateKey: "log_date", hoursKey: "hours_run",
+    sortKey: prefs.sortKey, sortDir: prefs.sortDir, sortRows: prefs.sortRows,
+    limitPerMachine: (!dateFrom && !dateTo && groupByMachine) ? RECENT_READINGS_PER_MACHINE : null,
+  }), [filtered, assets, groupByMachine, dateFrom, dateTo, prefs.sortKey, prefs.sortDir, prefs.sortRows]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Flat list of what's on screen, for Export to Excel.
   const visibleRows = useMemo(() => grouped.flatMap((g) => g.rows), [grouped]);
@@ -1586,7 +1662,8 @@ function DailyHoursPage({ assets, dailyHours, userEmail, selectedSiteId, onRefre
       </div>
 
       <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <GroupByMachineToggle value={groupByMachine} onChange={setGroupByMachine} />
           <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
             <Download size={14} /> Export to Excel
           </button>
@@ -1600,39 +1677,13 @@ function DailyHoursPage({ assets, dailyHours, userEmail, selectedSiteId, onRefre
       <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <SmartTableHead prefs={prefs} />
-          <tbody>
-            {grouped.map((g, gi) => (
-              <React.Fragment key={g.assetId}>
-                <tr>
-                  <td colSpan={columns.length + 1} style={{ padding: "8px 12px", background: "#F2F1EA", fontWeight: 700, fontSize: 12.5, color: NAVY, borderTop: gi > 0 ? "1px solid #E2E6E3" : "none" }}>
-                    {g.assetId}{g.assetName ? ` - ${g.assetName}` : ""}
-                    <span style={{ fontWeight: 500, color: "#4B5659" }}>
-                      {g.fleet && g.fleet !== "-" ? `  ·  ${g.fleet}` : ""}
-                      {`  ·  ${g.rows.length} reading${g.rows.length === 1 ? "" : "s"}`}
-                      {`  ·  ${g.totalHours.toFixed(1)} hrs`}
-                    </span>
-                  </td>
-                </tr>
-                {g.rows.map((row, i) => (
-                  <tr key={row.id ?? `${g.assetId}-${i}`} style={{ borderBottom: "1px solid #EFEEE7", background: row.exceeds_shift_limit ? "#F6E2E0" : "transparent" }}>
-                    {columns.map((c) => (
-                      <td key={c.key} onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>{row[c.key] ?? <span style={{ color: "#B4B2A9" }}>-</span>}</td>
-                    ))}
-                    <td style={{ padding: "9px 12px" }}>
-                      <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
-                        <Trash2 size={15} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </React.Fragment>
-            ))}
-            {grouped.length === 0 && (
-              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
-                {dailyHours.length === 0 ? "No hours logged yet." : "No entries match the current filters."}
-              </td></tr>
-            )}
-          </tbody>
+          <MachineTableBody
+            groups={grouped} columns={columns}
+            onRowClick={(row) => { setEditing(row); setShowForm(true); }}
+            onDelete={(row) => setDeleting(row)}
+            totalLabel="hrs" countNoun="reading" countNounPlural="readings"
+            emptyMessage={dailyHours.length === 0 ? "No hours logged yet." : "No entries match the current filters."}
+          />
         </table>
       </div>
 
@@ -4673,6 +4724,7 @@ function FuelLogPage({ assets, fuelLog, userEmail, myFullName, dailyHours, onRef
   const [selectedFleet, setSelectedFleet] = useState("");
   const [selectedAsset, setSelectedAsset] = useState("");
 
+  const [groupByMachine, setGroupByMachine] = useState(true);
   const prefs = useTablePrefs("fuel_log", FUEL_LOG_COLUMNS);
   const columns = prefs.columns;
 
@@ -4681,9 +4733,13 @@ function FuelLogPage({ assets, fuelLog, userEmail, myFullName, dailyHours, onRef
     if (selectedAsset) rows = rows.filter((r) => r.asset_id === selectedAsset);
     else if (selectedFleet) rows = rows.filter((r) => { const a = assets.find((x) => x.asset_id === r.asset_id); return a && a.fleet === selectedFleet; });
     if (query.trim()) { const q = query.toLowerCase(); rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q))); }
-    const byDate = [...rows].sort((a, b) => (b.fill_date || "").localeCompare(a.fill_date || ""));
-    return prefs.sortRows(byDate);
-  }, [fuelLog, assets, query, selectedFleet, selectedAsset, prefs.sortRows]); // eslint-disable-line react-hooks/exhaustive-deps
+    return [...rows].sort((a, b) => (b.fill_date || "").localeCompare(a.fill_date || ""));
+  }, [fuelLog, assets, query, selectedFleet, selectedAsset]);
+
+  const groups = useMemo(() => buildMachineGroups(filtered, assets, {
+    enabled: groupByMachine, dateKey: "fill_date", hoursKey: "litres",
+    sortKey: prefs.sortKey, sortDir: prefs.sortDir, sortRows: prefs.sortRows,
+  }), [filtered, assets, groupByMachine, prefs.sortKey, prefs.sortDir, prefs.sortRows]);
 
   const handleDelete = async (reason) => {
     await deleteWithReason("fuel_log", deleting.id, "id", reason, userEmail, deleting.asset_id);
@@ -4706,7 +4762,8 @@ function FuelLogPage({ assets, fuelLog, userEmail, myFullName, dailyHours, onRef
           <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search fuel log" style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }} />
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <GroupByMachineToggle value={groupByMachine} onChange={setGroupByMachine} />
           <ColumnsButton prefs={prefs} />
           <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
             + Log Fuel
@@ -4721,41 +4778,13 @@ function FuelLogPage({ assets, fuelLog, userEmail, myFullName, dailyHours, onRef
       <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <SmartTableHead prefs={prefs} />
-          <tbody>
-            {filtered.map((row, i) => {
-              const prevDate = i > 0 ? filtered[i - 1].fill_date : null;
-              const groupByDate = !prefs.sortKey || prefs.sortKey === "fill_date";
-              const showHeader = groupByDate && row.fill_date !== prevDate;
-              return (
-                <React.Fragment key={row.id ?? i}>
-                  {showHeader && (
-                    <tr>
-                      <td colSpan={columns.length + 1} style={{ padding: "8px 12px", background: "#F2F1EA", fontWeight: 700, fontSize: 12.5, color: NAVY, borderTop: i > 0 ? "1px solid #E2E6E3" : "none" }}>
-                        {row.fill_date ? new Date(row.fill_date + "T12:00:00").toLocaleDateString("en-ZA", { weekday: "long", day: "2-digit", month: "short", year: "numeric" }) : "No date"}
-                      </td>
-                    </tr>
-                  )}
-                  <tr style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none" }}>
-                    {columns.map((c) => (
-                      <td key={c.key} onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>
-                        {row[c.key] ?? <span style={{ color: "#B4B2A9" }}>-</span>}
-                      </td>
-                    ))}
-                    <td style={{ padding: "9px 12px" }}>
-                      <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
-                        <Trash2 size={15} />
-                      </button>
-                    </td>
-                  </tr>
-                </React.Fragment>
-              );
-            })}
-            {filtered.length === 0 && (
-              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
-                {fuelLog.length === 0 ? "No fuel entries yet." : "No entries match your filters."}
-              </td></tr>
-            )}
-          </tbody>
+          <MachineTableBody
+            groups={groups} columns={columns}
+            onRowClick={(row) => { setEditing(row); setShowForm(true); }}
+            onDelete={(row) => setDeleting(row)}
+            totalLabel="L" countNoun="fill" countNounPlural="fills"
+            emptyMessage={fuelLog.length === 0 ? "No fuel entries yet." : "No entries match your filters."}
+          />
         </table>
       </div>
       {showForm && (
@@ -4917,6 +4946,7 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, myFullName, dai
   const [selectedFleet, setSelectedFleet] = useState("");
   const [selectedAsset, setSelectedAsset] = useState("");
 
+  const [groupByMachine, setGroupByMachine] = useState(true);
   const prefs = useTablePrefs("oil_consumption", OIL_CONSUMPTION_COLUMNS);
   const columns = prefs.columns;
 
@@ -4925,9 +4955,13 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, myFullName, dai
     if (selectedAsset) rows = rows.filter((r) => r.asset_id === selectedAsset);
     else if (selectedFleet) rows = rows.filter((r) => { const a = assets.find((x) => x.asset_id === r.asset_id); return a && a.fleet === selectedFleet; });
     if (query.trim()) { const q = query.toLowerCase(); rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q))); }
-    const byDate = [...rows].sort((a, b) => (b.fill_date || "").localeCompare(a.fill_date || ""));
-    return prefs.sortRows(byDate);
-  }, [oilConsumption, assets, query, selectedFleet, selectedAsset, prefs.sortRows]); // eslint-disable-line react-hooks/exhaustive-deps
+    return [...rows].sort((a, b) => (b.fill_date || "").localeCompare(a.fill_date || ""));
+  }, [oilConsumption, assets, query, selectedFleet, selectedAsset]);
+
+  const groups = useMemo(() => buildMachineGroups(filtered, assets, {
+    enabled: groupByMachine, dateKey: "fill_date", hoursKey: "litres",
+    sortKey: prefs.sortKey, sortDir: prefs.sortDir, sortRows: prefs.sortRows,
+  }), [filtered, assets, groupByMachine, prefs.sortKey, prefs.sortDir, prefs.sortRows]);
 
   const handleDelete = async (reason) => {
     await deleteWithReason("oil_consumption", deleting.id, "id", reason, userEmail, deleting.asset_id);
@@ -4952,7 +4986,8 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, myFullName, dai
           <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search oil consumption" style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }} />
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <GroupByMachineToggle value={groupByMachine} onChange={setGroupByMachine} />
           <ColumnsButton prefs={prefs} />
           <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
             + Log Oil
@@ -4967,41 +5002,13 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, myFullName, dai
       <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <SmartTableHead prefs={prefs} />
-          <tbody>
-            {filtered.map((row, i) => {
-              const prevDate = i > 0 ? filtered[i - 1].fill_date : null;
-              const groupByDate = !prefs.sortKey || prefs.sortKey === "fill_date";
-              const showHeader = groupByDate && row.fill_date !== prevDate;
-              return (
-                <React.Fragment key={row.id ?? i}>
-                  {showHeader && (
-                    <tr>
-                      <td colSpan={columns.length + 1} style={{ padding: "8px 12px", background: "#F2F1EA", fontWeight: 700, fontSize: 12.5, color: NAVY, borderTop: i > 0 ? "1px solid #E2E6E3" : "none" }}>
-                        {row.fill_date ? new Date(row.fill_date + "T12:00:00").toLocaleDateString("en-ZA", { weekday: "long", day: "2-digit", month: "short", year: "numeric" }) : "No date"}
-                      </td>
-                    </tr>
-                  )}
-                  <tr style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none" }}>
-                    {columns.map((c) => (
-                      <td key={c.key} onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>
-                        {row[c.key] ?? <span style={{ color: "#B4B2A9" }}>-</span>}
-                      </td>
-                    ))}
-                    <td style={{ padding: "9px 12px" }}>
-                      <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
-                        <Trash2 size={15} />
-                      </button>
-                    </td>
-                  </tr>
-                </React.Fragment>
-              );
-            })}
-            {filtered.length === 0 && (
-              <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
-                {oilConsumption.length === 0 ? "No oil entries yet." : "No entries match your filters."}
-              </td></tr>
-            )}
-          </tbody>
+          <MachineTableBody
+            groups={groups} columns={columns}
+            onRowClick={(row) => { setEditing(row); setShowForm(true); }}
+            onDelete={(row) => setDeleting(row)}
+            totalLabel="L" countNoun="fill" countNounPlural="fills"
+            emptyMessage={oilConsumption.length === 0 ? "No oil entries yet." : "No entries match your filters."}
+          />
         </table>
       </div>
       {showForm && (
