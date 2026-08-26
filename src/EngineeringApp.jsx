@@ -900,6 +900,33 @@ function MachineTableBody({ groups, columns, onRowClick, onDelete, emptyMessage,
   );
 }
 
+// For tables whose rows are hand-written (badges, action buttons), the
+// generic body above doesn't fit. These two let a page keep its own row
+// markup and just interleave machine banners into it.
+function flattenGroups(groups) {
+  const out = [];
+  for (const g of groups) {
+    if (g.banner) out.push({ kind: "banner", group: g });
+    for (const row of g.rows) out.push({ kind: "row", row, group: g });
+  }
+  return out;
+}
+
+function MachineBannerRow({ group, colSpan, first, totalLabel = "hrs", countNoun = "entry", countNounPlural = "entries" }) {
+  return (
+    <tr>
+      <td colSpan={colSpan} style={{ padding: "8px 12px", background: "#F2F1EA", fontWeight: 700, fontSize: 12.5, color: NAVY, borderTop: first ? "none" : "1px solid #E2E6E3" }}>
+        {group.assetId}{group.assetName ? ` - ${group.assetName}` : ""}
+        <span style={{ fontWeight: 500, color: "#4B5659" }}>
+          {group.fleet ? `  ·  ${group.fleet}` : ""}
+          {`  ·  ${group.rows.length} ${group.rows.length === 1 ? countNoun : countNounPlural}`}
+          {group.total != null ? `  ·  ${group.total.toFixed(1)} ${totalLabel}` : ""}
+        </span>
+      </td>
+    </tr>
+  );
+}
+
 function GroupByMachineToggle({ value, onChange }) {
   return (
     <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, color: "#4B5659", cursor: "pointer", whiteSpace: "nowrap" }}>
@@ -2032,6 +2059,7 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, myFullName, 
   const [deleting, setDeleting] = useState(null); // row pending delete confirmation
   const [selectedFleet, setSelectedFleet] = useState("");
   const [selectedAsset, setSelectedAsset] = useState("");
+  const [groupByMachine, setGroupByMachine] = useState(true);
   const [sortKey, setSortKey] = useState("downtime_start");
   const [sortDir, setSortDir] = useState("desc");
 
@@ -2108,6 +2136,11 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, myFullName, 
     });
   }, [allRows, assets, query, selectedFleet, selectedAsset, sortKey, sortDir]);
 
+  const groups = useMemo(() => buildMachineGroups(filtered, assets, {
+    enabled: groupByMachine, dateKey: "downtime_start", hoursKey: "downtime_hours",
+    sortKey: null, sortDir: null, sortRows: (r) => r,
+  }), [filtered, assets, groupByMachine]);
+
   const handleSaved = () => {
     setShowForm(false);
     setEditing(null);
@@ -2166,7 +2199,8 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, myFullName, 
             style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }}
           />
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <GroupByMachineToggle value={groupByMachine} onChange={setGroupByMachine} />
           <button
             onClick={exportToExcel}
             style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}
@@ -2223,7 +2257,11 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, myFullName, 
             </tr>
           </thead>
           <tbody>
-            {filtered.map((row, i) => {
+            {flattenGroups(groups).map((item, i) => {
+              if (item.kind === "banner") {
+                return <MachineBannerRow key={`b-${item.group.key}`} group={item.group} colSpan={columns.length + 1} first={i === 0} countNoun="event" countNounPlural="events" />;
+              }
+              const row = item.row;
               const isRepeat = (row.repeat_count ?? 0) >= 2;
               const openRow = () => {
                 if (row.isScheduledPlaceholder) { setActivating(row.sourceWorkOrder); setShowForm(true); }
@@ -2232,7 +2270,7 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, myFullName, 
               return (
                 <tr
                   key={row.id ?? i}
-                  style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none", background: row.isScheduledPlaceholder ? "#FFF8EB" : isRepeat ? "#F5E9D8" : "transparent" }}
+                  style={{ borderBottom: "1px solid #EFEEE7", background: row.isScheduledPlaceholder ? "#FFF8EB" : isRepeat ? "#F5E9D8" : "transparent" }}
                 >
                   {columns.map((c) => (
                     <td key={c.key} onClick={openRow} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>
@@ -2452,6 +2490,8 @@ function WorkRequestsPage({ assets, workRequests, workOrders, userEmail, myFullN
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
 
+  const [groupByMachine, setGroupByMachine] = useState(true);
+
   const filtered = useMemo(() => {
     let rows = workRequests;
     if (selectedAsset) rows = rows.filter((r) => r.asset_id === selectedAsset);
@@ -2460,6 +2500,11 @@ function WorkRequestsPage({ assets, workRequests, workOrders, userEmail, myFullN
     if (query.trim()) { const q = query.toLowerCase(); rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q))); }
     return [...rows].sort((a, b) => (b.reported_at || "").localeCompare(a.reported_at || ""));
   }, [workRequests, assets, query, selectedFleet, selectedAsset, statusFilter]);
+
+  const groups = useMemo(() => buildMachineGroups(filtered, assets, {
+    enabled: groupByMachine, dateKey: "reported_at", hoursKey: null,
+    sortKey: null, sortDir: null, sortRows: (r) => r,
+  }), [filtered, assets, groupByMachine]);
 
   const formatDateTime = (iso) => iso
     ? new Date(iso).toLocaleString("en-ZA", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })
@@ -2515,9 +2560,12 @@ function WorkRequestsPage({ assets, workRequests, workOrders, userEmail, myFullN
             {["Open", "Converted", "Rejected", "Merged", "All"].map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <GroupByMachineToggle value={groupByMachine} onChange={setGroupByMachine} />
         <button onClick={() => setShowForm(true)} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
           + Report a Problem
-        </button>
+          </button>
+        </div>
       </div>
       {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "10px 0 0" }}>{error}</p>}
       <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10, marginTop: 12, WebkitOverflowScrolling: "touch" }}>
@@ -2530,8 +2578,11 @@ function WorkRequestsPage({ assets, workRequests, workOrders, userEmail, myFullN
             </tr>
           </thead>
           <tbody>
-            {filtered.map((r, i) => (
-              <tr key={r.id} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none" }}>
+            {flattenGroups(groups).map((item, i) => item.kind === "banner" ? (
+              <MachineBannerRow key={`b-${item.group.key}`} group={item.group} colSpan={8} first={i === 0} countNoun="request" countNounPlural="requests" />
+            ) : (
+              (({ row: r }) => (
+              <tr key={r.id} style={{ borderBottom: "1px solid #EFEEE7" }}>
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{formatDateTime(r.reported_at)}</td>
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.asset_id}</td>
                 <td style={{ padding: "9px 12px", maxWidth: 260 }}>{r.description}</td>
@@ -2557,6 +2608,7 @@ function WorkRequestsPage({ assets, workRequests, workOrders, userEmail, myFullN
                   )}
                 </td>
               </tr>
+              ))(item)
             ))}
             {filtered.length === 0 && (
               <tr><td colSpan={8} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
@@ -2743,6 +2795,8 @@ function DefectsPage({ assets, defects, userEmail, myFullName, onRefresh }) {
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
 
+  const [groupByMachine, setGroupByMachine] = useState(true);
+
   const filtered = useMemo(() => {
     let rows = defects;
     if (selectedAsset) rows = rows.filter((r) => r.asset_id === selectedAsset);
@@ -2751,6 +2805,11 @@ function DefectsPage({ assets, defects, userEmail, myFullName, onRefresh }) {
     if (query.trim()) { const q = query.toLowerCase(); rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q))); }
     return [...rows].sort((a, b) => (b.reported_date || "").localeCompare(a.reported_date || ""));
   }, [defects, assets, query, selectedFleet, selectedAsset, statusFilter]);
+
+  const groups = useMemo(() => buildMachineGroups(filtered, assets, {
+    enabled: groupByMachine, dateKey: "reported_date", hoursKey: null,
+    sortKey: null, sortDir: null, sortRows: (r) => r,
+  }), [filtered, assets, groupByMachine]);
 
   const handleCreateWorkOrder = async (defect) => {
     setBusyId(defect.id);
@@ -2807,9 +2866,12 @@ function DefectsPage({ assets, defects, userEmail, myFullName, onRefresh }) {
             {["Open", "Work Order Created", "Completed", "Verified", "All"].map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <GroupByMachineToggle value={groupByMachine} onChange={setGroupByMachine} />
         <button onClick={() => setShowForm(true)} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
           + Report Defect
-        </button>
+          </button>
+        </div>
       </div>
       {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "10px 0 0" }}>{error}</p>}
       <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10, marginTop: 12, WebkitOverflowScrolling: "touch" }}>
@@ -2822,8 +2884,11 @@ function DefectsPage({ assets, defects, userEmail, myFullName, onRefresh }) {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((r, i) => (
-              <tr key={r.id} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none" }}>
+            {flattenGroups(groups).map((item, i) => item.kind === "banner" ? (
+              <MachineBannerRow key={`b-${item.group.key}`} group={item.group} colSpan={7} first={i === 0} countNoun="defect" countNounPlural="defects" />
+            ) : (
+              (({ row: r }) => (
+              <tr key={r.id} style={{ borderBottom: "1px solid #EFEEE7" }}>
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.reported_date || "-"}</td>
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{r.asset_id}</td>
                 <td style={{ padding: "9px 12px", maxWidth: 260 }}>
@@ -2850,6 +2915,7 @@ function DefectsPage({ assets, defects, userEmail, myFullName, onRefresh }) {
                   )}
                 </td>
               </tr>
+              ))(item)
             ))}
             {filtered.length === 0 && (
               <tr><td colSpan={7} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
@@ -5763,6 +5829,9 @@ function WorkOrdersPage({ assets, workOrders, userEmail, onRefresh }) {
   const [printing, setPrinting] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [query, setQuery] = useState("");
+  const [selectedFleet, setSelectedFleet] = useState("");
+  const [selectedAsset, setSelectedAsset] = useState("");
+  const [groupByMachine, setGroupByMachine] = useState(true);
 
   const columns = [
     ["wo_no", "Work order #"], ["asset_id", "Equipment #"], ["work_type", "Type"],
@@ -5771,12 +5840,19 @@ function WorkOrdersPage({ assets, workOrders, userEmail, onRefresh }) {
 
   const filtered = useMemo(() => {
     let rows = workOrders;
+    if (selectedAsset) rows = rows.filter((r) => r.asset_id === selectedAsset);
+    else if (selectedFleet) rows = rows.filter((r) => { const a = assets.find((x) => x.asset_id === r.asset_id); return a && a.fleet === selectedFleet; });
     if (query.trim()) {
       const q = query.toLowerCase();
       rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q)));
     }
     return [...rows].sort((a, b) => (b.request_date || "").localeCompare(a.request_date || ""));
-  }, [workOrders, query]);
+  }, [workOrders, assets, query, selectedFleet, selectedAsset]);
+
+  const groups = useMemo(() => buildMachineGroups(filtered, assets, {
+    enabled: groupByMachine, dateKey: "request_date", hoursKey: null,
+    sortKey: null, sortDir: null, sortRows: (r) => r,
+  }), [filtered, assets, groupByMachine]);
 
   const handleSaved = () => { setShowForm(false); setEditing(null); onRefresh(); };
 
@@ -5801,15 +5877,19 @@ function WorkOrdersPage({ assets, workOrders, userEmail, onRefresh }) {
 
   return (
     <div>
+      <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 12, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
           <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search work orders"
             style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }} />
         </div>
-        <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
-          + Add Work Order
-        </button>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <GroupByMachineToggle value={groupByMachine} onChange={setGroupByMachine} />
+          <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+            + Add Work Order
+          </button>
+        </div>
       </div>
       <ExcelSync
         data={workOrders} assets={assets} fields={WORK_ORDER_FIELDS} tableName="work_orders"
@@ -5826,8 +5906,11 @@ function WorkOrdersPage({ assets, workOrders, userEmail, onRefresh }) {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((row, i) => (
-              <tr key={row.id ?? i} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #EFEEE7" : "none" }}>
+            {flattenGroups(groups).map((item, i) => item.kind === "banner" ? (
+              <MachineBannerRow key={`b-${item.group.key}`} group={item.group} colSpan={columns.length + 1} first={i === 0} countNoun="work order" countNounPlural="work orders" />
+            ) : (
+              (({ row }) => (
+              <tr key={row.id ?? i} style={{ borderBottom: "1px solid #EFEEE7" }}>
                 {columns.map((c) => (
                   <td key={c.key} onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", whiteSpace: "nowrap", cursor: "pointer" }}>
                     {c.key === "status" || c.key === "priority" ? <Badge value={row[c.key]} /> : (row[c.key] ?? <span style={{ color: "#B4B2A9" }}>-</span>)}
@@ -5842,6 +5925,7 @@ function WorkOrdersPage({ assets, workOrders, userEmail, onRefresh }) {
                   </button>
                 </td>
               </tr>
+              ))(item)
             ))}
             {filtered.length === 0 && (
               <tr><td colSpan={columns.length + 1} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
@@ -6090,11 +6174,26 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
 
   const [pmCheckMessage, setPmCheckMessage] = useState(null);
   const [pmChecking, setPmChecking] = useState(false);
+  const [selectedFleet, setSelectedFleet] = useState("");
+  const [selectedAsset, setSelectedAsset] = useState("");
+  const [groupByMachine, setGroupByMachine] = useState(true);
 
   const plannedJobs = useMemo(
-    () => [...workOrders].filter((w) => w.work_type === "Preventive").sort((a, b) => (b.request_date || "").localeCompare(a.request_date || "")),
-    [workOrders]
+    () => [...workOrders]
+      .filter((w) => w.work_type === "Preventive")
+      .filter((w) => {
+        if (selectedAsset) return w.asset_id === selectedAsset;
+        if (selectedFleet) { const a = assets.find((x) => x.asset_id === w.asset_id); return a && a.fleet === selectedFleet; }
+        return true;
+      })
+      .sort((a, b) => (b.request_date || "").localeCompare(a.request_date || "")),
+    [workOrders, assets, selectedFleet, selectedAsset]
   );
+
+  const jobGroups = useMemo(() => buildMachineGroups(plannedJobs, assets, {
+    enabled: groupByMachine, dateKey: "request_date", hoursKey: null,
+    sortKey: null, sortDir: null, sortRows: (r) => r,
+  }), [plannedJobs, assets, groupByMachine]);
 
   const checkForDuePM = React.useCallback(async (silent) => {
     setPmChecking(true);
@@ -6150,6 +6249,7 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
 
   return (
     <div>
+      <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
       {pmCheckMessage && (
         <div style={{
           background: pmCheckMessage.type === "error" ? "#F6E2E0" : pmCheckMessage.type === "success" ? "#E2EFE9" : "#F2F1EA",
@@ -6221,6 +6321,7 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
         Add a specific planned maintenance task, print its Job Card for the technician to take on site, then upload the completed (signed) scan back here once it's done.
       </p>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <GroupByMachineToggle value={groupByMachine} onChange={setGroupByMachine} />
         <button onClick={() => { setEditingJob(null); setShowJobForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
           + Add Planned Maintenance
         </button>
@@ -6236,8 +6337,11 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
             </tr>
           </thead>
           <tbody>
-            {plannedJobs.map((row, i) => (
-              <tr key={row.id ?? i} style={{ borderBottom: i < plannedJobs.length - 1 ? "1px solid #EFEEE7" : "none" }}>
+            {flattenGroups(jobGroups).map((item, i) => item.kind === "banner" ? (
+              <MachineBannerRow key={`b-${item.group.key}`} group={item.group} colSpan={7} first={i === 0} countNoun="job" countNounPlural="jobs" />
+            ) : (
+              (({ row }) => (
+              <tr key={row.id ?? i} style={{ borderBottom: "1px solid #EFEEE7" }}>
                 <td style={{ padding: "9px 12px", cursor: "pointer" }} onClick={() => { setEditingJob(row); setShowJobForm(true); }}>{row.wo_no}</td>
                 <td style={{ padding: "9px 12px" }}>{row.asset_id}</td>
                 <td style={{ padding: "9px 12px", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.problem_scope}</td>
@@ -6253,6 +6357,7 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
                   </button>
                 </td>
               </tr>
+              ))(item)
             ))}
             {plannedJobs.length === 0 && (
               <tr><td colSpan={7} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No planned maintenance jobs yet.</td></tr>
