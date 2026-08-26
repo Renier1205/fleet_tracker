@@ -944,6 +944,12 @@ function todayForInput() {
 
 // Shifts a YYYY-MM-DD string by whole days. Built at midday so a daylight
 // saving jump can't roll the result onto the wrong date.
+function firstOfMonthForInput() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-01`;
+}
+
 function addDaysToInput(dateStr, days) {
   if (!dateStr) return dateStr;
   const d = new Date(`${dateStr}T12:00:00`);
@@ -4791,6 +4797,8 @@ function FuelLogPage({ assets, fuelLog, userEmail, myFullName, dailyHours, onRef
   const [selectedAsset, setSelectedAsset] = useState("");
 
   const [groupByMachine, setGroupByMachine] = useState(true);
+  const [dateFrom, setDateFrom] = useState(firstOfMonthForInput());
+  const [dateTo, setDateTo] = useState(todayForInput());
   const prefs = useTablePrefs("fuel_log", FUEL_LOG_COLUMNS);
   const columns = prefs.columns;
 
@@ -4799,8 +4807,10 @@ function FuelLogPage({ assets, fuelLog, userEmail, myFullName, dailyHours, onRef
     if (selectedAsset) rows = rows.filter((r) => r.asset_id === selectedAsset);
     else if (selectedFleet) rows = rows.filter((r) => { const a = assets.find((x) => x.asset_id === r.asset_id); return a && a.fleet === selectedFleet; });
     if (query.trim()) { const q = query.toLowerCase(); rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q))); }
+    if (dateFrom) rows = rows.filter((r) => (r.fill_date || "") >= dateFrom);
+    if (dateTo) rows = rows.filter((r) => (r.fill_date || "") <= dateTo);
     return [...rows].sort((a, b) => (b.fill_date || "").localeCompare(a.fill_date || ""));
-  }, [fuelLog, assets, query, selectedFleet, selectedAsset]);
+  }, [fuelLog, assets, query, selectedFleet, selectedAsset, dateFrom, dateTo]);
 
   const groups = useMemo(() => buildMachineGroups(filtered, assets, {
     enabled: groupByMachine, dateKey: "fill_date", hoursKey: "litres",
@@ -4823,6 +4833,22 @@ function FuelLogPage({ assets, fuelLog, userEmail, myFullName, dailyHours, onRef
   return (
     <div>
       <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap", fontSize: 13, color: "#4B5659" }}>
+        <span style={{ fontWeight: 600 }}>Dates</span>
+        <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+          style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8 }} />
+        <span>to</span>
+        <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+          style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8 }} />
+        <button onClick={() => { setDateFrom(firstOfMonthForInput()); setDateTo(todayForInput()); }}
+          style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12.5, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: "pointer" }}>
+          Month to date
+        </button>
+        <button onClick={() => { setDateFrom(""); setDateTo(""); }}
+          style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#4B5659", fontSize: 12.5, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: "pointer" }}>
+          Show all
+        </button>
+      </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 12, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
           <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
@@ -5013,6 +5039,8 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, myFullName, dai
   const [selectedAsset, setSelectedAsset] = useState("");
 
   const [groupByMachine, setGroupByMachine] = useState(true);
+  const [dateFrom, setDateFrom] = useState(firstOfMonthForInput());
+  const [dateTo, setDateTo] = useState(todayForInput());
   const prefs = useTablePrefs("oil_consumption", OIL_CONSUMPTION_COLUMNS);
   const columns = prefs.columns;
 
@@ -5021,8 +5049,10 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, myFullName, dai
     if (selectedAsset) rows = rows.filter((r) => r.asset_id === selectedAsset);
     else if (selectedFleet) rows = rows.filter((r) => { const a = assets.find((x) => x.asset_id === r.asset_id); return a && a.fleet === selectedFleet; });
     if (query.trim()) { const q = query.toLowerCase(); rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q))); }
+    if (dateFrom) rows = rows.filter((r) => (r.fill_date || "") >= dateFrom);
+    if (dateTo) rows = rows.filter((r) => (r.fill_date || "") <= dateTo);
     return [...rows].sort((a, b) => (b.fill_date || "").localeCompare(a.fill_date || ""));
-  }, [oilConsumption, assets, query, selectedFleet, selectedAsset]);
+  }, [oilConsumption, assets, query, selectedFleet, selectedAsset, dateFrom, dateTo]);
 
   const groups = useMemo(() => buildMachineGroups(filtered, assets, {
     enabled: groupByMachine, dateKey: "fill_date", hoursKey: "litres",
@@ -5047,6 +5077,22 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, myFullName, dai
   return (
     <div>
       <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap", fontSize: 13, color: "#4B5659" }}>
+        <span style={{ fontWeight: 600 }}>Dates</span>
+        <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+          style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8 }} />
+        <span>to</span>
+        <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+          style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8 }} />
+        <button onClick={() => { setDateFrom(firstOfMonthForInput()); setDateTo(todayForInput()); }}
+          style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12.5, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: "pointer" }}>
+          Month to date
+        </button>
+        <button onClick={() => { setDateFrom(""); setDateTo(""); }}
+          style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#4B5659", fontSize: 12.5, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: "pointer" }}>
+          Show all
+        </button>
+      </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 12, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
           <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
