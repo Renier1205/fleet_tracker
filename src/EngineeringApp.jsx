@@ -1207,6 +1207,10 @@ function DailyHoursPage({ assets, dailyHours, userEmail, selectedSiteId, onRefre
   const [showBudgetForm, setShowBudgetForm] = useState(false);
   const [query, setQuery] = useState("");
   const [shiftFilter, setShiftFilter] = useState("");
+  const [selectedFleet, setSelectedFleet] = useState("");
+  const [selectedAsset, setSelectedAsset] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [budgetLoading, setBudgetLoading] = useState(true);
   const [deleting, setDeleting] = useState(null);
   const [drillFleet, setDrillFleet] = useState(null);
@@ -1283,17 +1287,35 @@ function DailyHoursPage({ assets, dailyHours, userEmail, selectedSiteId, onRefre
 
   const fleetByAsset = useMemo(() => new Map(assets.map((a) => [a.asset_id, a.fleet])), [assets]);
 
+  const RECENT_DAYS_SHOWN = 2;
+
   const filtered = useMemo(() => {
     let rows = dailyHours;
     if (shiftFilter) rows = rows.filter((r) => r.shift === shiftFilter);
+    if (selectedAsset) rows = rows.filter((r) => r.asset_id === selectedAsset);
+    else if (selectedFleet) rows = rows.filter((r) => fleetByAsset.get(r.asset_id) === selectedFleet);
     if (query.trim()) {
       const q = query.toLowerCase();
       rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q)));
     }
+
+    // With no date range set, show only the most recent couple of capture
+    // dates - a full month of every machine is unreadable. Applied after
+    // the other filters, so narrowing to one machine shows that machine's
+    // last two days rather than the fleet's.
+    if (dateFrom) rows = rows.filter((r) => (r.log_date || "") >= dateFrom);
+    if (dateTo) rows = rows.filter((r) => (r.log_date || "") <= dateTo);
+    if (!dateFrom && !dateTo) {
+      const recent = new Set(
+        [...new Set(rows.map((r) => r.log_date).filter(Boolean))].sort().reverse().slice(0, RECENT_DAYS_SHOWN)
+      );
+      rows = rows.filter((r) => recent.has(r.log_date));
+    }
+
     rows = rows.map((r) => ({ ...r, fleet: fleetByAsset.get(r.asset_id) || "-" }));
     const byDate = [...rows].sort((a, b) => (b.log_date || "").localeCompare(a.log_date || "") || (a.shift || "").localeCompare(b.shift || ""));
     return prefs.sortRows(byDate);
-  }, [dailyHours, query, shiftFilter, fleetByAsset, prefs.sortRows]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [dailyHours, query, shiftFilter, selectedFleet, selectedAsset, dateFrom, dateTo, fleetByAsset, prefs.sortRows]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSaved = () => {
     setShowForm(false);
@@ -1520,6 +1542,25 @@ function DailyHoursPage({ assets, dailyHours, userEmail, selectedSiteId, onRefre
           }}>
             {bulkMessage.text}
           </div>
+        )}
+      </div>
+
+      <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap", fontSize: 13, color: "#4B5659" }}>
+        <span style={{ fontWeight: 600 }}>Dates</span>
+        <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+          style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8 }} />
+        <span>to</span>
+        <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+          style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8 }} />
+        {(dateFrom || dateTo) ? (
+          <button onClick={() => { setDateFrom(""); setDateTo(""); }}
+            style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12.5, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: "pointer" }}>
+            Back to latest {RECENT_DAYS_SHOWN} days
+          </button>
+        ) : (
+          <span style={{ color: "#859195" }}>Showing the latest {RECENT_DAYS_SHOWN} capture dates — pick a range to see more.</span>
         )}
       </div>
 
