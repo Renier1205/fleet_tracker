@@ -811,6 +811,22 @@ function todayForInput() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+// Shifts a YYYY-MM-DD string by whole days. Built at midday so a daylight
+// saving jump can't roll the result onto the wrong date.
+function addDaysToInput(dateStr, days) {
+  if (!dateStr) return dateStr;
+  const d = new Date(`${dateStr}T12:00:00`);
+  d.setDate(d.getDate() + days);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// Renders a date as e.g. "Tue 13 Aug" for the shift confirmation line.
+function shortDateLabel(dateStr) {
+  if (!dateStr) return "";
+  return new Date(`${dateStr}T12:00:00`).toLocaleDateString("en-ZA", { weekday: "short", day: "2-digit", month: "short" });
+}
+
 // Formats a price with a space as the thousands separator and 2 decimal
 // places (e.g. 16938 -> "16 938.00") - easier to read at a glance than a
 // long run of digits, without relying on a locale's own grouping/decimal
@@ -842,16 +858,87 @@ function findExpectedOpeningHours(dailyHours, assetId, logDate, shift) {
   return candidate ? candidate.closing_hours : null;
 }
 
-function DailyHoursForm({ assets, dailyHours, existing, onClose, onSaved }) {
+function DailyHoursForm({ assets, dailyHours, existing, selectedSiteId, onClose, onSaved }) {
   const isEdit = !!existing;
   const [assetId, setAssetId] = useState(existing?.asset_id || assets[0]?.asset_id || "");
-  const [logDate, setLogDate] = useState(existing?.log_date || todayForInput());
-  const [shift, setShift] = useState(existing?.shift || "Day");
+  const [captureDate, setCaptureDate] = useState(existing?.log_date || todayForInput());
   const [closingHours, setClosingHours] = useState(existing?.closing_hours ?? "");
   const [status, setStatus] = useState(existing?.status || "Operating");
   const [notes, setNotes] = useState(existing?.notes || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // Equipment picker filters - a long fleet list is painful to scroll on
+  // a tablet at the workshop door.
+  const [fleetFilter, setFleetFilter] = useState("");
+  const [assetQuery, setAssetQuery] = useState("");
+
+  // Shift changeover times come from the site, so a site running 06:00 /
+  // 18:00 gets its own options rather than the 07:00 / 19:00 default.
+  const [shiftTimes, setShiftTimes] = useState({ day: "07:00", night: "19:00" });
+  const [captureTime, setCaptureTime] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!selectedSiteId) return;
+      try {
+        const { data, error: siteErr } = await supabase
+          .from("sites").select("day_shift_start, night_shift_start").eq("id", selectedSiteId).maybeSingle();
+        if (siteErr || cancelled || !data) return;
+        setShiftTimes({
+          day: (data.day_shift_start || "07:00").slice(0, 5),
+          night: (data.night_shift_start || "19:00").slice(0, 5),
+        });
+      } catch (err) {
+        // 07:00 / 19:00 remain in place - never block logging over this.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedSiteId]);
+
+  // Default to whichever changeover has most recently passed.
+  useEffect(() => {
+    if (isEdit || captureTime) return;
+    const nowHM = new Date().toTimeString().slice(0, 5);
+    setCaptureTime(nowHM >= shiftTimes.night || nowHM < shiftTimes.day ? shiftTimes.night : shiftTimes.day);
+  }, [shiftTimes, isEdit, captureTime]);
+
+  // The rule: a reading at the morning changeover closes the NIGHT shift
+  // that began the evening before, so it files against the previous day.
+  // A reading at the evening changeover closes that same day's DAY shift.
+  // Operators only ever see the date they're standing in.
+  const derived = useMemo(() => {
+    if (isEdit) return { logDate: existing.log_date, shift: existing.shift };
+    if (captureTime === shiftTimes.day) return { logDate: addDaysToInput(captureDate, -1), shift: "Night" };
+    return { logDate: captureDate, shift: "Day" };
+  }, [isEdit, existing, captureTime, captureDate, shiftTimes]);
+
+  const logDate = derived.logDate;
+  const shift = derived.shift;
+
+  const visibleAssets = useMemo(() => {
+    const q = assetQuery.trim().toLowerCase();
+    return assets.filter((a) => {
+      if (fleetFilter && a.fleet !== fleetFilter) return false;
+      if (!q) return true;
+      return `${a.asset_id} ${a.asset_name || ""} ${a.fleet || ""}`.toLowerCase().includes(q);
+    });
+  }, [assets, fleetFilter, assetQuery]);
+
+  const fleetOptions = useMemo(
+    () => [...new Set(assets.map((a) => a.fleet).filter(Boolean))].sort(),
+    [assets]
+  );
+
+  // If filtering hides the selected machine, move the selection to
+  // something visible so the form can't save a machine you can't see.
+  useEffect(() => {
+    if (isEdit) return;
+    if (visibleAssets.length && !visibleAssets.some((a) => a.asset_id === assetId)) {
+      setAssetId(visibleAssets[0].asset_id);
+    }
+  }, [visibleAssets, assetId, isEdit]);
 
   const openingHours = isEdit && existing?.opening_hours != null
     ? existing.opening_hours
@@ -931,25 +1018,63 @@ function DailyHoursForm({ assets, dailyHours, existing, onClose, onSaved }) {
           {isEdit ? "Edit Daily Hours" : "Log Daily Hours"}
         </h3>
 
+        {!isEdit && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 8 }}>
+            <div>
+              <label style={labelStyle}>Filter by fleet</label>
+              <select value={fleetFilter} onChange={(e) => setFleetFilter(e.target.value)} style={fieldStyle}>
+                <option value="">All fleets</option>
+                {fleetOptions.map((f) => <option key={f} value={f}>{f}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Search equipment</label>
+              <input value={assetQuery} onChange={(e) => setAssetQuery(e.target.value)} placeholder="Type a number or name" style={fieldStyle} />
+            </div>
+          </div>
+        )}
+
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Equipment</label>
           <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#4B5659" } : {}) }}>
-            {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
+            {(isEdit ? assets : visibleAssets).map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id} - {a.asset_name}</option>)}
           </select>
+          {!isEdit && visibleAssets.length === 0 && (
+            <p style={{ fontSize: 12, color: "#B85450", margin: "4px 0 0" }}>No equipment matches that fleet or search.</p>
+          )}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-          <div>
-            <label style={labelStyle}>Date</label>
-            <input type="date" value={logDate} onChange={(e) => setLogDate(e.target.value)} required disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#4B5659" } : {}) }} />
+        {isEdit ? (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+            <div>
+              <label style={labelStyle}>Date</label>
+              <input type="date" value={logDate} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#4B5659" }} />
+            </div>
+            <div>
+              <label style={labelStyle}>Shift</label>
+              <input type="text" value={shift} disabled style={{ ...fieldStyle, background: "#F2F1EA", color: "#4B5659" }} />
+            </div>
           </div>
-          <div>
-            <label style={labelStyle}>Shift</label>
-            <select value={shift} onChange={(e) => setShift(e.target.value)} disabled={isEdit} style={{ ...fieldStyle, ...(isEdit ? { background: "#F2F1EA", color: "#4B5659" } : {}) }}>
-              {SHIFTS.map((s) => <option key={s} value={s}>{s} {s === "Day" ? "(07:00-19:00)" : "(19:00-07:00)"}</option>)}
-            </select>
-          </div>
-        </div>
+        ) : (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 8 }}>
+              <div>
+                <label style={labelStyle}>Reading date</label>
+                <input type="date" value={captureDate} onChange={(e) => setCaptureDate(e.target.value)} required style={fieldStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Reading time</label>
+                <select value={captureTime} onChange={(e) => setCaptureTime(e.target.value)} style={fieldStyle}>
+                  <option value={shiftTimes.day}>{shiftTimes.day}</option>
+                  <option value={shiftTimes.night}>{shiftTimes.night}</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ marginBottom: 12, padding: "8px 10px", background: "#E2EFE9", border: "1px solid #B7D89A", borderRadius: 8, fontSize: 12.5, color: "#2C5646" }}>
+              {captureTime} closes the <strong>{shift} shift</strong> of {shortDateLabel(logDate)}
+            </div>
+          </>
+        )}
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 4 }}>
           <div>
@@ -1076,7 +1201,7 @@ function ScheduledHoursForm({ assets, fleets, existing, onClose, onSaved }) {
   );
 }
 
-function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
+function DailyHoursPage({ assets, dailyHours, userEmail, selectedSiteId, onRefresh }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [showBudgetForm, setShowBudgetForm] = useState(false);
@@ -1462,7 +1587,7 @@ function DailyHoursPage({ assets, dailyHours, userEmail, onRefresh }) {
       </div>
 
       {showForm && (
-        <DailyHoursForm assets={assets} dailyHours={dailyHours} existing={editing}
+        <DailyHoursForm assets={assets} dailyHours={dailyHours} existing={editing} selectedSiteId={selectedSiteId}
           onClose={() => { setShowForm(false); setEditing(null); }} onSaved={handleSaved} />
       )}
       {deleting && (
@@ -9978,7 +10103,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
             ) : active === "assets" ? (
               <AssetsPage assets={assets} selectedSiteId={selectedSiteId} onRefresh={loadCoreData} isAdmin={isAdmin} mySites={mySites} />
             ) : active === "daily_hours" ? (
-              <DailyHoursPage assets={assets} dailyHours={dailyHours} userEmail={userEmail} onRefresh={loadCoreData} />
+              <DailyHoursPage assets={assets} dailyHours={dailyHours} userEmail={userEmail} selectedSiteId={selectedSiteId} onRefresh={loadCoreData} />
             ) : active === "planned_maintenance" ? (
               <PlannedMaintenancePage assets={assets} plannedMaintenance={plannedMaintenance} workOrders={workOrders} userEmail={userEmail} onRefresh={loadRestOfData} />
             ) : active === "work_orders" ? (
