@@ -5197,6 +5197,9 @@ function MtbfMttrReportPage({ assets }) {
       const availByAsset = (rows) => Object.fromEntries((rows || []).map((r) => [r.asset_id, r.availability]));
       const last24ByAsset = availByAsset(last24Res.data);
       const mtdByAsset = availByAsset(mtdRes.data);
+      // Full last-24h row too - the charts plot it beside the selected
+      // period, so mtbf/mttr/utilisation are needed, not just availability.
+      const last24RowByAsset = Object.fromEntries((last24Res.data || []).map((r) => [r.asset_id, r]));
 
       // plant_performance_kpi() returns every asset across every site (it
       // has no site filter of its own) - scope it down to just the assets
@@ -5210,6 +5213,9 @@ function MtbfMttrReportPage({ assets }) {
           ...r,
           availability_24h: last24ByAsset[r.asset_id] ?? null,
           availability_mtd: mtdByAsset[r.asset_id] ?? null,
+          mtbf_24h: last24RowByAsset[r.asset_id]?.mtbf ?? null,
+          mttr_24h: last24RowByAsset[r.asset_id]?.mttr ?? null,
+          utilisation_24h: last24RowByAsset[r.asset_id]?.utilisation ?? null,
         }));
 
       setKpiData(merged);
@@ -5301,7 +5307,14 @@ function MtbfMttrReportPage({ assets }) {
         const chartXKey = showByFleet ? "fleet" : "asset_id";
         const mtbfMax = Math.max(mtbfTarget, ...chartData.map((r) => r.mtbf || 0)) * 1.15;
         const mttrMax = Math.max(mttrTarget, ...chartData.map((r) => r.mttr || 0)) * 1.15;
-        const utilRows = chartData.map((r) => ({ ...r, utilisationPct: r.utilisation != null ? Math.round(r.utilisation * 100) : null }));
+        const utilRows = chartData.map((r) => ({
+          ...r,
+          utilisationPct: r.utilisation != null ? Math.round(r.utilisation * 100) : null,
+          utilisationPct24h: r.utilisation_24h != null ? Math.round(r.utilisation_24h * 100) : null,
+        }));
+        // Solid bar follows the date range at the top (month to date by
+        // default); the faded bar beside it is always the last 24 hours.
+        const periodLabel = "Selected period";
         const handleBarClick = (row) => {
           if (showByFleet) setSelectedFleet(row.fleet);
           else if (!selectedAsset) setSelectedAsset(row.asset_id);
@@ -5323,28 +5336,28 @@ function MtbfMttrReportPage({ assets }) {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(280px,100%),1fr))", gap: 16, marginBottom: 8 }}>
             <KpiBarChart
-              title={showByFleet ? "MTBF by fleet (hrs)" : "MTBF by equipment (hrs)"} data={chartData} xKey={chartXKey} dataKey="mtbf"
+              title={showByFleet ? "MTBF by fleet (hrs)" : "MTBF by equipment (hrs)"} data={chartData} xKey={chartXKey} dataKey="mtbf" dataKey2="mtbf_24h" seriesName={periodLabel} seriesName2="Last 24h" meetsTarget2={(r) => (r.mtbf_24h || 0) >= mtbfTarget}
               target={mtbfTarget} domainMax={mtbfMax} unitSuffix="h"
               valueFormatter={(v) => Number(v).toFixed(1)}
               meetsTarget={(r) => (r.mtbf || 0) >= mtbfTarget}
               onBarClick={handleBarClick}
             />
             <KpiBarChart
-              title={showByFleet ? "MTTR by fleet (hrs)" : "MTTR by equipment (hrs)"} data={chartData} xKey={chartXKey} dataKey="mttr"
+              title={showByFleet ? "MTTR by fleet (hrs)" : "MTTR by equipment (hrs)"} data={chartData} xKey={chartXKey} dataKey="mttr" dataKey2="mttr_24h" seriesName={periodLabel} seriesName2="Last 24h" meetsTarget2={(r) => (r.mttr_24h || 0) <= mttrTarget}
               target={mttrTarget} domainMax={mttrMax} unitSuffix="h"
               valueFormatter={(v) => Number(v).toFixed(1)}
               meetsTarget={(r) => (r.mttr || 0) <= mttrTarget}
               onBarClick={handleBarClick}
             />
             <KpiBarChart
-              title={showByFleet ? "Utilisation by fleet" : "Utilisation by equipment"} data={utilRows} xKey={chartXKey} dataKey="utilisationPct"
+              title={showByFleet ? "Utilisation by fleet" : "Utilisation by equipment"} data={utilRows} xKey={chartXKey} dataKey="utilisationPct" dataKey2="utilisationPct24h" seriesName={periodLabel} seriesName2="Last 24h" meetsTarget2={(r) => (r.utilisationPct24h || 0) >= utilTarget}
               target={utilTarget} domainMax={100} unitSuffix="%"
               valueFormatter={(v) => `${v}%`}
               meetsTarget={(r) => (r.utilisationPct || 0) >= utilTarget}
               onBarClick={handleBarClick}
             />
           </div>
-          <KpiLegend targetLabel="Target" />
+          <KpiLegend targetLabel="Target" showSeries />
         </div>
         );
       })()}
@@ -8607,6 +8620,9 @@ function aggregateMetrics(kpiRows, assetIds) {
     breakdown_count: totalBreakdowns,
     mtbf: avgMtbf,
     mttr: avgMttr,
+    mtbf_24h: avg("mtbf_24h"),
+    mttr_24h: avg("mttr_24h"),
+    utilisation_24h: avg("utilisation_24h"),
     availability_index: avgMtbf != null && avgMttr != null && (avgMtbf + avgMttr) > 0
       ? (avgMtbf / (avgMtbf + avgMttr)) * 100
       : avg("availability_index"),
@@ -9005,7 +9021,7 @@ function niceDomainMax(value) {
   return niceNormalized * magnitude;
 }
 
-function KpiBarChart({ title, data, xKey, dataKey, target, domainMax, valueFormatter, meetsTarget, unitSuffix, onClick, onBarClick }) {
+function KpiBarChart({ title, data, xKey, dataKey, dataKey2, seriesName, seriesName2, target, domainMax, valueFormatter, meetsTarget, meetsTarget2, unitSuffix, onClick, onBarClick }) {
   const gradGreen = `grad-green-${dataKey}`;
   const gradRed = `grad-red-${dataKey}`;
   const niceMax = domainMax === 100 ? 100 : niceDomainMax(domainMax);
@@ -9043,10 +9059,20 @@ function KpiBarChart({ title, data, xKey, dataKey, target, domainMax, valueForma
               <XAxis dataKey={xKey} interval={0} angle={-40} textAnchor="end" height={isMobile ? 54 : 44} tick={{ fontSize: 10, fill: "#CFCFCF" }} axisLine={{ stroke: "#4A4A4A" }} tickLine={false} tickFormatter={(v) => truncateLabel(v, isMobile ? 12 : 14)} />
               <YAxis domain={[0, niceMax]} tick={{ fontSize: 11, fill: "#CFCFCF" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}${unitSuffix || ""}`} />
               <Tooltip formatter={(v) => `${Number(v).toFixed(1)}${unitSuffix || ""}`} contentStyle={{ background: "#1F1F1F", border: "1px solid #444", borderRadius: 8 }} labelStyle={{ color: "#fff" }} itemStyle={{ color: "#fff" }} />
-              <Bar dataKey={dataKey} radius={[3, 3, 0, 0]} cursor={(onClick || onBarClick) ? "pointer" : "default"} onClick={onBarClick ? (row) => onBarClick(row) : undefined}>
+              <Bar dataKey={dataKey} name={seriesName} radius={[3, 3, 0, 0]} cursor={(onClick || onBarClick) ? "pointer" : "default"} onClick={onBarClick ? (row) => onBarClick(row) : undefined}>
                 {data.map((row, i) => <Cell key={i} fill={meetsTarget(row) ? `url(#${gradGreen})` : `url(#${gradRed})`} />)}
                 <LabelList dataKey={dataKey} position="top" formatter={valueFormatter} fill="#fff" fontSize={11} fontWeight={700} />
               </Bar>
+              {dataKey2 && (
+                <Bar dataKey={dataKey2} name={seriesName2} radius={[3, 3, 0, 0]} cursor={(onClick || onBarClick) ? "pointer" : "default"} onClick={onBarClick ? (row) => onBarClick(row) : undefined}>
+                  {data.map((row, i) => (
+                    <Cell key={i}
+                      fill={(meetsTarget2 || meetsTarget)(row) ? `url(#${gradGreen})` : `url(#${gradRed})`}
+                      fillOpacity={0.45} stroke="#CFCFCF" strokeWidth={0.7} />
+                  ))}
+                  <LabelList dataKey={dataKey2} position="top" formatter={valueFormatter} fill="#CFCFCF" fontSize={10} fontWeight={600} />
+                </Bar>
+              )}
               <ReferenceLine y={target} stroke="#F5C518" strokeWidth={2.5} />
             </BarChart>
           </ResponsiveContainer>
@@ -9057,9 +9083,15 @@ function KpiBarChart({ title, data, xKey, dataKey, target, domainMax, valueForma
   );
 }
 
-function KpiLegend({ targetLabel }) {
+function KpiLegend({ targetLabel, showSeries }) {
   return (
-    <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 11.5, color: "#4B5659" }}>
+    <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 11.5, color: "#4B5659", flexWrap: "wrap" }}>
+      {showSeries && (
+        <>
+          <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#4B5659", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Solid bar = selected period</span>
+          <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#4B5659", opacity: 0.45, border: "1px solid #CFCFCF", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Faded bar = last 24 hours</span>
+        </>
+      )}
       <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#2F9E63", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Target met</span>
       <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#A62A1E", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Target not met</span>
       <span><span style={{ display: "inline-block", width: 12, height: 3, background: "#F5C518", borderRadius: 2, marginRight: 6, verticalAlign: "middle" }} />{targetLabel || "Target"}</span>
