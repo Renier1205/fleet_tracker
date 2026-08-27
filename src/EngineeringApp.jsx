@@ -5298,24 +5298,34 @@ function MtbfMttrReportPage({ assets }) {
       <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
 
       {!loading && rows.length > 0 && (() => {
-        const mtbfTarget = 40, mttrTarget = 4, utilTarget = 85;
+        const mtbfTarget = 40, mttrTarget = 4, utilTarget = 85, availTarget = 85;
         // No fleet/equipment picked -> chart by fleet (5 readable bars).
         // Fleet picked -> chart by individual machine within that fleet.
         // Equipment picked -> rows is just that one machine either way.
         const showByFleet = !selectedFleet && !selectedAsset;
         const chartData = showByFleet ? fleetKpiData : rows;
         const chartXKey = showByFleet ? "fleet" : "asset_id";
-        const mtbfMax = Math.max(mtbfTarget, ...chartData.map((r) => r.mtbf || 0)) * 1.15;
-        const mttrMax = Math.max(mttrTarget, ...chartData.map((r) => r.mttr || 0)) * 1.15;
-        const utilRows = chartData.map((r) => ({
+        const mtbfMax = Math.max(mtbfTarget, ...chartData.map((r) => Math.max(r.mtbf || 0, r.mtbf_24h || 0))) * 1.15;
+        const mttrMax = Math.max(mttrTarget, ...chartData.map((r) => Math.max(r.mttr || 0, r.mttr_24h || 0))) * 1.15;
+        // A Total group on the right, aggregated across everything on
+        // screen - the same shape as the Excel report.
+        const totalRow = chartData.length > 1
+          ? { [chartXKey]: "Total", ...aggregateMetrics(rows, rows.map((r) => r.asset_id)) }
+          : null;
+        const withTotal = totalRow ? [...chartData, totalRow] : chartData;
+
+        const pct = (v) => (v != null ? Math.round(v * 100) : null);
+        const chartRows = withTotal.map((r) => ({
           ...r,
-          utilisationPct: r.utilisation != null ? Math.round(r.utilisation * 100) : null,
-          utilisationPct24h: r.utilisation_24h != null ? Math.round(r.utilisation_24h * 100) : null,
+          utilisationPct: pct(r.utilisation),
+          utilisationPct24h: pct(r.utilisation_24h),
+          availabilityPct: pct(r.availability),
+          availabilityPct24h: pct(r.availability_24h),
         }));
-        // Solid bar follows the date range at the top (month to date by
-        // default); the faded bar beside it is always the last 24 hours.
+
         const periodLabel = "Selected period";
         const handleBarClick = (row) => {
+          if (row.fleet === "Total" || row.asset_id === "Total") return;
           if (showByFleet) setSelectedFleet(row.fleet);
           else if (!selectedAsset) setSelectedAsset(row.asset_id);
         };
@@ -5336,24 +5346,31 @@ function MtbfMttrReportPage({ assets }) {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(280px,100%),1fr))", gap: 16, marginBottom: 8 }}>
             <KpiBarChart
-              title={showByFleet ? "MTBF by fleet (hrs)" : "MTBF by equipment (hrs)"} data={chartData} xKey={chartXKey} dataKey="mtbf" dataKey2="mtbf_24h" seriesName={periodLabel} seriesName2="Last 24h" meetsTarget2={(r) => (r.mtbf_24h || 0) >= mtbfTarget}
+              title={showByFleet ? "MTBF by fleet (hrs)" : "MTBF by equipment (hrs)"} data={chartRows} xKey={chartXKey} dataKey="mtbf" dataKey2="mtbf_24h" seriesName={periodLabel} seriesName2="Last 24h" meetsTarget2={(r) => (r.mtbf_24h || 0) >= mtbfTarget}
               target={mtbfTarget} domainMax={mtbfMax} unitSuffix="h"
               valueFormatter={(v) => Number(v).toFixed(1)}
               meetsTarget={(r) => (r.mtbf || 0) >= mtbfTarget}
               onBarClick={handleBarClick}
             />
             <KpiBarChart
-              title={showByFleet ? "MTTR by fleet (hrs)" : "MTTR by equipment (hrs)"} data={chartData} xKey={chartXKey} dataKey="mttr" dataKey2="mttr_24h" seriesName={periodLabel} seriesName2="Last 24h" meetsTarget2={(r) => (r.mttr_24h || 0) <= mttrTarget}
+              title={showByFleet ? "MTTR by fleet (hrs)" : "MTTR by equipment (hrs)"} data={chartRows} xKey={chartXKey} dataKey="mttr" dataKey2="mttr_24h" seriesName={periodLabel} seriesName2="Last 24h" meetsTarget2={(r) => (r.mttr_24h || 0) <= mttrTarget}
               target={mttrTarget} domainMax={mttrMax} unitSuffix="h"
               valueFormatter={(v) => Number(v).toFixed(1)}
               meetsTarget={(r) => (r.mttr || 0) <= mttrTarget}
               onBarClick={handleBarClick}
             />
             <KpiBarChart
-              title={showByFleet ? "Utilisation by fleet" : "Utilisation by equipment"} data={utilRows} xKey={chartXKey} dataKey="utilisationPct" dataKey2="utilisationPct24h" seriesName={periodLabel} seriesName2="Last 24h" meetsTarget2={(r) => (r.utilisationPct24h || 0) >= utilTarget}
+              title={showByFleet ? "Utilisation by fleet" : "Utilisation by equipment"} data={chartRows} xKey={chartXKey} dataKey="utilisationPct" dataKey2="utilisationPct24h" seriesName={periodLabel} seriesName2="Last 24h" meetsTarget2={(r) => (r.utilisationPct24h || 0) >= utilTarget}
               target={utilTarget} domainMax={100} unitSuffix="%"
               valueFormatter={(v) => `${v}%`}
               meetsTarget={(r) => (r.utilisationPct || 0) >= utilTarget}
+              onBarClick={handleBarClick}
+            />
+            <KpiBarChart
+              title={showByFleet ? "Availability by fleet" : "Availability by equipment"} data={chartRows} xKey={chartXKey} dataKey="availabilityPct" dataKey2="availabilityPct24h" seriesName={periodLabel} seriesName2="Last 24h" meetsTarget2={(r) => (r.availabilityPct24h || 0) >= availTarget}
+              target={availTarget} domainMax={100} unitSuffix="%"
+              valueFormatter={(v) => `${v}%`}
+              meetsTarget={(r) => (r.availabilityPct || 0) >= availTarget}
               onBarClick={handleBarClick}
             />
           </div>
@@ -8603,7 +8620,13 @@ function KpiRow({ metrics }) {
 function aggregateMetrics(kpiRows, assetIds) {
   const rows = kpiRows.filter((r) => assetIds.includes(r.asset_id));
   if (rows.length === 0) return {};
-  const numRows = (key) => rows.map((r) => Number(r[key])).filter((v) => !isNaN(v));
+  // Missing values must be EXCLUDED, not treated as zero. Number(null)
+  // is 0, not NaN, so an isNaN filter alone silently counts a machine
+  // with no data as a 0% machine and drags its fleet's average down.
+  const numRows = (key) => rows
+    .filter((r) => r[key] !== null && r[key] !== undefined && r[key] !== "")
+    .map((r) => Number(r[key]))
+    .filter((v) => !isNaN(v));
   const sum = (key) => numRows(key).reduce((a, b) => a + b, 0);
   const avg = (key) => {
     const vals = numRows(key);
@@ -8620,6 +8643,7 @@ function aggregateMetrics(kpiRows, assetIds) {
     breakdown_count: totalBreakdowns,
     mtbf: avgMtbf,
     mttr: avgMttr,
+    availability_24h: avg("availability_24h"),
     mtbf_24h: avg("mtbf_24h"),
     mttr_24h: avg("mttr_24h"),
     utilisation_24h: avg("utilisation_24h"),
@@ -9021,6 +9045,12 @@ function niceDomainMax(value) {
   return niceNormalized * magnitude;
 }
 
+// Two-series charts use fixed colours per series (like the Excel report)
+// rather than target-based colouring, which becomes unreadable once two
+// bars sit side by side. The target line carries the pass/fail meaning.
+const SERIES_1_COLOUR = "#2F9E63";  // last 24 hours
+const SERIES_2_COLOUR = "#E8C51C";  // selected period / month to date
+
 function KpiBarChart({ title, data, xKey, dataKey, dataKey2, seriesName, seriesName2, target, domainMax, valueFormatter, meetsTarget, meetsTarget2, unitSuffix, onClick, onBarClick }) {
   const gradGreen = `grad-green-${dataKey}`;
   const gradRed = `grad-red-${dataKey}`;
@@ -9060,17 +9090,14 @@ function KpiBarChart({ title, data, xKey, dataKey, dataKey2, seriesName, seriesN
               <YAxis domain={[0, niceMax]} tick={{ fontSize: 11, fill: "#CFCFCF" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}${unitSuffix || ""}`} />
               <Tooltip formatter={(v) => `${Number(v).toFixed(1)}${unitSuffix || ""}`} contentStyle={{ background: "#1F1F1F", border: "1px solid #444", borderRadius: 8 }} labelStyle={{ color: "#fff" }} itemStyle={{ color: "#fff" }} />
               <Bar dataKey={dataKey} name={seriesName} radius={[3, 3, 0, 0]} cursor={(onClick || onBarClick) ? "pointer" : "default"} onClick={onBarClick ? (row) => onBarClick(row) : undefined}>
-                {data.map((row, i) => <Cell key={i} fill={meetsTarget(row) ? `url(#${gradGreen})` : `url(#${gradRed})`} />)}
+                {data.map((row, i) => (
+                  <Cell key={i} fill={dataKey2 ? SERIES_1_COLOUR : (meetsTarget(row) ? `url(#${gradGreen})` : `url(#${gradRed})`)} />
+                ))}
                 <LabelList dataKey={dataKey} position="top" formatter={valueFormatter} fill="#fff" fontSize={11} fontWeight={700} />
               </Bar>
               {dataKey2 && (
-                <Bar dataKey={dataKey2} name={seriesName2} radius={[3, 3, 0, 0]} cursor={(onClick || onBarClick) ? "pointer" : "default"} onClick={onBarClick ? (row) => onBarClick(row) : undefined}>
-                  {data.map((row, i) => (
-                    <Cell key={i}
-                      fill={(meetsTarget2 || meetsTarget)(row) ? `url(#${gradGreen})` : `url(#${gradRed})`}
-                      fillOpacity={0.45} stroke="#CFCFCF" strokeWidth={0.7} />
-                  ))}
-                  <LabelList dataKey={dataKey2} position="top" formatter={valueFormatter} fill="#CFCFCF" fontSize={10} fontWeight={600} />
+                <Bar dataKey={dataKey2} name={seriesName2} fill={SERIES_2_COLOUR} radius={[3, 3, 0, 0]} cursor={(onClick || onBarClick) ? "pointer" : "default"} onClick={onBarClick ? (row) => onBarClick(row) : undefined}>
+                  <LabelList dataKey={dataKey2} position="top" formatter={valueFormatter} fill="#fff" fontSize={10} fontWeight={700} />
                 </Bar>
               )}
               <ReferenceLine y={target} stroke="#F5C518" strokeWidth={2.5} />
@@ -9088,8 +9115,8 @@ function KpiLegend({ targetLabel, showSeries }) {
     <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 11.5, color: "#4B5659", flexWrap: "wrap" }}>
       {showSeries && (
         <>
-          <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#4B5659", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Solid bar = selected period</span>
-          <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#4B5659", opacity: 0.45, border: "1px solid #CFCFCF", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Faded bar = last 24 hours</span>
+          <span><span style={{ display: "inline-block", width: 10, height: 10, background: SERIES_1_COLOUR, borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Last 24 hours</span>
+          <span><span style={{ display: "inline-block", width: 10, height: 10, background: SERIES_2_COLOUR, borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Selected period</span>
         </>
       )}
       <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#2F9E63", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Target met</span>
