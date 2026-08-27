@@ -421,6 +421,14 @@ function MetricCard({ label, value, icon: Icon, accentColor, onClick }) {
 
 const CAUSE_CODES = ["Mechanical Failure", "Electrical Fault", "Hydraulic Failure", "Tyre/Track",
   "Operator Error", "Wear & Tear", "Structural", "Overheating", "Lubrication/Fluid", "Weather", "Unknown", "Other"];
+// Downtime Responsibility - WHOSE account the lost hours go to. This is
+// separate from Cause, which records WHAT broke: a hydraulic failure can
+// be Plant's or the OEM's depending on circumstance.
+// Engineering Availability / Engineering MTBF count PLANT and STORES
+// only; the rest are lost time outside engineering's control.
+const RESPONSIBILITY_CODES = ["Plant", "Stores", "Production", "OEM", "Client", "Uncontrollable Time", "Non-Shift"];
+const ENGINEERING_RESPONSIBILITY = ["Plant", "Stores"];
+
 const SEVERITIES = ["Low", "Medium", "High", "Critical"];
 const REPAIR_STATUSES = ["In Progress", "Awaiting Parts", "Closed"];
 
@@ -1744,6 +1752,8 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
   const [assetId, setAssetId] = useState(existing?.asset_id || activatingWorkOrder?.asset_id || assets[0]?.asset_id || "");
   const [causeCode, setCauseCode] = useState(existing?.cause_code || CAUSE_CODES[0]);
   const [severity, setSeverity] = useState(existing?.severity || "Medium");
+  // Blank by default and blank on historical events - never guessed.
+  const [responsibility, setResponsibility] = useState(existing?.responsibility || "");
   const [componentAffected, setComponentAffected] = useState(existing?.component_affected || activatingWorkOrder?.component || "");
   const [componentCode, setComponentCode] = useState(existing?.component_affected || activatingWorkOrder?.component || "");
   const [description, setDescription] = useState(existing?.description || activatingWorkOrder?.problem_scope || "");
@@ -1875,6 +1885,7 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
       time_reported: `${pad(startDate.getHours())}:${pad(startDate.getMinutes())}`,
       description,
       cause_code: causeCode,
+      responsibility: responsibility || null,
       severity,
       component_affected: componentAffected,
       repair_status: status,
@@ -1976,6 +1987,16 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
             <select value={causeCode} onChange={(e) => setCauseCode(e.target.value)} style={fieldStyle}>
               {CAUSE_CODES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Responsibility</label>
+            <select value={responsibility} onChange={(e) => setResponsibility(e.target.value)} style={fieldStyle}>
+              <option value="">- not set -</option>
+              {RESPONSIBILITY_CODES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <p style={{ fontSize: 11.5, color: "#859195", margin: "4px 0 0" }}>
+              Whose account the downtime goes to. Plant and Stores count as engineering.
+            </p>
           </div>
           <div>
             <label style={labelStyle}>Severity</label>
@@ -2944,6 +2965,9 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
   const isEdit = !!existing;
   const [assetId, setAssetId] = useState(existing?.asset_id || defaultAssetId || assets[0]?.asset_id || "");
   const [workType, setWorkType] = useState(existing?.work_type || defaultWorkType || "Corrective");
+  // Planned downtime counts toward Downtime Responsibility too, so a
+  // Preventive job needs an account the same way an event does.
+  const [responsibility, setResponsibility] = useState(existing?.responsibility || "");
   const [priority, setPriority] = useState(existing?.priority || "Medium");
   const [problemScope, setProblemScope] = useState(existing?.problem_scope || "");
   const [component, setComponent] = useState(existing?.component || "");
@@ -3019,7 +3043,7 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
 
     setSaving(true);
     const payload = {
-      asset_id: assetId, work_type: workType, priority, problem_scope: problemScope,
+      asset_id: assetId, work_type: workType, priority, problem_scope: problemScope, responsibility: responsibility || null,
       component: component || null, status,
       planned_start: plannedStart || null,
       actual_start: actualStart ? new Date(actualStart).toISOString() : null,
@@ -3079,6 +3103,13 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
             <label style={labelStyle}>Priority</label>
             <select value={priority} onChange={(e) => setPriority(e.target.value)} style={fieldStyle}>
               {WORK_ORDER_PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Responsibility</label>
+            <select value={responsibility} onChange={(e) => setResponsibility(e.target.value)} style={fieldStyle}>
+              <option value="">- not set -</option>
+              {RESPONSIBILITY_CODES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
         </div>
