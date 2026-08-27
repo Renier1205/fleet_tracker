@@ -9742,11 +9742,11 @@ function AboutPage({ assets, breakdowns, workOrders, plannedMaintenance, compone
               </div>
               <span style={{ width: 1, height: 30, background: "rgba(255,255,255,0.14)" }} />
               <span style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 13px", borderRadius: 999, border: "1px solid rgba(143,224,214,0.30)", background: "rgba(143,224,214,0.07)", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10.5, letterSpacing: "0.16em", textTransform: "uppercase", color: MINT }}>
-                <Truck size={13} strokeWidth={2} /> Engineering &amp; Fleet module
+                <Truck size={13} strokeWidth={2} /> Connected Mine Operations
               </span>
             </div>
 
-            <h1 style={{ margin: "30px 0 0", fontSize: 56, lineHeight: 1.02, letterSpacing: "-0.035em", fontWeight: 800, color: "#fff" }}>Fleet Tracker</h1>
+            <h1 style={{ margin: "30px 0 0", fontSize: 56, lineHeight: 1.02, letterSpacing: "-0.035em", fontWeight: 800, color: "#fff" }}>Mine2U</h1>
             <p style={{ margin: "15px 0 0", fontSize: 22, lineHeight: 1.32, fontWeight: 700, letterSpacing: "-0.015em", color: MINT, maxWidth: "34ch" }}>Complete visibility. Better decisions. Maximum uptime.</p>
             <p style={{ margin: "15px 0 0", fontSize: 16, lineHeight: 1.6, color: "rgba(255,255,255,0.68)", maxWidth: "54ch" }}>A connected mining operations platform designed to manage equipment, maintenance, availability, parts, production and operational reporting from one live source of truth.</p>
           </div>
