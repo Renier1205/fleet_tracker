@@ -5305,8 +5305,8 @@ function MtbfMttrReportPage({ assets }) {
         const showByFleet = !selectedFleet && !selectedAsset;
         const chartData = showByFleet ? fleetKpiData : rows;
         const chartXKey = showByFleet ? "fleet" : "asset_id";
-        const mtbfMax = Math.max(mtbfTarget, ...chartData.map((r) => Math.max(r.mtbf || 0, r.mtbf_24h || 0))) * 1.15;
-        const mttrMax = Math.max(mttrTarget, ...chartData.map((r) => Math.max(r.mttr || 0, r.mttr_24h || 0))) * 1.15;
+        const mtbfMax = Math.max(mtbfTarget, ...chartData.map((r) => r.mtbf || 0)) * 1.15;
+        const mttrMax = Math.max(mttrTarget, ...chartData.map((r) => r.mttr || 0)) * 1.15;
         // A Total group on the right, aggregated across everything on
         // screen - the same shape as the Excel report.
         const totalRow = chartData.length > 1
@@ -5346,14 +5346,14 @@ function MtbfMttrReportPage({ assets }) {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(280px,100%),1fr))", gap: 16, marginBottom: 8 }}>
             <KpiBarChart
-              title={showByFleet ? "MTBF by fleet (hrs)" : "MTBF by equipment (hrs)"} data={chartRows} xKey={chartXKey} dataKey="mtbf" dataKey2="mtbf_24h" seriesName={periodLabel} seriesName2="Last 24h" meetsTarget2={(r) => (r.mtbf_24h || 0) >= mtbfTarget}
+              title={showByFleet ? "MTBF by fleet (hrs)" : "MTBF by equipment (hrs)"} data={chartRows} xKey={chartXKey} dataKey="mtbf"
               target={mtbfTarget} domainMax={mtbfMax} unitSuffix="h"
               valueFormatter={(v) => Number(v).toFixed(1)}
               meetsTarget={(r) => (r.mtbf || 0) >= mtbfTarget}
               onBarClick={handleBarClick}
             />
             <KpiBarChart
-              title={showByFleet ? "MTTR by fleet (hrs)" : "MTTR by equipment (hrs)"} data={chartRows} xKey={chartXKey} dataKey="mttr" dataKey2="mttr_24h" seriesName={periodLabel} seriesName2="Last 24h" meetsTarget2={(r) => (r.mttr_24h || 0) <= mttrTarget}
+              title={showByFleet ? "MTTR by fleet (hrs)" : "MTTR by equipment (hrs)"} data={chartRows} xKey={chartXKey} dataKey="mttr"
               target={mttrTarget} domainMax={mttrMax} unitSuffix="h"
               valueFormatter={(v) => Number(v).toFixed(1)}
               meetsTarget={(r) => (r.mttr || 0) <= mttrTarget}
@@ -9115,7 +9115,7 @@ function KpiLegend({ targetLabel, showSeries }) {
     <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 11.5, color: "#4B5659", flexWrap: "wrap" }}>
       {showSeries && (
         <>
-          <span><span style={{ display: "inline-block", width: 10, height: 10, background: SERIES_1_COLOUR, borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Last 24 hours</span>
+          <span><span style={{ display: "inline-block", width: 10, height: 10, background: SERIES_1_COLOUR, borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Last 24 hours (Utilisation &amp; Availability)</span>
           <span><span style={{ display: "inline-block", width: 10, height: 10, background: SERIES_2_COLOUR, borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Selected period</span>
         </>
       )}
