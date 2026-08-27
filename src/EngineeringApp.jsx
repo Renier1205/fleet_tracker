@@ -9048,8 +9048,21 @@ function niceDomainMax(value) {
 // Two-series charts use fixed colours per series (like the Excel report)
 // rather than target-based colouring, which becomes unreadable once two
 // bars sit side by side. The target line carries the pass/fail meaning.
-const SERIES_1_COLOUR = "#2F9E63";  // last 24 hours
-const SERIES_2_COLOUR = "#E8C51C";  // selected period / month to date
+const CHART_COLOURS = {
+  target:      "#F5C518",  // target reference line
+  met:         "#2F9E63",  // single-series bar meeting target
+  missed:      "#A62A1E",  // single-series bar missing target
+  last24h:     "#2F9E63",  // two-series: last 24 hours
+  period:      "#E8C51C",  // two-series: selected period
+  metLight:    "#8FE8B4",  // gradient top, target met
+  missedLight: "#F3998A",  // gradient top, target missed
+  gridline:    "#3D3D3D",
+  axisText:    "#CFCFCF",
+  panel:       "#292929",
+  panelBorder: "#1C1C1C",
+};
+const SERIES_1_COLOUR = CHART_COLOURS.last24h;
+const SERIES_2_COLOUR = CHART_COLOURS.period;
 
 function KpiBarChart({ title, data, xKey, dataKey, dataKey2, seriesName, seriesName2, target, domainMax, valueFormatter, meetsTarget, meetsTarget2, unitSuffix, onClick, onBarClick }) {
   const gradGreen = `grad-green-${dataKey}`;
@@ -9070,24 +9083,24 @@ function KpiBarChart({ title, data, xKey, dataKey, dataKey2, seriesName, seriesN
       {title && <p style={{ fontSize: 12.5, fontWeight: 600, margin: "0 0 6px", color: "#4B5659" }}>{title}</p>}
       <div
         onClick={onBarClick ? undefined : onClick}
-        style={{ height: 240, background: "#292929", border: "1px solid #1C1C1C", borderRadius: 10, padding: "18px 8px 4px", cursor: (onClick || onBarClick) ? "pointer" : "default", overflowX: needsScroll ? "auto" : "hidden", WebkitOverflowScrolling: "touch" }}
+        style={{ height: 240, background: CHART_COLOURS.panel, border: `1px solid ${CHART_COLOURS.panelBorder}`, borderRadius: 10, padding: "18px 8px 4px", cursor: (onClick || onBarClick) ? "pointer" : "default", overflowX: needsScroll ? "auto" : "hidden", WebkitOverflowScrolling: "touch" }}
       >
         <div style={{ width: chartWidth, height: "100%" }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 20, right: 8, left: 0, bottom: isMobile ? 34 : 20 }}>
               <defs>
                 <linearGradient id={gradGreen} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#8FE8B4" />
-                  <stop offset="100%" stopColor="#2F9E63" />
+                  <stop offset="0%" stopColor={CHART_COLOURS.metLight} />
+                  <stop offset="100%" stopColor={CHART_COLOURS.met} />
                 </linearGradient>
                 <linearGradient id={gradRed} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#F3998A" />
-                  <stop offset="100%" stopColor="#A62A1E" />
+                  <stop offset="0%" stopColor={CHART_COLOURS.missedLight} />
+                  <stop offset="100%" stopColor={CHART_COLOURS.missed} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#3D3D3D" vertical={false} />
-              <XAxis dataKey={xKey} interval={0} angle={-40} textAnchor="end" height={isMobile ? 54 : 44} tick={{ fontSize: 10, fill: "#CFCFCF" }} axisLine={{ stroke: "#4A4A4A" }} tickLine={false} tickFormatter={(v) => truncateLabel(v, isMobile ? 12 : 14)} />
-              <YAxis domain={[0, niceMax]} tick={{ fontSize: 11, fill: "#CFCFCF" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}${unitSuffix || ""}`} />
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLOURS.gridline} vertical={false} />
+              <XAxis dataKey={xKey} interval={0} angle={-40} textAnchor="end" height={isMobile ? 54 : 44} tick={{ fontSize: 10, fill: CHART_COLOURS.axisText }} axisLine={{ stroke: "#4A4A4A" }} tickLine={false} tickFormatter={(v) => truncateLabel(v, isMobile ? 12 : 14)} />
+              <YAxis domain={[0, niceMax]} tick={{ fontSize: 11, fill: CHART_COLOURS.axisText }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}${unitSuffix || ""}`} />
               <Tooltip formatter={(v) => `${Number(v).toFixed(1)}${unitSuffix || ""}`} contentStyle={{ background: "#1F1F1F", border: "1px solid #444", borderRadius: 8 }} labelStyle={{ color: "#fff" }} itemStyle={{ color: "#fff" }} />
               <Bar dataKey={dataKey} name={seriesName} radius={[3, 3, 0, 0]} cursor={(onClick || onBarClick) ? "pointer" : "default"} onClick={onBarClick ? (row) => onBarClick(row) : undefined}>
                 {data.map((row, i) => (
@@ -9100,7 +9113,7 @@ function KpiBarChart({ title, data, xKey, dataKey, dataKey2, seriesName, seriesN
                   <LabelList dataKey={dataKey2} position="top" formatter={valueFormatter} fill="#fff" fontSize={10} fontWeight={700} />
                 </Bar>
               )}
-              <ReferenceLine y={target} stroke="#F5C518" strokeWidth={2.5} />
+              <ReferenceLine y={target} stroke={CHART_COLOURS.target} strokeWidth={2.5} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -9119,9 +9132,9 @@ function KpiLegend({ targetLabel, showSeries }) {
           <span><span style={{ display: "inline-block", width: 10, height: 10, background: SERIES_2_COLOUR, borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Selected period</span>
         </>
       )}
-      <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#2F9E63", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Target met</span>
-      <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#A62A1E", borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Target not met</span>
-      <span><span style={{ display: "inline-block", width: 12, height: 3, background: "#F5C518", borderRadius: 2, marginRight: 6, verticalAlign: "middle" }} />{targetLabel || "Target"}</span>
+      <span><span style={{ display: "inline-block", width: 10, height: 10, background: CHART_COLOURS.met, borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Target met</span>
+      <span><span style={{ display: "inline-block", width: 10, height: 10, background: CHART_COLOURS.missed, borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />Target not met</span>
+      <span><span style={{ display: "inline-block", width: 12, height: 3, background: CHART_COLOURS.target, borderRadius: 2, marginRight: 6, verticalAlign: "middle" }} />{targetLabel || "Target"}</span>
     </div>
   );
 }
