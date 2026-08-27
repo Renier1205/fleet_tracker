@@ -5651,7 +5651,11 @@ function MtbfMttrReportPage({ assets }) {
       {loading ? (
         <p style={{ fontSize: 13, color: "#859195" }}>Loading…</p>
       ) : (
-        <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
+      <>
+        <p style={{ fontSize: 11.5, color: "#859195", margin: "0 0 6px" }}>
+          Scroll sideways inside the table to reach every column — the Equipment column and the headings stay in place.
+        </p>
+        <div style={{ overflow: "auto", maxHeight: "62vh", border: "1px solid #E2E6E3", borderRadius: 10, position: "relative" }}>
           {(() => {
             // Group banner spans: consecutive columns sharing a group name.
             const spans = [];
@@ -5703,7 +5707,8 @@ function MtbfMttrReportPage({ assets }) {
                   <tr style={{ background: "#E9ECEA" }}>
                     {spans.map((sp, i) => (
                       <th key={i} colSpan={sp.span}
-                        style={{ textAlign: "center", padding: "4px 4px", fontWeight: 700, fontSize: 10, color: NAVY,
+                        style={{ position: "sticky", top: 0, zIndex: 3, background: "#E9ECEA",
+                                 textAlign: "center", padding: "4px 4px", fontWeight: 700, fontSize: 10, color: NAVY,
                                  borderBottom: "1px solid #E2E6E3", borderLeft: i > 0 ? "1px solid #DCE0DD" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {sp.group}
                       </th>
@@ -5712,7 +5717,8 @@ function MtbfMttrReportPage({ assets }) {
                   <tr style={{ background: "#F7F8F6" }}>
                     {KPI_REPORT_COLUMNS.map(([key, label, , fmtType, shortLabel]) => (
                       <th key={key} onClick={() => handleSort(key)} title={label}
-                        style={{ ...(key === "asset_id" ? stickyFirst({ background: "#F7F8F6" }) : {}),
+                        style={{ position: "sticky", top: 26, zIndex: key === "asset_id" ? 5 : 3, background: "#F7F8F6",
+                                 ...(key === "asset_id" ? { left: 0 } : {}),
                                  textAlign: fmtType === "text" ? "left" : "right", padding: "5px 5px", fontWeight: 600, color: "#4B5659",
                                  fontSize: 10.5, lineHeight: 1.2, borderBottom: "1px solid #E2E6E3", cursor: "pointer", userSelect: "none",
                                  whiteSpace: "normal", wordBreak: "break-word" }}>
@@ -5781,6 +5787,7 @@ function MtbfMttrReportPage({ assets }) {
             );
           })()}
         </div>
+      </>
       )}
     </div>
   );
