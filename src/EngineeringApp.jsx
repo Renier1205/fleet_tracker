@@ -5401,7 +5401,7 @@ function MtbfMttrReportPage({ assets }) {
     const ExcelJS = (await import("exceljs")).default;
     const now = new Date();
     const wb = new ExcelJS.Workbook();
-    wb.creator = "Fleet Tracker";
+    wb.creator = "Mine2U";
     wb.created = now;
     const ws = wb.addWorksheet("Plant Performance KPI", {
       views: [{ state: "frozen", xSplit: 2, ySplit: 10 }],
@@ -6058,7 +6058,7 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
       // including on a slow site connection.
       const { default: ExcelJS } = await import("exceljs");
       const wb = new ExcelJS.Workbook();
-      wb.creator = "Fleet Tracker";
+      wb.creator = "Mine2U";
       wb.created = new Date();
 
       const colCount = DOWNTIME_SUMMARY_COLUMNS.length;
@@ -8331,7 +8331,7 @@ function QuotePriceListPage({ selectedSiteId, parts, userEmail, isAdmin }) {
           {extracting ? "Reading quote…" : "Drag a scanned quote here, or click to browse"}
         </p>
         <p style={{ fontSize: 12, color: "#859195", margin: 0 }}>
-          Image or PDF, any language - Fleet Tracker will read it, translate part descriptions into English automatically, detect the currency, and pull out the Supplier, Part, Part Number and Price for you to review before saving.
+          Image or PDF, any language - Mine2U will read it, translate part descriptions into English automatically, detect the currency, and pull out the Supplier, Part, Part Number and Price for you to review before saving.
         </p>
         <input
           ref={fileInputRef}
@@ -8351,7 +8351,7 @@ function QuotePriceListPage({ selectedSiteId, parts, userEmail, isAdmin }) {
       {review && (
         <div style={{ border: "1px solid #E2E6E3", borderRadius: 10, padding: 16, marginBottom: 20, background: "#fff" }}>
           <p style={{ fontSize: 13.5, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>Review before saving</p>
-          <p style={{ fontSize: 12, color: "#859195", margin: "0 0 14px" }}>Check what Fleet Tracker read off the quote - fix anything that's wrong, remove lines that shouldn't be there, then save. Lines flagged "In stock" already have some on hand - worth checking before ordering more.</p>
+          <p style={{ fontSize: 12, color: "#859195", margin: "0 0 14px" }}>Check what Mine2U read off the quote - fix anything that's wrong, remove lines that shouldn't be there, then save. Lines flagged "In stock" already have some on hand - worth checking before ordering more.</p>
           {review.detectedLanguage && !/^english$/i.test(review.detectedLanguage) && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#DCEFED", border: "1px solid #A9D6D2", borderRadius: 8, padding: "7px 11px", marginBottom: 14, fontSize: 12, color: "#183642" }}>
               <span>🌐</span>
@@ -9792,7 +9792,7 @@ function AboutPage({ assets, breakdowns, workOrders, plannedMaintenance, compone
             <div style={kicker}>Platform modules</div>
             <h2 style={h2}>One platform, extended as you need it</h2>
           </div>
-          <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: MUTED, maxWidth: "42ch" }}>Fleet Tracker covers engineering and maintenance. Datavera can scope, develop and connect any of the operational areas below on the same platform as your requirements grow.</p>
+          <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: MUTED, maxWidth: "42ch" }}>Mine2U covers engineering and maintenance. Datavera can scope, develop and connect any of the operational areas below on the same platform as your requirements grow.</p>
         </div>
         <div style={{ marginTop: 24, border: `1px solid ${LINE}`, borderRadius: 12, background: "#fff", boxShadow: "0 1px 2px rgba(20,40,46,0.04)", overflow: "hidden" }}>
           {platform.map(({ Icon, name, sub }, i) => (
@@ -9805,7 +9805,7 @@ function AboutPage({ assets, breakdowns, workOrders, plannedMaintenance, compone
             </div>
           ))}
         </div>
-        <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "#A6AFB1" }}>Each area can be scoped and delivered on request, on the same data and permissions model as Fleet Tracker.</p>
+        <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "#A6AFB1" }}>Each area can be scoped and delivered on request, on the same data and permissions model as Mine2U.</p>
       </section>
 
       {/* 5. WHY DATAVERA */}
@@ -10589,10 +10589,10 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
           {sidebarOpen && (
             <button
               onClick={() => handleNavClick("about")}
-              title="About Fleet Tracker"
+              title="About Mine2U"
               style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: GREEN, fontWeight: 700, fontSize: 15, textAlign: "left" }}
             >
-              Fleet Tracker
+              Mine2U
             </button>
           )}
           {!isMobile && (
