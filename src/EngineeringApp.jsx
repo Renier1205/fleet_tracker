@@ -5299,28 +5299,122 @@ function MtbfMttrReportPage({ assets }) {
     return val;
   };
 
-  const exportToExcel = () => {
+  // Built with ExcelJS rather than the xlsx community build, which
+  // cannot write fonts, fills or number formats. Just as important:
+  // numbers go in as NUMBERS with a display format, not as pre-formatted
+  // strings - the old export wrote "213.3" and "61%" as text, so nothing
+  // in the file could be summed, sorted or charted by the person opening it.
+  const exportToExcel = async () => {
+    const ExcelJS = (await import("exceljs")).default;
     const now = new Date();
-    const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
-    const headerRow = MTBF_MTTR_COLUMNS.map((c) => c[1]);
-    const dataRows = rows.map((row) => MTBF_MTTR_COLUMNS.map(([key]) => fmt(key, row[key])));
-    const aoa = [
-      ["MTBF / MTTR Report"],
-      [`Date Range: ${formatRangeForDisplay(fromDateTime, toDateTime)}`],
-      [`Exported: ${timestamp}`],
-      [],
-      headerRow, ...dataRows,
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!merges"] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: MTBF_MTTR_COLUMNS.length - 1 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: MTBF_MTTR_COLUMNS.length - 1 } },
-      { s: { r: 2, c: 0 }, e: { r: 2, c: MTBF_MTTR_COLUMNS.length - 1 } },
-    ];
-    ws["!cols"] = MTBF_MTTR_COLUMNS.map((c) => ({ wch: Math.max(c[1].length + 2, 14) }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "MTBF MTTR");
-    XLSX.writeFile(wb, `MTBF_MTTR_Report_${now.toISOString().slice(0, 10)}.xlsx`);
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "Fleet Tracker";
+    wb.created = now;
+    const ws = wb.addWorksheet("MTBF MTTR", {
+      views: [{ state: "frozen", ySplit: 9 }],
+      pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 } },
+    });
+
+    const NCOLS = MTBF_MTTR_COLUMNS.length;
+    const INK = "FF1F6668", RULE = "FFD8DCD9", HEAD = "FF203B46";
+    const money = { name: "Arial", size: 10 };
+
+    const bandRow = (label, value, r) => {
+      ws.mergeCells(r, 2, r, NCOLS);
+      const a = ws.getCell(r, 1), b = ws.getCell(r, 2);
+      a.value = label; b.value = value;
+      a.font = { ...money, bold: true, color: { argb: "FF4B5659" } };
+      b.font = money;
+    };
+
+    // --- title block, mirroring the KPI report layout ---
+    ws.mergeCells(1, 1, 1, NCOLS);
+    const title = ws.getCell(1, 1);
+    title.value = "MTBF / MTTR Report";
+    title.font = { name: "Arial", size: 15, bold: true, color: { argb: INK } };
+    ws.getRow(1).height = 22;
+
+    bandRow("Date Range", formatRangeForDisplay(fromDateTime, toDateTime), 3);
+    bandRow("Exported", now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" }), 4);
+    bandRow("Hierarchy", `Fleet: ${selectedFleet || "All"}    Equipment: ${selectedAsset || "All"}`, 5);
+    bandRow("Equipment count", String(rows.length), 6);
+
+    // --- column headers ---
+    const HEADER_ROW = 8;
+    const hr = ws.getRow(HEADER_ROW);
+    MTBF_MTTR_COLUMNS.forEach(([, label], i) => {
+      const c = hr.getCell(i + 1);
+      c.value = label;
+      c.font = { name: "Arial", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
+      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: HEAD } };
+      c.alignment = { vertical: "middle", horizontal: i < 3 ? "left" : "center", wrapText: true };
+      c.border = { bottom: { style: "thin", color: { argb: INK } } };
+    });
+    hr.height = 30;
+
+    // --- data ---
+    const numFmt = {
+      num_unplanned_events: "0",
+      mtbf: "#,##0.0",
+      mttr: "#,##0.0",
+      availability_24h: "0%",
+      availability_mtd: "0%",
+    };
+    rows.forEach((row, ri) => {
+      const r = ws.getRow(HEADER_ROW + 1 + ri);
+      MTBF_MTTR_COLUMNS.forEach(([key], i) => {
+        const c = r.getCell(i + 1);
+        const raw = row[key];
+        // Percentages are stored as fractions so Excel's own % format
+        // applies; everything numeric stays numeric.
+        c.value = raw == null || raw === "" ? null : (numFmt[key] ? Number(raw) : raw);
+        if (numFmt[key]) c.numFmt = numFmt[key];
+        c.font = money;
+        c.alignment = { horizontal: i < 3 ? "left" : "center" };
+        c.border = { bottom: { style: "hair", color: { argb: RULE } } };
+        if (ri % 2 === 1) c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5F7F6" } };
+      });
+    });
+
+    // --- total row, matching the Total bar on the charts ---
+    const totals = aggregateMetrics(rows, rows.map((r) => r.asset_id));
+    const tr = ws.getRow(HEADER_ROW + 1 + rows.length);
+    const totalValues = {
+      asset_id: "Total", asset_name: "", fleet: "",
+      num_unplanned_events: totals.breakdown_count ?? null,
+      mtbf: totals.mtbf ?? null, mttr: totals.mttr ?? null,
+      availability_24h: totals.availability_24h ?? null,
+      availability_mtd: totals.availability ?? null,
+    };
+    MTBF_MTTR_COLUMNS.forEach(([key], i) => {
+      const c = tr.getCell(i + 1);
+      const v = totalValues[key];
+      c.value = v == null || v === "" ? null : (numFmt[key] ? Number(v) : v);
+      if (numFmt[key]) c.numFmt = numFmt[key];
+      c.font = { ...money, bold: true, color: { argb: INK } };
+      c.alignment = { horizontal: i < 3 ? "left" : "center" };
+      c.border = { top: { style: "thin", color: { argb: INK } } };
+    });
+
+    // --- footnote: says plainly how the totals were reached ---
+    const noteRow = HEADER_ROW + rows.length + 3;
+    ws.mergeCells(noteRow, 1, noteRow, NCOLS);
+    const note = ws.getCell(noteRow, 1);
+    note.value = "Totals are averages across the equipment listed; machines with no data for the period are excluded rather than counted as zero. Availability (Last 24h) covers the 24 hours to the export time, independent of the date range above.";
+    note.font = { name: "Arial", size: 8.5, italic: true, color: { argb: "FF859195" } };
+    note.alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(noteRow).height = 26;
+
+    ws.columns = MTBF_MTTR_COLUMNS.map(([, label], i) => ({ width: i < 3 ? 18 : Math.max(label.length + 3, 12) }));
+    ws.autoFilter = { from: { row: HEADER_ROW, column: 1 }, to: { row: HEADER_ROW, column: NCOLS } };
+
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `MTBF_MTTR_Report_${now.toISOString().slice(0, 10)}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   return (
@@ -9083,8 +9177,14 @@ const CHART_COLOURS = {
   target:      "#F5C518",  // target reference line
   met:         "#2F9E63",  // single-series bar meeting target
   missed:      "#A62A1E",  // single-series bar missing target
-  last24h:     "#2F9E63",  // two-series: last 24 hours
-  period:      "#E8C51C",  // two-series: selected period
+  // Two-series bars take the brand teal and a gold, both as gradients so
+  // they read as part of the same system as the MTBF/MTTR bars. Green is
+  // deliberately NOT reused here - on a two-series chart colour means
+  // "which series", and green already means "target met" elsewhere.
+  last24h:      "#1F6668",
+  last24hLight: "#5FB3B0",
+  period:       "#C79A12",
+  periodLight:  "#F2D46B",
   metLight:    "#8FE8B4",  // gradient top, target met
   missedLight: "#F3998A",  // gradient top, target missed
   gridline:    "#3D3D3D",
@@ -9098,6 +9198,8 @@ const SERIES_2_COLOUR = CHART_COLOURS.period;
 function KpiBarChart({ title, data, xKey, dataKey, dataKey2, seriesName, seriesName2, target, domainMax, valueFormatter, meetsTarget, meetsTarget2, unitSuffix, onClick, onBarClick }) {
   const gradGreen = `grad-green-${dataKey}`;
   const gradRed = `grad-red-${dataKey}`;
+  const gradS1 = `grad-s1-${dataKey}`;
+  const gradS2 = `grad-s2-${dataKey}`;
   const niceMax = domainMax === 100 ? 100 : niceDomainMax(domainMax);
 
   // Bars are always upright columns now, never sideways - on a phone,
@@ -9128,6 +9230,14 @@ function KpiBarChart({ title, data, xKey, dataKey, dataKey2, seriesName, seriesN
                   <stop offset="0%" stopColor={CHART_COLOURS.missedLight} />
                   <stop offset="100%" stopColor={CHART_COLOURS.missed} />
                 </linearGradient>
+                <linearGradient id={gradS1} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={CHART_COLOURS.last24hLight} />
+                  <stop offset="100%" stopColor={CHART_COLOURS.last24h} />
+                </linearGradient>
+                <linearGradient id={gradS2} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={CHART_COLOURS.periodLight} />
+                  <stop offset="100%" stopColor={CHART_COLOURS.period} />
+                </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLOURS.gridline} vertical={false} />
               <XAxis dataKey={xKey} interval={0} angle={-40} textAnchor="end" height={isMobile ? 54 : 44} tick={{ fontSize: 10, fill: CHART_COLOURS.axisText }} axisLine={{ stroke: "#4A4A4A" }} tickLine={false} tickFormatter={(v) => truncateLabel(v, isMobile ? 12 : 14)} />
@@ -9135,12 +9245,12 @@ function KpiBarChart({ title, data, xKey, dataKey, dataKey2, seriesName, seriesN
               <Tooltip formatter={(v) => `${Number(v).toFixed(1)}${unitSuffix || ""}`} contentStyle={{ background: "#1F1F1F", border: "1px solid #444", borderRadius: 8 }} labelStyle={{ color: "#fff" }} itemStyle={{ color: "#fff" }} />
               <Bar dataKey={dataKey} name={seriesName} radius={[3, 3, 0, 0]} cursor={(onClick || onBarClick) ? "pointer" : "default"} onClick={onBarClick ? (row) => onBarClick(row) : undefined}>
                 {data.map((row, i) => (
-                  <Cell key={i} fill={dataKey2 ? SERIES_1_COLOUR : (meetsTarget(row) ? `url(#${gradGreen})` : `url(#${gradRed})`)} />
+                  <Cell key={i} fill={dataKey2 ? `url(#${gradS1})` : (meetsTarget(row) ? `url(#${gradGreen})` : `url(#${gradRed})`)} />
                 ))}
                 <LabelList dataKey={dataKey} position="top" formatter={valueFormatter} fill="#fff" fontSize={11} fontWeight={700} />
               </Bar>
               {dataKey2 && (
-                <Bar dataKey={dataKey2} name={seriesName2} fill={SERIES_2_COLOUR} radius={[3, 3, 0, 0]} cursor={(onClick || onBarClick) ? "pointer" : "default"} onClick={onBarClick ? (row) => onBarClick(row) : undefined}>
+                <Bar dataKey={dataKey2} name={seriesName2} fill={`url(#${gradS2})`} radius={[3, 3, 0, 0]} cursor={(onClick || onBarClick) ? "pointer" : "default"} onClick={onBarClick ? (row) => onBarClick(row) : undefined}>
                   <LabelList dataKey={dataKey2} position="top" formatter={valueFormatter} fill="#fff" fontSize={10} fontWeight={700} />
                 </Bar>
               )}
