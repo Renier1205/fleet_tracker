@@ -5175,49 +5175,49 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, myFullName, dai
 // Groups drive the merged banner row above the headers.
 //   n1/n2 = numbers to 1 / 2 decimals, int = whole, pct = fraction shown as %
 const KPI_REPORT_COLUMNS = [
-  ["asset_id", "Equipment", "", "text"],
-  ["asset_name", "Name", "", "text"],
-  ["model", "Model", "", "text"],
-  ["fleet", "Fleet", "", "text"],
-  ["uom", "UOM", "", "text"],
+  ["asset_id", "Equipment", "", "text", "Equipment"],
+  ["asset_name", "Name", "", "text", "Name"],
+  ["model", "Model", "", "text", "Model"],
+  ["fleet", "Fleet", "", "text", "Fleet"],
+  ["uom", "UOM", "", "text", "UOM"],
 
-  ["scheduled_hours", "Scheduled", "Hours", "n1"],
-  ["opening_hours", "Opening Usage", "Hours", "n1"],
-  ["closing_hours", "Closing Usage", "Hours", "n1"],
-  ["worked_hours", "Worked", "Hours", "n1"],
+  ["scheduled_hours", "Scheduled", "Hours", "n1", "Sched"],
+  ["opening_hours", "Opening Usage", "Hours", "n1", "Open"],
+  ["closing_hours", "Closing Usage", "Hours", "n1", "Close"],
+  ["worked_hours", "Worked", "Hours", "n1", "Worked"],
 
-  ["uncontrollable_hours", "Uncontrollable Time", "Prod.", "n2"],
+  ["uncontrollable_hours", "Uncontrollable Time", "Prod.", "n2", "Uncontr."],
 
-  ["planned_downtime_hrs", "Planned Downtime Hrs", "Downtime", "n2"],
-  ["unplanned_downtime_hrs", "Unplanned Downtime Hrs", "Downtime", "n2"],
-  ["total_downtime_hrs", "Total Downtime Hrs", "Downtime", "n2"],
+  ["planned_downtime_hrs", "Planned Downtime Hrs", "Downtime", "n2", "Planned"],
+  ["unplanned_downtime_hrs", "Unplanned Downtime Hrs", "Downtime", "n2", "Unplan."],
+  ["total_downtime_hrs", "Total Downtime Hrs", "Downtime", "n2", "Total"],
 
-  ["resp_plant", "Plant", "Downtime Responsibility", "n2"],
-  ["resp_stores", "Stores", "Downtime Responsibility", "n2"],
-  ["resp_production", "Production", "Downtime Responsibility", "n2"],
-  ["resp_oem", "OEM", "Downtime Responsibility", "n2"],
-  ["resp_client", "Client", "Downtime Responsibility", "n2"],
-  ["resp_uncontrollable", "Uncontrollable Time", "Downtime Responsibility", "n2"],
-  ["resp_non_shift", "Non-Shift", "Downtime Responsibility", "n2"],
-  ["resp_not_set", "Not set", "Downtime Responsibility", "n2"],
+  ["resp_plant", "Plant", "Downtime Responsibility", "n2", "Plant"],
+  ["resp_stores", "Stores", "Downtime Responsibility", "n2", "Stores"],
+  ["resp_production", "Production", "Downtime Responsibility", "n2", "Prod."],
+  ["resp_oem", "OEM", "Downtime Responsibility", "n2", "OEM"],
+  ["resp_client", "Client", "Downtime Responsibility", "n2", "Client"],
+  ["resp_uncontrollable", "Uncontrollable Time", "Downtime Responsibility", "n2", "Uncontr."],
+  ["resp_non_shift", "Non-Shift", "Downtime Responsibility", "n2", "Non-Sh."],
+  ["resp_not_set", "Not set", "Downtime Responsibility", "n2", "Not set"],
 
-  ["num_planned_events", "Planned", "Number of Stoppages", "int"],
-  ["num_unplanned_events", "Unplanned", "Number of Stoppages", "int"],
-  ["num_engineering_unplanned", "Engineering Unplanned", "Number of Stoppages", "int"],
+  ["num_planned_events", "Planned", "Number of Stoppages", "int", "Pl."],
+  ["num_unplanned_events", "Unplanned", "Number of Stoppages", "int", "Unpl."],
+  ["num_engineering_unplanned", "Engineering Unplanned", "Number of Stoppages", "int", "Eng."],
 
-  ["mtbf", "Equipment MTBF", "Reliability", "n1"],
-  ["engineering_mtbf", "Engineering MTBF", "Reliability", "n1"],
-  ["mttr", "MTTR", "Reliability", "n1"],
-  ["breakdown_pct", "Breakdown %", "Reliability", "pct"],
+  ["mtbf", "Equipment MTBF", "Reliability", "n1", "Eq MTBF"],
+  ["engineering_mtbf", "Engineering MTBF", "Reliability", "n1", "Eng MTBF"],
+  ["mttr", "MTTR", "Reliability", "n1", "MTTR"],
+  ["breakdown_pct", "Breakdown %", "Reliability", "pct", "Bkdn %"],
 
-  ["availability_24h", "Last 24 Hours", "Equipment Availability", "pct"],
-  ["availability", "Period", "Equipment Availability", "pct"],
+  ["availability_24h", "Last 24 Hours", "Equipment Availability", "pct", "24h"],
+  ["availability", "Period", "Equipment Availability", "pct", "Period"],
 
-  ["engineering_availability_24h", "Last 24 Hours", "Engineering Availability", "pct"],
-  ["engineering_availability", "Period", "Engineering Availability", "pct"],
+  ["engineering_availability_24h", "Last 24 Hours", "Engineering Availability", "pct", "24h"],
+  ["engineering_availability", "Period", "Engineering Availability", "pct", "Period"],
 
-  ["utilisation_24h", "Last 24 Hours", "Equipment Utilisation", "pct"],
-  ["utilisation", "Period", "Equipment Utilisation", "pct"],
+  ["utilisation_24h", "Last 24 Hours", "Equipment Utilisation", "pct", "24h"],
+  ["utilisation", "Period", "Equipment Utilisation", "pct", "Period"],
 ];
 
 // Columns that make sense to total across a fleet by SUMMING; the rest
@@ -5382,11 +5382,12 @@ function MtbfMttrReportPage({ assets }) {
 
   const fmt = (key, val) => {
     if (val == null || val === "") return "-";
+    const n = Number(val);
     switch (KPI_FMT[key]) {
-      case "pct": return `${Math.round(Number(val) * 100)}%`;
-      case "n1":  return Number(val).toFixed(1);
-      case "n2":  return Number(val).toFixed(2);
-      case "int": return String(Math.round(Number(val)));
+      case "pct": return `${Math.round(n * 100)}%`;
+      case "n1":  return n === 0 ? "-" : n.toFixed(1);
+      case "n2":  return n === 0 ? "-" : n.toFixed(2);
+      case "int": return n === 0 ? "-" : String(Math.round(n));
       default:    return val;
     }
   };
@@ -5415,7 +5416,13 @@ function MtbfMttrReportPage({ assets }) {
     // Excel formats matching the on-screen ones. Percentages are written
     // as fractions so Excel's own % format applies - the file stays
     // numeric and can be summed, sorted and charted.
-    const XL_FMT = { n1: "#,##0.0", n2: "#,##0.00", int: "0", pct: "0%", text: null };
+    const XL_FMT = {
+      n1: '#,##0.0;-#,##0.0;"-"',
+      n2: '#,##0.00;-#,##0.00;"-"',
+      int: '0;-0;"-"',
+      pct: "0%",           // 0% is a real reading, not an absent one
+      text: null,
+    };
 
     const bandRow = (label, value, r) => {
       ws.mergeCells(r, 2, r, Math.min(N, 8));
@@ -5454,7 +5461,7 @@ function MtbfMttrReportPage({ assets }) {
     }
     COLS.forEach(([, label, , fmtType], i) => {
       const c = ws.getCell(HEADER_ROW, i + 1);
-      c.value = label;
+      c.value = label;   // full names in the file; the screen uses short ones
       c.font = { ...base, bold: true, color: { argb: "FFFFFFFF" } };
       c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: HEAD } };
       c.alignment = { horizontal: fmtType === "text" ? "left" : "center", vertical: "middle", wrapText: true };
@@ -5523,7 +5530,11 @@ function MtbfMttrReportPage({ assets }) {
       r += 1;
     }
 
-    ws.columns = COLS.map(([, label, , fmtType]) => ({ width: fmtType === "text" ? 17 : Math.min(Math.max(label.length + 2, 10), 15) }));
+    ws.columns = COLS.map(([key, , , fmtType, shortLabel]) => ({
+      width: key === "asset_id" || key === "asset_name" ? 16
+           : fmtType === "text" ? 9
+           : Math.min(Math.max((shortLabel || "").length + 3, 8), 11),
+    }));
     ws.autoFilter = { from: { row: HEADER_ROW, column: 1 }, to: { row: HEADER_ROW, column: N } };
 
     const buf = await wb.xlsx.writeBuffer();
@@ -5660,29 +5671,52 @@ function MtbfMttrReportPage({ assets }) {
             });
             const anyConflict = rows.some(hasHoursConflict);
 
+            // Sized to fit all 34 columns on a desktop screen: identity
+            // columns get real room, numeric ones only what a figure needs.
+            const widthFor = (key, fmtType) => {
+              if (key === "asset_id") return 88;
+              if (key === "asset_name") return 80;
+              if (fmtType === "text") return 50;
+              if (fmtType === "int") return 38;
+              if (fmtType === "pct") return 42;
+              return 48;
+            };
+            // Equipment stays pinned while the rest scrolls sideways -
+            // 34 columns will not fit a laptop screen at a readable size,
+            // so the column you need for orientation never leaves view.
+            const stickyFirst = (extra = {}) => ({
+              position: "sticky", left: 0, zIndex: 2, ...extra,
+            });
             const cellStyle = (fmtType) => ({
-              padding: "7px 10px", whiteSpace: "nowrap",
+              padding: "5px 5px", whiteSpace: "nowrap",
               textAlign: fmtType === "text" ? "left" : "right",
             });
 
             return (
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, tableLayout: "fixed" }}>
+                <colgroup>
+                  {KPI_REPORT_COLUMNS.map(([key, , , fmtType]) => (
+                    <col key={key} style={{ width: widthFor(key, fmtType) }} />
+                  ))}
+                </colgroup>
                 <thead>
                   <tr style={{ background: "#E9ECEA" }}>
                     {spans.map((sp, i) => (
                       <th key={i} colSpan={sp.span}
-                        style={{ textAlign: "center", padding: "6px 10px", fontWeight: 700, fontSize: 11.5, color: NAVY,
-                                 borderBottom: "1px solid #E2E6E3", borderLeft: i > 0 ? "1px solid #DCE0DD" : "none", whiteSpace: "nowrap" }}>
+                        style={{ textAlign: "center", padding: "4px 4px", fontWeight: 700, fontSize: 10, color: NAVY,
+                                 borderBottom: "1px solid #E2E6E3", borderLeft: i > 0 ? "1px solid #DCE0DD" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {sp.group}
                       </th>
                     ))}
                   </tr>
                   <tr style={{ background: "#F7F8F6" }}>
-                    {KPI_REPORT_COLUMNS.map(([key, label, , fmtType]) => (
-                      <th key={key} onClick={() => handleSort(key)}
-                        style={{ textAlign: fmtType === "text" ? "left" : "right", padding: "8px 10px", fontWeight: 600, color: "#4B5659",
-                                 whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3", cursor: "pointer", userSelect: "none" }}>
-                        {label} {sortKey === key ? (sortDir === "asc" ? "▲" : "▼") : ""}
+                    {KPI_REPORT_COLUMNS.map(([key, label, , fmtType, shortLabel]) => (
+                      <th key={key} onClick={() => handleSort(key)} title={label}
+                        style={{ ...(key === "asset_id" ? stickyFirst({ background: "#F7F8F6" }) : {}),
+                                 textAlign: fmtType === "text" ? "left" : "right", padding: "5px 5px", fontWeight: 600, color: "#4B5659",
+                                 fontSize: 10.5, lineHeight: 1.2, borderBottom: "1px solid #E2E6E3", cursor: "pointer", userSelect: "none",
+                                 whiteSpace: "normal", wordBreak: "break-word" }}>
+                        {shortLabel || label}{sortKey === key ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
                       </th>
                     ))}
                   </tr>
@@ -5698,7 +5732,9 @@ function MtbfMttrReportPage({ assets }) {
                             <tr key={row.asset_id} title={conflict ? "Worked hours plus downtime exceed the hours in this period - the Daily Hours and downtime records contradict each other" : undefined}
                               style={{ borderBottom: "1px solid #EFEEE7", background: conflict ? "#FDF3E3" : "transparent" }}>
                               {KPI_REPORT_COLUMNS.map(([key, , , fmtType]) => (
-                                <td key={key} style={{ ...cellStyle(fmtType),
+                                <td key={key} title={fmtType === "text" ? String(row[key] ?? "") : undefined}
+                                  style={{ ...cellStyle(fmtType), overflow: "hidden", textOverflow: "ellipsis",
+                                  ...(key === "asset_id" ? stickyFirst({ background: conflict ? "#FDF3E3" : "#FFFFFF" }) : {}),
                                   fontWeight: key === "num_unplanned_events" && row[key] >= 3 ? 700 : 400,
                                   color: key === "num_unplanned_events" && row[key] >= 3 ? "#B85450" : "#183642" }}>
                                   {key === "asset_id" && conflict ? <span style={{ color: "#B07D2B", fontWeight: 700 }} title="Hours conflict">⚠ </span> : null}
@@ -5710,7 +5746,8 @@ function MtbfMttrReportPage({ assets }) {
                         })}
                         <tr style={{ background: "#F2F1EA", borderBottom: "1px solid #E2E6E3" }}>
                           {KPI_REPORT_COLUMNS.map(([key, , , fmtType], ci) => (
-                            <td key={key} style={{ ...cellStyle(fmtType), fontWeight: 700, color: NAVY }}>
+                            <td key={key} style={{ ...cellStyle(fmtType), overflow: "hidden", textOverflow: "ellipsis", fontWeight: 700, color: NAVY,
+                              ...(key === "asset_id" ? stickyFirst({ background: "#F2F1EA" }) : {}) }}>
                               {ci === 0 ? `${fleetName} (${fleetRows.length})` : (KPI_SUM_KEYS.has(key) || KPI_AVG_KEYS.has(key) ? fmt(key, sub[key]) : "")}
                             </td>
                           ))}
@@ -5723,7 +5760,8 @@ function MtbfMttrReportPage({ assets }) {
                     return (
                       <tr style={{ background: "#E2EFE9", borderTop: `2px solid ${NAVY}` }}>
                         {KPI_REPORT_COLUMNS.map(([key, , , fmtType], ci) => (
-                          <td key={key} style={{ ...cellStyle(fmtType), fontWeight: 800, color: NAVY }}>
+                          <td key={key} style={{ ...cellStyle(fmtType), overflow: "hidden", textOverflow: "ellipsis", fontWeight: 800, color: NAVY,
+                            ...(key === "asset_id" ? stickyFirst({ background: "#E2EFE9" }) : {}) }}>
                             {ci === 0 ? `Total (${rows.length})` : (KPI_SUM_KEYS.has(key) || KPI_AVG_KEYS.has(key) ? fmt(key, tot[key]) : "")}
                           </td>
                         ))}
