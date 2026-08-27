@@ -5677,13 +5677,28 @@ function MtbfMttrReportPage({ assets }) {
 
             // Sized to fit all 34 columns on a desktop screen: identity
             // columns get real room, numeric ones only what a figure needs.
+            // Wide enough that nothing gets clipped. The table scrolls
+            // sideways in its own box, so readability wins over fitting -
+            // a truncated equipment number helps nobody.
             const widthFor = (key, fmtType) => {
-              if (key === "asset_id") return 88;
-              if (key === "asset_name") return 80;
-              if (fmtType === "text") return 50;
-              if (fmtType === "int") return 38;
-              if (fmtType === "pct") return 42;
-              return 48;
+              if (key === "asset_id") return 112;
+              if (key === "asset_name") return 124;
+              if (key === "fleet") return 94;
+              if (key === "model") return 64;
+              if (fmtType === "text") return 64;
+              if (fmtType === "int") return 48;
+              if (fmtType === "pct") return 54;
+              return 64;   // fits a 5-digit subtotal like 12345.67
+            };
+
+            // Group banners get short forms too - "Equipment Availability"
+            // across two 54px columns would clip no matter the font.
+            const SHORT_GROUP = {
+              "Downtime Responsibility": "Downtime Responsibility",
+              "Number of Stoppages": "Stoppages",
+              "Equipment Availability": "Equip. Availability",
+              "Engineering Availability": "Eng. Availability",
+              "Equipment Utilisation": "Equip. Utilisation",
             };
             // Equipment stays pinned while the rest scrolls sideways -
             // 34 columns will not fit a laptop screen at a readable size,
@@ -5692,12 +5707,12 @@ function MtbfMttrReportPage({ assets }) {
               position: "sticky", left: 0, zIndex: 2, ...extra,
             });
             const cellStyle = (fmtType) => ({
-              padding: "5px 5px", whiteSpace: "nowrap",
+              padding: "6px 7px", whiteSpace: "nowrap",
               textAlign: fmtType === "text" ? "left" : "right",
             });
 
             return (
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, tableLayout: "fixed" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, tableLayout: "fixed" }}>
                 <colgroup>
                   {KPI_REPORT_COLUMNS.map(([key, , , fmtType]) => (
                     <col key={key} style={{ width: widthFor(key, fmtType) }} />
@@ -5706,11 +5721,11 @@ function MtbfMttrReportPage({ assets }) {
                 <thead>
                   <tr style={{ background: "#E9ECEA" }}>
                     {spans.map((sp, i) => (
-                      <th key={i} colSpan={sp.span}
+                      <th key={i} colSpan={sp.span} title={sp.group}
                         style={{ position: "sticky", top: 0, zIndex: 3, background: "#E9ECEA",
-                                 textAlign: "center", padding: "4px 4px", fontWeight: 700, fontSize: 10, color: NAVY,
+                                 textAlign: "center", padding: "5px 6px", fontWeight: 700, fontSize: 11, color: NAVY,
                                  borderBottom: "1px solid #E2E6E3", borderLeft: i > 0 ? "1px solid #DCE0DD" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {sp.group}
+                        {SHORT_GROUP[sp.group] || sp.group}
                       </th>
                     ))}
                   </tr>
@@ -5719,8 +5734,8 @@ function MtbfMttrReportPage({ assets }) {
                       <th key={key} onClick={() => handleSort(key)} title={label}
                         style={{ position: "sticky", top: 26, zIndex: key === "asset_id" ? 5 : 3, background: "#F7F8F6",
                                  ...(key === "asset_id" ? { left: 0 } : {}),
-                                 textAlign: fmtType === "text" ? "left" : "right", padding: "5px 5px", fontWeight: 600, color: "#4B5659",
-                                 fontSize: 10.5, lineHeight: 1.2, borderBottom: "1px solid #E2E6E3", cursor: "pointer", userSelect: "none",
+                                 textAlign: fmtType === "text" ? "left" : "right", padding: "6px 7px", fontWeight: 600, color: "#4B5659",
+                                 fontSize: 11, lineHeight: 1.25, borderBottom: "1px solid #E2E6E3", cursor: "pointer", userSelect: "none",
                                  whiteSpace: "normal", wordBreak: "break-word" }}>
                         {shortLabel || label}{sortKey === key ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
                       </th>
