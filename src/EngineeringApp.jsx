@@ -5171,11 +5171,96 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, myFullName, dai
   );
 }
 
-const MTBF_MTTR_COLUMNS = [
-  ["asset_id", "Equipment #"], ["asset_name", "Name"], ["fleet", "Fleet"],
-  ["num_unplanned_events", "Breakdowns"], ["mtbf", "MTBF (hrs)"], ["mttr", "MTTR (hrs)"],
-  ["availability_24h", "Availability (Last 24h)"], ["availability_mtd", "Availability (MTD)"],
+// Full Plant Performance KPI column set: [key, label, group, format].
+// Groups drive the merged banner row above the headers.
+//   n1/n2 = numbers to 1 / 2 decimals, int = whole, pct = fraction shown as %
+const KPI_REPORT_COLUMNS = [
+  ["asset_id", "Equipment", "", "text"],
+  ["asset_name", "Name", "", "text"],
+  ["model", "Model", "", "text"],
+  ["fleet", "Fleet", "", "text"],
+  ["uom", "UOM", "", "text"],
+
+  ["scheduled_hours", "Scheduled", "Hours", "n1"],
+  ["opening_hours", "Opening Usage", "Hours", "n1"],
+  ["closing_hours", "Closing Usage", "Hours", "n1"],
+  ["worked_hours", "Worked", "Hours", "n1"],
+
+  ["uncontrollable_hours", "Uncontrollable Time", "Prod.", "n2"],
+
+  ["planned_downtime_hrs", "Planned Downtime Hrs", "Downtime", "n2"],
+  ["unplanned_downtime_hrs", "Unplanned Downtime Hrs", "Downtime", "n2"],
+  ["total_downtime_hrs", "Total Downtime Hrs", "Downtime", "n2"],
+
+  ["resp_plant", "Plant", "Downtime Responsibility", "n2"],
+  ["resp_stores", "Stores", "Downtime Responsibility", "n2"],
+  ["resp_production", "Production", "Downtime Responsibility", "n2"],
+  ["resp_oem", "OEM", "Downtime Responsibility", "n2"],
+  ["resp_client", "Client", "Downtime Responsibility", "n2"],
+  ["resp_uncontrollable", "Uncontrollable Time", "Downtime Responsibility", "n2"],
+  ["resp_non_shift", "Non-Shift", "Downtime Responsibility", "n2"],
+  ["resp_not_set", "Not set", "Downtime Responsibility", "n2"],
+
+  ["num_planned_events", "Planned", "Number of Stoppages", "int"],
+  ["num_unplanned_events", "Unplanned", "Number of Stoppages", "int"],
+  ["num_engineering_unplanned", "Engineering Unplanned", "Number of Stoppages", "int"],
+
+  ["mtbf", "Equipment MTBF", "Reliability", "n1"],
+  ["engineering_mtbf", "Engineering MTBF", "Reliability", "n1"],
+  ["mttr", "MTTR", "Reliability", "n1"],
+  ["breakdown_pct", "Breakdown %", "Reliability", "pct"],
+
+  ["availability_24h", "Last 24 Hours", "Equipment Availability", "pct"],
+  ["availability", "Period", "Equipment Availability", "pct"],
+
+  ["engineering_availability_24h", "Last 24 Hours", "Engineering Availability", "pct"],
+  ["engineering_availability", "Period", "Engineering Availability", "pct"],
+
+  ["utilisation_24h", "Last 24 Hours", "Equipment Utilisation", "pct"],
+  ["utilisation", "Period", "Equipment Utilisation", "pct"],
 ];
+
+// Columns that make sense to total across a fleet by SUMMING; the rest
+// are averaged, and identity columns are left blank on subtotal rows.
+const KPI_SUM_KEYS = new Set([
+  "worked_hours", "uncontrollable_hours", "planned_downtime_hrs", "unplanned_downtime_hrs",
+  "total_downtime_hrs", "resp_plant", "resp_stores", "resp_production", "resp_oem",
+  "resp_client", "resp_uncontrollable", "resp_non_shift", "resp_not_set",
+  "num_planned_events", "num_unplanned_events", "num_engineering_unplanned",
+]);
+const KPI_AVG_KEYS = new Set([
+  "scheduled_hours", "mtbf", "engineering_mtbf", "mttr", "breakdown_pct",
+  "availability_24h", "availability", "engineering_availability_24h",
+  "engineering_availability", "utilisation_24h", "utilisation",
+]);
+
+// A machine cannot be working and broken at the same time. When worked
+// hours plus downtime exceed the scheduled hours of the period, the two
+// records contradict each other - the report flags the row rather than
+// letting the clamped percentage hide it.
+function hasHoursConflict(row) {
+  const sched = Number(row?.scheduled_hours);
+  const worked = Number(row?.worked_hours);
+  const down = Number(row?.total_downtime_hrs);
+  if (!isFinite(sched) || !isFinite(worked) || !isFinite(down) || sched <= 0) return false;
+  return (worked + down) > sched * 1.001;   // 0.1% tolerance for rounding
+}
+
+function kpiAggregate(rowsIn) {
+  const out = {};
+  const nums = (key) => rowsIn.map((r) => r[key])
+    .filter((v) => v !== null && v !== undefined && v !== "")
+    .map(Number).filter((v) => !isNaN(v));
+  for (const [key] of KPI_REPORT_COLUMNS) {
+    const vals = nums(key);
+    if (KPI_SUM_KEYS.has(key)) out[key] = vals.length ? vals.reduce((a, b) => a + b, 0) : null;
+    else if (KPI_AVG_KEYS.has(key)) out[key] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    else out[key] = null;
+  }
+  return out;
+}
+
+const MTBF_MTTR_COLUMNS = KPI_REPORT_COLUMNS.map(([k, l]) => [k, l]);
 
 function MtbfMttrReportPage({ assets }) {
   const [fromDateTime, setFromDateTime] = useState(DEFAULT_FROM);
@@ -5247,6 +5332,7 @@ function MtbfMttrReportPage({ assets }) {
           mtbf_24h: last24RowByAsset[r.asset_id]?.mtbf ?? null,
           mttr_24h: last24RowByAsset[r.asset_id]?.mttr ?? null,
           utilisation_24h: last24RowByAsset[r.asset_id]?.utilisation ?? null,
+          engineering_availability_24h: last24RowByAsset[r.asset_id]?.engineering_availability ?? null,
         }));
 
       setKpiData(merged);
@@ -5292,11 +5378,17 @@ function MtbfMttrReportPage({ assets }) {
     else { setSortKey(key); setSortDir("desc"); }
   };
 
+  const KPI_FMT = Object.fromEntries(KPI_REPORT_COLUMNS.map(([k, , , f]) => [k, f]));
+
   const fmt = (key, val) => {
-    if (val == null) return "-";
-    if (key === "availability" || key === "availability_24h" || key === "availability_mtd") return `${Math.round(val * 100)}%`;
-    if (key === "mtbf" || key === "mttr") return Number(val).toFixed(1);
-    return val;
+    if (val == null || val === "") return "-";
+    switch (KPI_FMT[key]) {
+      case "pct": return `${Math.round(Number(val) * 100)}%`;
+      case "n1":  return Number(val).toFixed(1);
+      case "n2":  return Number(val).toFixed(2);
+      case "int": return String(Math.round(Number(val)));
+      default:    return val;
+    }
   };
 
   // Built with ExcelJS rather than the xlsx community build, which
@@ -5310,109 +5402,135 @@ function MtbfMttrReportPage({ assets }) {
     const wb = new ExcelJS.Workbook();
     wb.creator = "Fleet Tracker";
     wb.created = now;
-    const ws = wb.addWorksheet("MTBF MTTR", {
-      views: [{ state: "frozen", ySplit: 9 }],
-      pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 } },
+    const ws = wb.addWorksheet("Plant Performance KPI", {
+      views: [{ state: "frozen", xSplit: 2, ySplit: 10 }],
+      pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
     });
 
-    const NCOLS = MTBF_MTTR_COLUMNS.length;
-    const INK = "FF1F6668", RULE = "FFD8DCD9", HEAD = "FF203B46";
-    const money = { name: "Arial", size: 10 };
+    const COLS = KPI_REPORT_COLUMNS;
+    const N = COLS.length;
+    const INK = "FF1F6668", HEAD = "FF203B46", BAND = "FF3D7379", WARN = "FFFDF3E3";
+    const base = { name: "Arial", size: 9.5 };
+
+    // Excel formats matching the on-screen ones. Percentages are written
+    // as fractions so Excel's own % format applies - the file stays
+    // numeric and can be summed, sorted and charted.
+    const XL_FMT = { n1: "#,##0.0", n2: "#,##0.00", int: "0", pct: "0%", text: null };
 
     const bandRow = (label, value, r) => {
-      ws.mergeCells(r, 2, r, NCOLS);
+      ws.mergeCells(r, 2, r, Math.min(N, 8));
       const a = ws.getCell(r, 1), b = ws.getCell(r, 2);
       a.value = label; b.value = value;
-      a.font = { ...money, bold: true, color: { argb: "FF4B5659" } };
-      b.font = money;
+      a.font = { ...base, bold: true, color: { argb: "FF4B5659" } };
+      b.font = base;
     };
 
-    // --- title block, mirroring the KPI report layout ---
-    ws.mergeCells(1, 1, 1, NCOLS);
+    ws.mergeCells(1, 1, 1, Math.min(N, 10));
     const title = ws.getCell(1, 1);
-    title.value = "MTBF / MTTR Report";
+    title.value = "Plant Performance KPI";
     title.font = { name: "Arial", size: 15, bold: true, color: { argb: INK } };
     ws.getRow(1).height = 22;
 
     bandRow("Date Range", formatRangeForDisplay(fromDateTime, toDateTime), 3);
-    bandRow("Exported", now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" }), 4);
+    bandRow("Execution", now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" }), 4);
     bandRow("Hierarchy", `Fleet: ${selectedFleet || "All"}    Equipment: ${selectedAsset || "All"}`, 5);
-    bandRow("Equipment count", String(rows.length), 6);
+    bandRow("Group By", "Fleet", 6);
+    bandRow("Equipment count", String(rows.length), 7);
 
-    // --- column headers ---
-    const HEADER_ROW = 8;
-    const hr = ws.getRow(HEADER_ROW);
-    MTBF_MTTR_COLUMNS.forEach(([, label], i) => {
-      const c = hr.getCell(i + 1);
+    // --- two header rows: group banner, then column names ---
+    const GROUP_ROW = 9, HEADER_ROW = 10;
+    let ci = 0;
+    while (ci < N) {
+      const g = COLS[ci][2];
+      let span = 1;
+      while (ci + span < N && COLS[ci + span][2] === g) span += 1;
+      const c = ws.getCell(GROUP_ROW, ci + 1);
+      if (span > 1) ws.mergeCells(GROUP_ROW, ci + 1, GROUP_ROW, ci + span);
+      c.value = g || null;
+      c.font = { ...base, bold: true, color: { argb: "FFFFFFFF" } };
+      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BAND } };
+      c.alignment = { horizontal: "center", vertical: "middle" };
+      ci += span;
+    }
+    COLS.forEach(([, label, , fmtType], i) => {
+      const c = ws.getCell(HEADER_ROW, i + 1);
       c.value = label;
-      c.font = { name: "Arial", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
+      c.font = { ...base, bold: true, color: { argb: "FFFFFFFF" } };
       c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: HEAD } };
-      c.alignment = { vertical: "middle", horizontal: i < 3 ? "left" : "center", wrapText: true };
-      c.border = { bottom: { style: "thin", color: { argb: INK } } };
+      c.alignment = { horizontal: fmtType === "text" ? "left" : "center", vertical: "middle", wrapText: true };
     });
-    hr.height = 30;
+    ws.getRow(GROUP_ROW).height = 18;
+    ws.getRow(HEADER_ROW).height = 30;
 
-    // --- data ---
-    const numFmt = {
-      num_unplanned_events: "0",
-      mtbf: "#,##0.0",
-      mttr: "#,##0.0",
-      availability_24h: "0%",
-      availability_mtd: "0%",
-    };
-    rows.forEach((row, ri) => {
-      const r = ws.getRow(HEADER_ROW + 1 + ri);
-      MTBF_MTTR_COLUMNS.forEach(([key], i) => {
-        const c = r.getCell(i + 1);
-        const raw = row[key];
-        // Percentages are stored as fractions so Excel's own % format
-        // applies; everything numeric stays numeric.
-        c.value = raw == null || raw === "" ? null : (numFmt[key] ? Number(raw) : raw);
-        if (numFmt[key]) c.numFmt = numFmt[key];
-        c.font = money;
-        c.alignment = { horizontal: i < 3 ? "left" : "center" };
-        c.border = { bottom: { style: "hair", color: { argb: RULE } } };
-        if (ri % 2 === 1) c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5F7F6" } };
+    const writeRow = (r, values, opts = {}) => {
+      COLS.forEach(([key, , , fmtType], i) => {
+        const c = ws.getCell(r, i + 1);
+        const raw = values[key];
+        c.value = raw === null || raw === undefined || raw === "" ? null
+                : (fmtType === "text" ? raw : Number(raw));
+        if (XL_FMT[fmtType]) c.numFmt = XL_FMT[fmtType];
+        c.font = { ...base, bold: !!opts.bold, color: { argb: opts.bold ? INK : "FF183642" } };
+        c.alignment = { horizontal: fmtType === "text" ? "left" : "right" };
+        if (opts.fill) c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: opts.fill } };
+        if (opts.topBorder) c.border = { top: { style: "thin", color: { argb: INK } } };
       });
-    });
-
-    // --- total row, matching the Total bar on the charts ---
-    const totals = aggregateMetrics(rows, rows.map((r) => r.asset_id));
-    const tr = ws.getRow(HEADER_ROW + 1 + rows.length);
-    const totalValues = {
-      asset_id: "Total", asset_name: "", fleet: "",
-      num_unplanned_events: totals.breakdown_count ?? null,
-      mtbf: totals.mtbf ?? null, mttr: totals.mttr ?? null,
-      availability_24h: totals.availability_24h ?? null,
-      availability_mtd: totals.availability ?? null,
     };
-    MTBF_MTTR_COLUMNS.forEach(([key], i) => {
-      const c = tr.getCell(i + 1);
-      const v = totalValues[key];
-      c.value = v == null || v === "" ? null : (numFmt[key] ? Number(v) : v);
-      if (numFmt[key]) c.numFmt = numFmt[key];
-      c.font = { ...money, bold: true, color: { argb: INK } };
-      c.alignment = { horizontal: i < 3 ? "left" : "center" };
-      c.border = { top: { style: "thin", color: { argb: INK } } };
+
+    // --- data, grouped by fleet with a subtotal after each ---
+    const byFleet = new Map();
+    rows.forEach((r) => {
+      const f = r.fleet || "(no fleet)";
+      if (!byFleet.has(f)) byFleet.set(f, []);
+      byFleet.get(f).push(r);
     });
 
-    // --- footnote: says plainly how the totals were reached ---
-    const noteRow = HEADER_ROW + rows.length + 3;
-    ws.mergeCells(noteRow, 1, noteRow, NCOLS);
-    const note = ws.getCell(noteRow, 1);
-    note.value = "Totals are averages across the equipment listed; machines with no data for the period are excluded rather than counted as zero. Availability (Last 24h) covers the 24 hours to the export time, independent of the date range above.";
-    note.font = { name: "Arial", size: 8.5, italic: true, color: { argb: "FF859195" } };
-    note.alignment = { wrapText: true, vertical: "top" };
-    ws.getRow(noteRow).height = 26;
+    let r = HEADER_ROW + 1;
+    let conflicts = 0;
+    for (const [fleetName, fleetRows] of byFleet) {
+      for (const row of fleetRows) {
+        const conflict = hasHoursConflict(row);
+        if (conflict) conflicts += 1;
+        writeRow(r, row, { fill: conflict ? WARN : null });
+        r += 1;
+      }
+      const sub = kpiAggregate(fleetRows);
+      writeRow(r, { ...sub, asset_id: `${fleetName} (${fleetRows.length})`, asset_name: "", model: "", fleet: "", uom: "" },
+               { bold: true, fill: "FFF2F1EA" });
+      r += 1;
+    }
+    if (rows.length) {
+      const tot = kpiAggregate(rows);
+      writeRow(r, { ...tot, asset_id: `Total (${rows.length})`, asset_name: "", model: "", fleet: "", uom: "" },
+               { bold: true, fill: "FFE2EFE9", topBorder: true });
+      r += 1;
+    }
 
-    ws.columns = MTBF_MTTR_COLUMNS.map(([, label], i) => ({ width: i < 3 ? 18 : Math.max(label.length + 3, 12) }));
-    ws.autoFilter = { from: { row: HEADER_ROW, column: 1 }, to: { row: HEADER_ROW, column: NCOLS } };
+    // --- notes: the things a reader would otherwise have to ask about ---
+    const notes = [
+      "Subtotal and Total rows SUM hours, downtime and stoppage counts; they AVERAGE rates (MTBF, MTTR, availability, utilisation, breakdown %). Machines with no data are excluded from averages rather than counted as zero.",
+      "Engineering Availability and Engineering MTBF count downtime whose Responsibility is Plant or Stores. Events recorded before Responsibility was introduced appear under 'Not set' and are excluded from those two figures.",
+      "Last 24 Hours columns cover the 24 hours up to the export time and are independent of the date range above.",
+    ];
+    if (conflicts) notes.push(`${conflicts} shaded row(s): worked hours plus downtime exceed the hours available in the period, so the Daily Hours and downtime records contradict each other. Utilisation is capped at 100% on those rows and the true figure is higher.`);
+    r += 1;
+    for (const n of notes) {
+      ws.mergeCells(r, 1, r, Math.min(N, 12));
+      const c = ws.getCell(r, 1);
+      c.value = n;
+      c.font = { name: "Arial", size: 8.5, italic: true, color: { argb: "FF859195" } };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 24;
+      r += 1;
+    }
+
+    ws.columns = COLS.map(([, label, , fmtType]) => ({ width: fmtType === "text" ? 17 : Math.min(Math.max(label.length + 2, 10), 15) }));
+    ws.autoFilter = { from: { row: HEADER_ROW, column: 1 }, to: { row: HEADER_ROW, column: N } };
 
     const buf = await wb.xlsx.writeBuffer();
     const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `MTBF_MTTR_Report_${now.toISOString().slice(0, 10)}.xlsx`;
+    a.download = `Plant_Performance_KPI_${now.toISOString().slice(0, 10)}.xlsx`;
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -5523,35 +5641,107 @@ function MtbfMttrReportPage({ assets }) {
         <p style={{ fontSize: 13, color: "#859195" }}>Loading…</p>
       ) : (
         <div style={{ overflowX: "auto", border: "1px solid #E2E6E3", borderRadius: 10 }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: "#F7F8F6" }}>
-                {MTBF_MTTR_COLUMNS.map(([key, label]) => (
-                  <th
-                    key={key}
-                    onClick={() => handleSort(key)}
-                    style={{ textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659", whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3", cursor: "pointer", userSelect: "none" }}
-                  >
-                    {label} {sortKey === key ? (sortDir === "asc" ? "▲" : "▼") : ""}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, i) => (
-                <tr key={row.asset_id ?? i} style={{ borderBottom: i < rows.length - 1 ? "1px solid #EFEEE7" : "none" }}>
-                  {MTBF_MTTR_COLUMNS.map(([key]) => (
-                    <td key={key} style={{ padding: "9px 12px", whiteSpace: "nowrap", fontWeight: key === "num_unplanned_events" && row[key] >= 3 ? 700 : 400, color: key === "num_unplanned_events" && row[key] >= 3 ? "#B85450" : "#183642" }}>
-                      {fmt(key, row[key])}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-              {rows.length === 0 && (
-                <tr><td colSpan={MTBF_MTTR_COLUMNS.length} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No data for this date range.</td></tr>
-              )}
-            </tbody>
-          </table>
+          {(() => {
+            // Group banner spans: consecutive columns sharing a group name.
+            const spans = [];
+            KPI_REPORT_COLUMNS.forEach(([, , group]) => {
+              const last = spans[spans.length - 1];
+              if (last && last.group === group) last.span += 1;
+              else spans.push({ group, span: 1 });
+            });
+
+            // Rows grouped by fleet, each fleet followed by a subtotal,
+            // then a site total - the shape of the reference report.
+            const byFleet = new Map();
+            rows.forEach((r) => {
+              const f = r.fleet || "(no fleet)";
+              if (!byFleet.has(f)) byFleet.set(f, []);
+              byFleet.get(f).push(r);
+            });
+            const anyConflict = rows.some(hasHoursConflict);
+
+            const cellStyle = (fmtType) => ({
+              padding: "7px 10px", whiteSpace: "nowrap",
+              textAlign: fmtType === "text" ? "left" : "right",
+            });
+
+            return (
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                <thead>
+                  <tr style={{ background: "#E9ECEA" }}>
+                    {spans.map((sp, i) => (
+                      <th key={i} colSpan={sp.span}
+                        style={{ textAlign: "center", padding: "6px 10px", fontWeight: 700, fontSize: 11.5, color: NAVY,
+                                 borderBottom: "1px solid #E2E6E3", borderLeft: i > 0 ? "1px solid #DCE0DD" : "none", whiteSpace: "nowrap" }}>
+                        {sp.group}
+                      </th>
+                    ))}
+                  </tr>
+                  <tr style={{ background: "#F7F8F6" }}>
+                    {KPI_REPORT_COLUMNS.map(([key, label, , fmtType]) => (
+                      <th key={key} onClick={() => handleSort(key)}
+                        style={{ textAlign: fmtType === "text" ? "left" : "right", padding: "8px 10px", fontWeight: 600, color: "#4B5659",
+                                 whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3", cursor: "pointer", userSelect: "none" }}>
+                        {label} {sortKey === key ? (sortDir === "asc" ? "▲" : "▼") : ""}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...byFleet.entries()].map(([fleetName, fleetRows]) => {
+                    const sub = kpiAggregate(fleetRows);
+                    return (
+                      <React.Fragment key={fleetName}>
+                        {fleetRows.map((row) => {
+                          const conflict = hasHoursConflict(row);
+                          return (
+                            <tr key={row.asset_id} title={conflict ? "Worked hours plus downtime exceed the hours in this period - the Daily Hours and downtime records contradict each other" : undefined}
+                              style={{ borderBottom: "1px solid #EFEEE7", background: conflict ? "#FDF3E3" : "transparent" }}>
+                              {KPI_REPORT_COLUMNS.map(([key, , , fmtType]) => (
+                                <td key={key} style={{ ...cellStyle(fmtType),
+                                  fontWeight: key === "num_unplanned_events" && row[key] >= 3 ? 700 : 400,
+                                  color: key === "num_unplanned_events" && row[key] >= 3 ? "#B85450" : "#183642" }}>
+                                  {key === "asset_id" && conflict ? <span style={{ color: "#B07D2B", fontWeight: 700 }} title="Hours conflict">⚠ </span> : null}
+                                  {fmt(key, row[key])}
+                                </td>
+                              ))}
+                            </tr>
+                          );
+                        })}
+                        <tr style={{ background: "#F2F1EA", borderBottom: "1px solid #E2E6E3" }}>
+                          {KPI_REPORT_COLUMNS.map(([key, , , fmtType], ci) => (
+                            <td key={key} style={{ ...cellStyle(fmtType), fontWeight: 700, color: NAVY }}>
+                              {ci === 0 ? `${fleetName} (${fleetRows.length})` : (KPI_SUM_KEYS.has(key) || KPI_AVG_KEYS.has(key) ? fmt(key, sub[key]) : "")}
+                            </td>
+                          ))}
+                        </tr>
+                      </React.Fragment>
+                    );
+                  })}
+                  {rows.length > 0 && (() => {
+                    const tot = kpiAggregate(rows);
+                    return (
+                      <tr style={{ background: "#E2EFE9", borderTop: `2px solid ${NAVY}` }}>
+                        {KPI_REPORT_COLUMNS.map(([key, , , fmtType], ci) => (
+                          <td key={key} style={{ ...cellStyle(fmtType), fontWeight: 800, color: NAVY }}>
+                            {ci === 0 ? `Total (${rows.length})` : (KPI_SUM_KEYS.has(key) || KPI_AVG_KEYS.has(key) ? fmt(key, tot[key]) : "")}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })()}
+                  {rows.length === 0 && (
+                    <tr><td colSpan={KPI_REPORT_COLUMNS.length} style={{ padding: 20, textAlign: "center", color: "#859195" }}>No data for this date range.</td></tr>
+                  )}
+                  {anyConflict && (
+                    <tr><td colSpan={KPI_REPORT_COLUMNS.length} style={{ padding: "8px 10px", fontSize: 11.5, color: "#8A6320", background: "#FDF3E3" }}>
+                      ⚠ Shaded rows: worked hours plus downtime exceed the hours available in this period, so the Daily Hours and downtime records contradict each other. Utilisation is capped at 100% on those rows and the true figure is higher.
+                    </td></tr>
+                  )}
+                </tbody>
+              </table>
+            );
+          })()}
         </div>
       )}
     </div>
