@@ -1750,6 +1750,9 @@ function DailyHoursPage({ assets, dailyHours, userEmail, selectedSiteId, onRefre
 
 function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved, userEmail, myFullName, workOrders, parts, componentCodes, onRefresh }) {
   const [assetId, setAssetId] = useState(existing?.asset_id || activatingWorkOrder?.asset_id || assets[0]?.asset_id || "");
+  // Planned vs Breakdown is now recorded on the event itself rather than
+  // inferred from which table the row lives in.
+  const [eventType, setEventType] = useState(existing?.event_type || "Breakdown");
   const [causeCode, setCauseCode] = useState(existing?.cause_code || CAUSE_CODES[0]);
   const [severity, setSeverity] = useState(existing?.severity || "Medium");
   // Blank by default and blank on historical events - never guessed.
@@ -1884,6 +1887,7 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
       breakdown_date: breakdownDate,
       time_reported: `${pad(startDate.getHours())}:${pad(startDate.getMinutes())}`,
       description,
+      event_type: eventType,
       cause_code: causeCode,
       responsibility: responsibility || null,
       severity,
@@ -1947,7 +1951,7 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
-      <form onSubmit={handleSubmit} style={{ background: "#fff", borderRadius: 12, padding: 24, width: 560, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto" }}>
+      <form onSubmit={handleSubmit} style={{ background: "#fff", borderRadius: 12, padding: 24, width: 980, maxWidth: "96vw", maxHeight: "90vh", overflowY: "auto" }}>
         <h3 style={{ fontSize: 16, fontWeight: 700, color: NAVY, margin: "0 0 16px" }}>
           {hasSavedRecord ? "Edit Event" : activatingWorkOrder ? "Book Machine Down" : "Log Event"}
         </h3>
@@ -1965,23 +1969,40 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
           </select>
         </div>
 
-        <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>Downtime</label>
-          <DateTimeField value={downtimeStart} onChange={setDowntimeStart} max={nowForInput()} required />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 6 }}>
+          <div>
+            <label style={labelStyle}>Downtime</label>
+            <DateTimeField value={downtimeStart} onChange={setDowntimeStart} max={nowForInput()} required />
+          </div>
+          <div>
+            <label style={labelStyle}>Uptime {status !== "Closed" && <span style={{ fontWeight: 400, color: "#859195" }}>(Closed first)</span>}</label>
+            <DateTimeField value={downtimeEnd} onChange={setDowntimeEnd} max={nowForInput()} disabled={status !== "Closed"} />
+          </div>
+          <div>
+            <label style={labelStyle}>Expected Up Time {status === "Closed" && <span style={{ fontWeight: 400, color: "#859195" }}>(not needed)</span>}</label>
+            <DateTimeField value={expectedUpTime} onChange={setExpectedUpTime} disabled={status === "Closed"} />
+          </div>
         </div>
-        <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>Uptime {status !== "Closed" && <span style={{ fontWeight: 400, color: "#859195" }}>(set Status to Closed first)</span>}</label>
-          <DateTimeField value={downtimeEnd} onChange={setDowntimeEnd} max={nowForInput()} disabled={status !== "Closed"} />
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>Expected Up Time {status === "Closed" && <span style={{ fontWeight: 400, color: "#859195" }}>(not needed once Closed)</span>}</label>
-          <DateTimeField value={expectedUpTime} onChange={setExpectedUpTime} disabled={status === "Closed"} />
-        </div>
-        <p style={{ fontSize: 11.5, color: "#859195", margin: "-6px 0 14px" }}>
-          Downtime defaults to right now, but you can set it earlier if you're logging something that happened previously (e.g. catching up after time away from the system) - future dates and times aren't allowed. Uptime only opens up once Status is Closed - an event that's still active doesn't have an end yet, and having both set at once would throw off MTBF, MTTR, Availability and Utilisation. Expected Up Time is your best estimate of when the machine will be back - unlike the other two, future dates are fine here, since that's the whole point of it.
-        </p>
+        {/* Collapsed by default - the guidance is long and pushed the form
+            past the bottom of the screen every time it opened. */}
+        <details style={{ marginBottom: 12 }}>
+          <summary style={{ fontSize: 11.5, color: "#859195", cursor: "pointer" }}>How these three dates work</summary>
+          <p style={{ fontSize: 11.5, color: "#859195", margin: "6px 0 0" }}>
+            Downtime defaults to right now, but you can set it earlier if you're logging something that happened previously (e.g. catching up after time away from the system) - future dates and times aren't allowed. Uptime only opens up once Status is Closed - an event that's still active doesn't have an end yet, and having both set at once would throw off MTBF, MTTR, Availability and Utilisation. Expected Up Time is your best estimate of when the machine will be back - unlike the other two, future dates are fine here, since that's the whole point of it.
+          </p>
+        </details>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <div>
+            <label style={labelStyle}>Event</label>
+            <select value={eventType} onChange={(e) => setEventType(e.target.value)} style={fieldStyle}>
+              <option value="Breakdown">Breakdown</option>
+              <option value="Planned">Planned</option>
+            </select>
+            <p style={{ fontSize: 11.5, color: "#859195", margin: "4px 0 0" }}>
+              Drives the Planned / Unplanned split on the KPI report.
+            </p>
+          </div>
           <div>
             <label style={labelStyle}>Cause</label>
             <select value={causeCode} onChange={(e) => setCauseCode(e.target.value)} style={fieldStyle}>
@@ -2006,22 +2027,23 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
           </div>
         </div>
 
-        <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>Component Code</label>
-          <select
-            value={componentCode}
-            onChange={(e) => { setComponentCode(e.target.value); if (e.target.value) setComponentAffected(e.target.value); }}
-            style={fieldStyle}
-          >
-            <option value="">- Select a component -</option>
-            {componentCodes.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
-          </select>
-          <p style={{ fontSize: 11, color: "#859195", margin: "4px 0 0" }}>Selecting one fills in Component / System Affected below - you can still edit it after.</p>
-        </div>
-
-        <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>Component / System Affected</label>
-          <input type="text" value={componentAffected} onChange={(e) => setComponentAffected(e.target.value)} placeholder="e.g. Starter Motor" style={fieldStyle} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <div>
+            <label style={labelStyle}>Component Code</label>
+            <select
+              value={componentCode}
+              onChange={(e) => { setComponentCode(e.target.value); if (e.target.value) setComponentAffected(e.target.value); }}
+              style={fieldStyle}
+            >
+              <option value="">- Select a component -</option>
+              {componentCodes.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+            </select>
+            <p style={{ fontSize: 11, color: "#859195", margin: "4px 0 0" }}>Fills in Component / System Affected - still editable after.</p>
+          </div>
+          <div>
+            <label style={labelStyle}>Component / System Affected</label>
+            <input type="text" value={componentAffected} onChange={(e) => setComponentAffected(e.target.value)} placeholder="e.g. Starter Motor" style={fieldStyle} />
+          </div>
         </div>
 
         <div style={{ marginBottom: 12 }}>
@@ -2144,7 +2166,7 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, myFullName, 
   // placeholders above are the planned side. Event says WHICH KIND of
   // event it was - the component that failed has its own column.
   const allRows = useMemo(
-    () => [...breakdowns.map((b) => ({ ...b, event_type: "Breakdown" })), ...scheduledRows],
+    () => [...breakdowns.map((b) => ({ ...b, event_type: b.event_type || "Breakdown" })), ...scheduledRows],
     [breakdowns, scheduledRows]
   );
 
