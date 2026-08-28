@@ -2091,7 +2091,7 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, myFullName, 
   const [sortDir, setSortDir] = useState("desc");
 
   const columns = [
-    ["asset_id", "Equipment #"], ["component_affected", "Event"], ["cause_code", "Reason"],
+    ["asset_id", "Equipment #"], ["event_type", "Event"], ["component_affected", "Component"], ["cause_code", "Reason"],
     ["description", "Description"], ["wo_reference", "WO-number"],
     ["downtime_start", "Downtime Start"], ["downtime_end", "Downtime End"],
     ["downtime_hours", "Downtime Hours"], ["repair_status", "Status"],
@@ -2129,7 +2129,8 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, myFullName, 
       isScheduledPlaceholder: true,
       sourceWorkOrder: w,
       asset_id: w.asset_id,
-      component_affected: w.component || "Planned Service",
+      event_type: "Planned",
+      component_affected: w.component || null,
       cause_code: null,
       description: w.problem_scope || "",
       wo_reference: w.wo_no,
@@ -2139,7 +2140,13 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, myFullName, 
       repair_status: "Planned",
     })), [workOrders]);
 
-  const allRows = useMemo(() => [...breakdowns, ...scheduledRows], [breakdowns, scheduledRows]);
+  // Anything in breakdown_log is by definition unplanned; the
+  // placeholders above are the planned side. Event says WHICH KIND of
+  // event it was - the component that failed has its own column.
+  const allRows = useMemo(
+    () => [...breakdowns.map((b) => ({ ...b, event_type: "Breakdown" })), ...scheduledRows],
+    [breakdowns, scheduledRows]
+  );
 
   const filtered = useMemo(() => {
     let rows = allRows;
