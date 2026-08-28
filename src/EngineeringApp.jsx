@@ -1754,6 +1754,9 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
   // inferred from which table the row lives in.
   const [eventType, setEventType] = useState(existing?.event_type || "Breakdown");
   const [causeCode, setCauseCode] = useState(existing?.cause_code || CAUSE_CODES[0]);
+  // "Other" on its own tells you nothing six months later, so it has to
+  // be spelled out before the event can be saved.
+  const [causeDetail, setCauseDetail] = useState(existing?.cause_detail || "");
   const [severity, setSeverity] = useState(existing?.severity || "Medium");
   // Blank by default and blank on historical events - never guessed.
   const [responsibility, setResponsibility] = useState(existing?.responsibility || "");
@@ -1831,6 +1834,10 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
       setError("Description is required.");
       return;
     }
+    if (causeCode === "Other" && !causeDetail.trim()) {
+      setError("Please specify the cause when Cause is set to Other.");
+      return;
+    }
     if (new Date(downtimeStart) > new Date()) {
       setError("Downtime Start can't be in the future - only past or present times are allowed.");
       return;
@@ -1889,6 +1896,7 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
       description,
       event_type: eventType,
       cause_code: causeCode,
+      cause_detail: causeCode === "Other" ? causeDetail.trim() : null,
       responsibility: responsibility || null,
       severity,
       component_affected: componentAffected,
@@ -2026,6 +2034,24 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
             </select>
           </div>
         </div>
+
+        {causeCode === "Other" && (
+          <div style={{ marginBottom: 12 }}>
+            <label style={labelStyle}>Specify the cause *</label>
+            <input
+              type="text"
+              value={causeDetail}
+              onChange={(e) => setCauseDetail(e.target.value)}
+              required
+              maxLength={120}
+              placeholder="e.g. Operator drove over a berm and damaged the sump guard"
+              style={fieldStyle}
+            />
+            <p style={{ fontSize: 11.5, color: "#859195", margin: "4px 0 0" }}>
+              Required when Cause is Other. This shows in the Reason column and on reports.
+            </p>
+          </div>
+        )}
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
           <div>
@@ -2166,7 +2192,14 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, myFullName, 
   // placeholders above are the planned side. Event says WHICH KIND of
   // event it was - the component that failed has its own column.
   const allRows = useMemo(
-    () => [...breakdowns.map((b) => ({ ...b, event_type: b.event_type || "Breakdown" })), ...scheduledRows],
+    () => [
+      ...breakdowns.map((b) => ({
+        ...b,
+        event_type: b.event_type || "Breakdown",
+        cause_code: b.cause_code === "Other" && b.cause_detail ? `Other - ${b.cause_detail}` : b.cause_code,
+      })),
+      ...scheduledRows,
+    ],
     [breakdowns, scheduledRows]
   );
 
