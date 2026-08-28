@@ -426,6 +426,11 @@ const CAUSE_CODES = ["Mechanical Failure", "Electrical Fault", "Hydraulic Failur
 // be Plant's or the OEM's depending on circumstance.
 // Engineering Availability / Engineering MTBF count PLANT and STORES
 // only; the rest are lost time outside engineering's control.
+const ACTION_TAKEN_OPTIONS = ["Repaired in place", "Adjusted", "Component replaced", "No fault found"];
+const CHANGEOUT_DOC_TYPES = ["Commission report", "Component certificate", "Oil sample", "Failure photos", "OEM inspection", "Return note", "Invoice", "Other"];
+const COMPONENT_CONDITIONS = ["New", "Reman", "Repaired"];
+const CLAIM_STATUSES = ["Not lodged", "Lodged", "Under assessment", "Approved", "Rejected", "Not applicable"];
+
 const RESPONSIBILITY_CODES = ["Plant", "Stores", "Production", "OEM", "Client", "Uncontrollable Time", "Non-Shift"];
 const ENGINEERING_RESPONSIBILITY = ["Plant", "Stores"];
 
@@ -1757,6 +1762,9 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
   // "Other" on its own tells you nothing six months later, so it has to
   // be spelled out before the event can be saved.
   const [causeDetail, setCauseDetail] = useState(existing?.cause_detail || "");
+  // What was actually DONE. Kept separate from cause: "engine overheating"
+  // and "engine replaced" are different facts and both matter to a claim.
+  const [actionTaken, setActionTaken] = useState(existing?.action_taken || "");
   const [severity, setSeverity] = useState(existing?.severity || "Medium");
   // Blank by default and blank on historical events - never guessed.
   const [responsibility, setResponsibility] = useState(existing?.responsibility || "");
@@ -1897,6 +1905,7 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
       event_type: eventType,
       cause_code: causeCode,
       cause_detail: causeCode === "Other" ? causeDetail.trim() : null,
+      action_taken: actionTaken || null,
       responsibility: responsibility || null,
       severity,
       component_affected: componentAffected,
@@ -2072,6 +2081,23 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
           </div>
         </div>
 
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <div>
+            <label style={labelStyle}>Action Taken</label>
+            <select value={actionTaken} onChange={(e) => setActionTaken(e.target.value)} style={fieldStyle}>
+              <option value="">- not set -</option>
+              {ACTION_TAKEN_OPTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+            {actionTaken === "Component replaced" && (
+              <p style={{ fontSize: 11.5, color: "#2C5646", margin: "4px 0 0" }}>
+                {hasSavedRecord
+                  ? "Fill in the Component Change Out panel below."
+                  : "Save the event first - the change out panel opens once it exists."}
+              </p>
+            )}
+          </div>
+        </div>
+
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Description *</label>
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} required style={{ ...fieldStyle, resize: "vertical" }} />
@@ -2117,7 +2143,10 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
 
         {hasSavedRecord && (
           <>
-            <EventPulledPartsPanel event={savedRecord} parts={parts} onRefresh={onRefresh} />
+            {actionTaken === "Component replaced" && (
+            <EventChangeoutPanel event={savedRecord} componentCodes={componentCodes} myFullName={myFullName} />
+          )}
+          <EventPulledPartsPanel event={savedRecord} parts={parts} onRefresh={onRefresh} />
             <EventWorkOrdersPanel event={savedRecord} assets={assets} parts={parts} onRefresh={onRefresh} />
           </>
         )}
@@ -3407,6 +3436,253 @@ function PartsUsedList({ workOrder, parts }) {
 // Parts pulled straight from Inventory against this event - for parts
 // already on hand. Separate from Work Orders (below), which are for
 // parts that need to be ordered in first.
+// ---------------------------------------------------------------------
+// Component Change Out - the drill-down behind Action Taken.
+//
+// Lives against an event via component_changeout_log.event_id. Written
+// in two stages for the same reason the parts and work order panels are:
+// the attachment rows need a changeout_id, so the record is saved first
+// and the documents attach to it afterwards.
+//
+// life_pct and premature_failure are derived in the database view rather
+// than here, so the form, the reports and anything built later can't
+// disagree about what counts as a premature failure.
+// ---------------------------------------------------------------------
+function EventChangeoutPanel({ event, componentCodes, myFullName }) {
+  const [row, setRow] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [docs, setDocs] = useState([]);
+  const [docType, setDocType] = useState(CHANGEOUT_DOC_TYPES[0]);
+  const [uploading, setUploading] = useState(false);
+
+  const [f, setF] = useState({
+    component_type: "", serial_out: "", serial_in: "", part_no: "", supplier: "",
+    component_condition: "New", machine_hours: "", comp_hours_achieved: "",
+    expected_life_hours: "", failure_mode: "", fitted_by: myFullName || "",
+    under_warranty: false, warranty_end: "", claim_ref: "", claim_status: "Not lodged",
+    reason_for_change: "", changeout_date: todayForInput(),
+  });
+  const set = (k, v) => setF((prev) => ({ ...prev, [k]: v }));
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase.from("component_changeout_calc").select("*").eq("event_id", event.id).maybeSingle();
+    if (data) {
+      setRow(data);
+      setF({
+        component_type: data.component_type || "", serial_out: data.serial_out || "",
+        serial_in: data.serial_in || "", part_no: data.part_no || "", supplier: data.supplier || "",
+        component_condition: data.component_condition || "New",
+        machine_hours: data.machine_hours ?? "", comp_hours_achieved: data.comp_hours_achieved ?? "",
+        expected_life_hours: data.expected_life_hours ?? "", failure_mode: data.failure_mode || "",
+        fitted_by: data.fitted_by || myFullName || "", under_warranty: !!data.under_warranty,
+        warranty_end: data.warranty_end || "", claim_ref: data.claim_ref || "",
+        claim_status: data.claim_status || "Not lodged", reason_for_change: data.reason_for_change || "",
+        changeout_date: data.changeout_date || todayForInput(),
+      });
+      const { data: scans } = await supabase.from("component_changeout_scans")
+        .select("*").eq("changeout_id", data.id).order("uploaded_at", { ascending: false });
+      setDocs(scans || []);
+    }
+    setLoading(false);
+  }, [event.id, myFullName]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Shown live while typing so the technician sees the number that will
+  // carry the claim, rather than discovering it on a report later.
+  const livePct = useMemo(() => {
+    const life = Number(f.expected_life_hours), got = Number(f.comp_hours_achieved);
+    if (!life || !got || isNaN(life) || isNaN(got)) return null;
+    return Math.round((got / life) * 1000) / 10;
+  }, [f.expected_life_hours, f.comp_hours_achieved]);
+
+  const save = async () => {
+    setError("");
+    if (!f.component_type.trim()) { setError("Component type is required."); return; }
+    setSaving(true);
+    const num = (v) => (v === "" || v === null ? null : Number(v));
+    const payload = {
+      asset_id: event.asset_id, event_id: event.id,
+      changeout_date: f.changeout_date || todayForInput(),
+      changeout_hours: num(f.machine_hours),
+      component_type: f.component_type.trim(),
+      serial_out: f.serial_out.trim() || null, serial_in: f.serial_in.trim() || null,
+      part_no: f.part_no.trim() || null, supplier: f.supplier.trim() || null,
+      component_condition: f.component_condition,
+      machine_hours: num(f.machine_hours), comp_hours_achieved: num(f.comp_hours_achieved),
+      expected_life_hours: num(f.expected_life_hours),
+      failure_mode: f.failure_mode.trim() || null, fitted_by: f.fitted_by.trim() || null,
+      under_warranty: f.under_warranty, warranty_end: f.warranty_end || null,
+      claim_ref: f.claim_ref.trim() || null, claim_status: f.claim_status,
+      reason_for_change: f.reason_for_change.trim() || null,
+    };
+    try {
+      if (row) {
+        const { error: e1 } = await supabase.from("component_changeout_log").update(payload).eq("id", row.id);
+        if (e1) throw e1;
+      } else {
+        const { error: e2 } = await supabase.from("component_changeout_log").insert(payload);
+        if (e2) throw e2;
+      }
+      // The register is what makes serial history work across machines.
+      if (f.serial_in.trim()) {
+        await supabase.from("component_register").insert({
+          asset_id: event.asset_id, component_id: f.serial_in.trim(),
+          component_type: f.component_type.trim(), serial_number: f.serial_in.trim(),
+          installed_date: f.changeout_date || todayForInput(),
+          installed_hours: num(f.machine_hours), expected_life_hours: num(f.expected_life_hours),
+          condition: f.component_condition, supplier: f.supplier.trim() || null,
+          warranty_end: f.warranty_end || null,
+        });
+      }
+      await load();
+    } catch (err) {
+      setError(err.message || String(err));
+    }
+    setSaving(false);
+  };
+
+  const upload = async (file) => {
+    if (!file || !row) return;
+    setUploading(true);
+    setError("");
+    try {
+      const path = `changeouts/${row.id}/${Date.now()}-${file.name.replace(/[^\w.\-]/g, "_")}`;
+      const { error: upErr } = await supabase.storage.from("job-card-scans").upload(path, file);
+      if (upErr) throw upErr;
+      const { error: insErr } = await supabase.from("component_changeout_scans").insert({
+        changeout_id: row.id, storage_path: path, file_name: file.name, document_type: docType,
+      });
+      if (insErr) throw insErr;
+      await load();
+    } catch (err) {
+      setError(err.message || String(err));
+    }
+    setUploading(false);
+  };
+
+  const openDoc = async (d) => {
+    const { data } = await supabase.storage.from("job-card-scans").createSignedUrl(d.storage_path, 3600);
+    if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+  };
+
+  const fs = { width: "100%", padding: "7px 9px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, boxSizing: "border-box" };
+  const ls = { display: "block", fontSize: 12, fontWeight: 600, color: "#183642", margin: "0 0 4px" };
+  const sec = { fontSize: 12, fontWeight: 700, color: "#4B5659", margin: "14px 0 6px" };
+
+  if (loading) return <p style={{ fontSize: 12.5, color: "#859195" }}>Loading change out…</p>;
+
+  return (
+    <div style={{ border: `1px solid ${NAVY}`, borderRadius: 10, padding: 14, marginBottom: 14 }}>
+      <p style={{ margin: "0 0 2px", fontSize: 13.5, fontWeight: 700, color: NAVY }}>Component Change Out</p>
+      <p style={{ margin: "0 0 8px", fontSize: 11.5, color: "#859195" }}>
+        The event keeps its own cause and description - this records what was replaced.
+      </p>
+
+      {error && <p style={{ fontSize: 12.5, color: "#B85450", margin: "0 0 8px" }}>{error}</p>}
+
+      <p style={sec}>Identity</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 4 }}>
+        <div>
+          <label style={ls}>Component type *</label>
+          <input list="changeout-components" value={f.component_type} onChange={(e) => set("component_type", e.target.value)} placeholder="Engine" style={fs} />
+          <datalist id="changeout-components">
+            {(componentCodes || []).map((c) => <option key={c.id} value={c.name} />)}
+          </datalist>
+        </div>
+        <div><label style={ls}>Serial out</label><input value={f.serial_out} onChange={(e) => set("serial_out", e.target.value)} placeholder="Removed unit" style={fs} /></div>
+        <div><label style={ls}>Serial in</label><input value={f.serial_in} onChange={(e) => set("serial_in", e.target.value)} placeholder="Fitted unit" style={fs} /></div>
+        <div><label style={ls}>Part no.</label><input value={f.part_no} onChange={(e) => set("part_no", e.target.value)} style={fs} /></div>
+        <div><label style={ls}>Supplier / OEM</label><input value={f.supplier} onChange={(e) => set("supplier", e.target.value)} style={fs} /></div>
+        <div>
+          <label style={ls}>Condition</label>
+          <select value={f.component_condition} onChange={(e) => set("component_condition", e.target.value)} style={fs}>
+            {COMPONENT_CONDITIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <p style={sec}>Life</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+        <div><label style={ls}>Change out date</label><input type="date" value={f.changeout_date} onChange={(e) => set("changeout_date", e.target.value)} style={fs} /></div>
+        <div><label style={ls}>Machine hours</label><input type="number" step="0.1" value={f.machine_hours} onChange={(e) => set("machine_hours", e.target.value)} style={fs} /></div>
+        <div><label style={ls}>Hours achieved</label><input type="number" step="0.1" value={f.comp_hours_achieved} onChange={(e) => set("comp_hours_achieved", e.target.value)} style={fs} /></div>
+        <div><label style={ls}>Expected life</label><input type="number" step="1" value={f.expected_life_hours} onChange={(e) => set("expected_life_hours", e.target.value)} style={fs} /></div>
+      </div>
+      {livePct != null && (
+        <p style={{ margin: "8px 0 0", fontSize: 12.5, padding: "7px 10px", borderRadius: 8,
+                    background: livePct < 70 ? "#F6E2E0" : "#E2EFE9", color: livePct < 70 ? "#8A2F28" : "#2C5646" }}>
+          Reached {livePct}% of expected life{livePct < 70 ? " - flagged as a premature failure" : ""}
+        </p>
+      )}
+
+      <p style={sec}>Warranty</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, alignItems: "end" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, color: "#183642", paddingBottom: 8 }}>
+          <input type="checkbox" checked={f.under_warranty} onChange={(e) => set("under_warranty", e.target.checked)} />
+          Under warranty
+        </label>
+        <div><label style={ls}>Warranty end</label><input type="date" value={f.warranty_end} onChange={(e) => set("warranty_end", e.target.value)} style={fs} /></div>
+        <div><label style={ls}>Claim ref</label><input value={f.claim_ref} onChange={(e) => set("claim_ref", e.target.value)} style={fs} /></div>
+        <div>
+          <label style={ls}>Claim status</label>
+          <select value={f.claim_status} onChange={(e) => set("claim_status", e.target.value)} style={fs}>
+            {CLAIM_STATUSES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <p style={sec}>Context</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+        <div><label style={ls}>Failure mode</label><input value={f.failure_mode} onChange={(e) => set("failure_mode", e.target.value)} placeholder="e.g. Bearing seizure" style={fs} /></div>
+        <div><label style={ls}>Reason for change</label><input value={f.reason_for_change} onChange={(e) => set("reason_for_change", e.target.value)} style={fs} /></div>
+        <div><label style={ls}>Fitted by</label><input value={f.fitted_by} onChange={(e) => set("fitted_by", e.target.value)} style={fs} /></div>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+        <button type="button" onClick={save} disabled={saving}
+          style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: saving ? "default" : "pointer" }}>
+          {saving ? "Saving…" : row ? "Save Change Out" : "Create Change Out"}
+        </button>
+      </div>
+
+      <p style={sec}>Evidence</p>
+      {!row ? (
+        <p style={{ fontSize: 12, color: "#859195", margin: 0 }}>
+          Save the change out first - documents attach to the saved record.
+        </p>
+      ) : (
+        <>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <select value={docType} onChange={(e) => setDocType(e.target.value)} style={{ ...fs, width: 200 }}>
+              {CHANGEOUT_DOC_TYPES.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+            <input type="file" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; upload(file); }} disabled={uploading} style={{ fontSize: 12.5 }} />
+            {uploading && <span style={{ fontSize: 12, color: "#859195" }}>Uploading…</span>}
+          </div>
+          {docs.length === 0 ? (
+            <p style={{ fontSize: 12, color: "#859195", margin: "8px 0 0" }}>No documents attached yet.</p>
+          ) : (
+            <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0" }}>
+              {docs.map((d) => (
+                <li key={d.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid #EFEEE7", fontSize: 12.5 }}>
+                  <span style={{ background: "#E2EFE9", color: "#2C5646", padding: "2px 8px", borderRadius: 6, fontSize: 11.5, fontWeight: 600 }}>{d.document_type}</span>
+                  <button type="button" onClick={() => openDoc(d)} style={{ background: "none", border: "none", color: NAVY, textDecoration: "underline", cursor: "pointer", padding: 0, fontSize: 12.5 }}>
+                    {d.file_name || "document"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function EventPulledPartsPanel({ event, parts, onRefresh }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
