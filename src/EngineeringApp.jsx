@@ -6124,7 +6124,7 @@ function MtbfMttrReportPage({ assets }) {
                                  ...(key === "asset_id" ? { left: 0 } : {}),
                                  textAlign: fmtType === "text" ? "left" : "right", padding: "6px 7px", fontWeight: 600, color: "#4B5659",
                                  fontSize: 11, lineHeight: 1.25, borderBottom: "1px solid #E2E6E3", cursor: "pointer", userSelect: "none",
-                                 whiteSpace: "normal", wordBreak: "break-word" }}>
+                                 whiteSpace: "normal", overflowWrap: "normal", hyphens: "none" }}>
                         {shortLabel || label}{sortKey === key ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
                       </th>
                     ))}
@@ -9436,6 +9436,189 @@ function ConsumptionCharts() {
   );
 }
 
+// ---------------------------------------------------------------------
+// Fleet Health drill-down: one machine's components.
+//
+// Reads the same component_status_calc as the main report, filtered to
+// one asset, so the drill-down can never disagree with the row that
+// opened it. Removed components are shown too - the history is the
+// point of tracking serials at all.
+// ---------------------------------------------------------------------
+function FleetHealthDrilldown({ machine, onClose }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error: err } = await supabase
+        .from("component_status_calc")
+        .select("*")
+        .eq("asset_id", machine.asset_id)
+        .order("life_used_pct", { ascending: false, nullsFirst: false });
+      if (cancelled) return;
+      if (err) setError(err.message); else setRows(data || []);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [machine.asset_id]);
+
+  const active = useMemo(() => rows.filter((r) => !r.removed_date), [rows]);
+  const history = useMemo(() => rows.filter((r) => r.removed_date), [rows]);
+
+  const tone = (s) =>
+    s === "OVERDUE" || s === "FAILED" ? { bg: "#F6E2E0", text: "#7A3330", bar: "#B85450" }
+    : s === "DUE" || s === "APPROACHING LIFE" ? { bg: "#F5E9D8", text: "#7A5A22", bar: "#C79A12" }
+    : s === "NORMAL" || s === "NEW" ? { bg: "#E2EFE9", text: "#2C5646", bar: "#2F9E63" }
+    : { bg: "#EDEBE4", text: "#4B5659", bar: "#B4B2A9" };
+
+  const num = (v, d = 1) => (v == null || v === "" ? "-" : Number(v).toLocaleString(undefined, { maximumFractionDigits: d }));
+  const money = (v) => (v == null || v === "" ? "-" : Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+  const th = { textAlign: "left", padding: "7px 9px", fontSize: 11, fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3", whiteSpace: "nowrap" };
+  const thR = { ...th, textAlign: "right" };
+  const td = { padding: "7px 9px", fontSize: 12, whiteSpace: "nowrap" };
+  const tdR = { ...td, textAlign: "right" };
+
+  const stat = (label, value, sub) => (
+    <div style={{ background: "#F7F8F6", borderRadius: 8, padding: "9px 12px", minWidth: 120 }}>
+      <p style={{ margin: 0, fontSize: 11, color: "#859195" }}>{label}</p>
+      <p style={{ margin: "2px 0 0", fontSize: 17, fontWeight: 700, color: NAVY }}>{value}</p>
+      {sub && <p style={{ margin: "1px 0 0", fontSize: 10.5, color: "#859195" }}>{sub}</p>}
+    </div>
+  );
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(24,54,66,0.45)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 24, zIndex: 100, overflowY: "auto" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, padding: 22, width: 1180, maxWidth: "97vw", maxHeight: "92vh", overflowY: "auto" }}>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
+          <div>
+            <p style={{ margin: 0, fontSize: 17, fontWeight: 700, color: NAVY }}>
+              {machine.asset_id}{machine.asset_name ? ` — ${machine.asset_name}` : ""}
+            </p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#859195" }}>
+              {[machine.fleet, machine.model, machine.make].filter(Boolean).join(" · ")}
+            </p>
+          </div>
+          <button onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#4B5659", padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Close</button>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+          {stat("Machine hours", num(machine.current_equip_hours), machine.last_reading_date ? `read ${String(machine.last_reading_date).slice(0, 10)}` : null)}
+          {stat("Health", machine.health_score == null ? "not scored" : Number(machine.health_score).toFixed(0), machine.coverage)}
+          {stat("Overdue", machine.overdue_count || 0, machine.due_count ? `${machine.due_count} due` : null)}
+          {stat("Hours / day", num(machine.avg_hours_per_day, 2), "last 30 days")}
+          {stat("Next changeout", machine.days_to_first_changeout == null ? "-" : `${machine.days_to_first_changeout} d`, machine.first_changeout_date ? String(machine.first_changeout_date).slice(0, 10) : "insufficient data")}
+        </div>
+
+        {error && <p style={{ fontSize: 12.5, color: "#B85450" }}>{error}</p>}
+        {loading ? <p style={{ fontSize: 13, color: "#859195" }}>Loading components…</p> : (
+          <>
+            <p style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 700, color: NAVY }}>Fitted components ({active.length})</p>
+            <div style={{ border: "1px solid #E2E6E3", borderRadius: 10, overflow: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "#F7F8F6" }}>
+                    <th style={th}>Component</th><th style={th}>Position</th><th style={th}>Serial</th>
+                    <th style={thR}>Fitted at</th><th style={thR}>Comp. hrs</th><th style={thR}>Target</th>
+                    <th style={thR}>Remaining</th><th style={{ ...th, width: 150 }}>Life used</th>
+                    <th style={th}>Status</th><th style={thR}>Next at</th><th style={thR}>Est. date</th>
+                    <th style={thR}>RVIC</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {active.map((c) => {
+                    const t = tone(c.status);
+                    const pct = c.life_used_pct == null ? null : Number(c.life_used_pct);
+                    return (
+                      <tr key={c.id} style={{ borderBottom: "1px solid #EFEEE7" }}>
+                        <td style={{ ...td, fontWeight: 600 }}>{c.component_type}</td>
+                        <td style={td}>{c.position_label || "-"}</td>
+                        <td style={td}>{c.serial_number || "-"}</td>
+                        <td style={tdR}>{num(c.installed_equip_hours)}</td>
+                        <td style={tdR}>{num(c.component_hours)}</td>
+                        <td style={tdR}>{num(c.target_life_hours, 0)}</td>
+                        <td style={{ ...tdR, color: Number(c.remaining_hours) < 0 ? "#B85450" : "#183642", fontWeight: Number(c.remaining_hours) < 0 ? 700 : 400 }}>{num(c.remaining_hours)}</td>
+                        <td style={td}>
+                          {pct == null ? <span style={{ fontSize: 11, color: "#859195" }}>no target</span> : (
+                            <>
+                              <span style={{ display: "block", height: 6, background: "#F2F1EA", borderRadius: 4, overflow: "hidden" }}>
+                                <span style={{ display: "block", height: "100%", width: `${Math.max(2, Math.min(100, pct))}%`, background: t.bar }} />
+                              </span>
+                              <span style={{ fontSize: 10.5, color: t.text }}>{pct.toFixed(1)}%</span>
+                            </>
+                          )}
+                        </td>
+                        <td style={td}><span style={{ background: t.bg, color: t.text, padding: "2px 8px", borderRadius: 6, fontSize: 10.5, fontWeight: 600 }}>{c.status}</span></td>
+                        <td style={tdR}>{num(c.next_changeout_equip_hours)}</td>
+                        <td style={{ ...tdR, color: c.estimated_changeout_date ? "#183642" : "#859195", fontSize: c.estimated_changeout_date ? 12 : 10.5 }}>
+                          {c.estimated_changeout_date ? String(c.estimated_changeout_date).slice(0, 10) : "insufficient data"}
+                        </td>
+                        <td style={tdR}>{money(c.rvic)}</td>
+                      </tr>
+                    );
+                  })}
+                  {active.length === 0 && (
+                    <tr><td colSpan={12} style={{ padding: 18, textAlign: "center", color: "#859195", fontSize: 12.5 }}>
+                      No components registered against this machine yet — which is why it reads NOT SCORED.
+                    </td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {history.length > 0 && (
+              <>
+                <button onClick={() => setShowHistory((v) => !v)}
+                  style={{ background: "none", border: "none", color: NAVY, fontSize: 12.5, fontWeight: 600, cursor: "pointer", padding: "12px 0 6px" }}>
+                  {showHistory ? "▾" : "▸"} Change out history ({history.length})
+                </button>
+                {showHistory && (
+                  <div style={{ border: "1px solid #E2E6E3", borderRadius: 10, overflow: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr style={{ background: "#F7F8F6" }}>
+                          <th style={th}>Component</th><th style={th}>Serial</th>
+                          <th style={thR}>Fitted</th><th style={thR}>Removed</th>
+                          <th style={thR}>Achieved</th><th style={thR}>Target</th><th style={thR}>Life used</th>
+                          <th style={th}>Reason</th><th style={th}>Destination</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {history.map((c) => (
+                          <tr key={c.id} style={{ borderBottom: "1px solid #EFEEE7" }}>
+                            <td style={{ ...td, fontWeight: 600 }}>{c.component_type}</td>
+                            <td style={td}>{c.serial_number || "-"}</td>
+                            <td style={tdR}>{c.installed_date || "-"}</td>
+                            <td style={tdR}>{c.removed_date || "-"}</td>
+                            <td style={tdR}>{num(c.component_hours)}</td>
+                            <td style={tdR}>{num(c.target_life_hours, 0)}</td>
+                            <td style={{ ...tdR, color: Number(c.life_used_pct) < 70 ? "#B85450" : "#183642", fontWeight: Number(c.life_used_pct) < 70 ? 700 : 400 }}>
+                              {c.life_used_pct == null ? "-" : `${Number(c.life_used_pct).toFixed(1)}%`}
+                            </td>
+                            <td style={td}>{c.removal_reason || "-"}</td>
+                            <td style={td}>{c.destination || "-"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <p style={{ margin: "8px 10px", fontSize: 11, color: "#859195" }}>
+                      A component removed well short of its target is a warranty case — life used below 70% is highlighted.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const FLEET_HEALTH_COLUMNS = [
   ["asset_id", "Equipment", "", "text"],
   ["asset_name", "Name", "", "text"],
@@ -9464,6 +9647,7 @@ function FleetHealthPage({ assets }) {
   const [selectedFleet, setSelectedFleet] = useState("");
   const [selectedAsset, setSelectedAsset] = useState("");
   const [bandFilter, setBandFilter] = useState("");
+  const [drill, setDrill] = useState(null);
   const prefs = useTablePrefs("fleet_health", FLEET_HEALTH_PREF_COLUMNS);
 
   useEffect(() => {
@@ -9562,7 +9746,6 @@ function FleetHealthPage({ assets }) {
 
   return (
     <div>
-      <h1 style={{ fontSize: 21, fontWeight: 700, color: NAVY, margin: "0 0 12px" }}>Fleet Health</h1>
 
       {error && (
         <p style={{ fontSize: 13, color: "#B85450", background: "#F6E2E0", padding: "9px 12px", borderRadius: 8 }}>
@@ -9575,7 +9758,7 @@ function FleetHealthPage({ assets }) {
       <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
-        <div style={{ position: "relative", flex: 1, maxWidth: 250 }}>
+        <div style={{ position: "relative", width: 250, flexShrink: 0 }}>
           <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search equipment"
             style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }} />
@@ -9635,7 +9818,7 @@ function FleetHealthPage({ assets }) {
                                textAlign: type === "text" ? "left" : "right", padding: "6px 7px",
                                fontWeight: 600, color: "#4B5659", fontSize: 11, lineHeight: 1.25,
                                borderBottom: "1px solid #E2E6E3", cursor: "pointer", userSelect: "none",
-                               whiteSpace: "normal", wordBreak: "break-word" }}>
+                               whiteSpace: "normal", overflowWrap: "normal", hyphens: "none" }}>
                       {c.label}{prefs.sortKey === c.key ? (prefs.sortDir === "asc" ? " ▲" : " ▼") : ""}
                     </th>
                   );
@@ -9646,7 +9829,12 @@ function FleetHealthPage({ assets }) {
               {filtered.map((row) => {
                 const tone = bandTone(row.health_band);
                 return (
-                  <tr key={row.asset_id} style={{ borderBottom: "1px solid #EFEEE7" }}>
+                  <tr key={row.asset_id}
+                    onClick={() => setDrill(row)}
+                    title="Open this machine's components"
+                    style={{ borderBottom: "1px solid #EFEEE7", cursor: "pointer" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "#F7F8F6"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
                     {prefs.columns.map((c) => {
                       const def = FLEET_HEALTH_COLUMNS.find((x) => x[0] === c.key);
                       const type = def?.[3];
@@ -9705,7 +9893,7 @@ function FleetHealthPage({ assets }) {
                         <td key={c.key} title={String(row[c.key] ?? "")}
                           style={{ padding: "6px 7px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                                    textAlign: type === "text" ? "left" : "right",
-                                   ...(c.key === "asset_id" ? { position: "sticky", left: 0, zIndex: 2, background: "#fff", fontWeight: 600 } : {}) }}>
+                                   ...(c.key === "asset_id" ? { position: "sticky", left: 0, zIndex: 2, background: "inherit", fontWeight: 600 } : {}) }}>
                           {fmt(c.key, row[c.key])}
                         </td>
                       );
@@ -9722,6 +9910,8 @@ function FleetHealthPage({ assets }) {
           </table>
         </div>
       )}
+
+      {drill && <FleetHealthDrilldown machine={drill} onClose={() => setDrill(null)} />}
     </div>
   );
 }
@@ -9767,7 +9957,6 @@ function ComponentMasterPage({ assets, selectedSiteId, myFullName }) {
 
   return (
     <div>
-      <h1 style={{ fontSize: 21, fontWeight: 700, color: NAVY, margin: "0 0 12px" }}>Component Master</h1>
 
       {error && (
         <p style={{ fontSize: 13, color: "#B85450", background: "#F6E2E0", padding: "9px 12px", borderRadius: 8 }}>
@@ -10485,7 +10674,6 @@ function ComponentStatusPage({ assets, selectedSiteId }) {
 
   return (
     <div>
-      <h1 style={{ fontSize: 21, fontWeight: 700, color: NAVY, margin: "0 0 14px" }}>Component Status</h1>
 
       {error && (
         <p style={{ fontSize: 13, color: "#B85450", background: "#F6E2E0", padding: "9px 12px", borderRadius: 8 }}>
@@ -10573,7 +10761,7 @@ function ComponentStatusPage({ assets, selectedSiteId }) {
                                  textAlign: type === "text" || type === "status" ? "left" : "right", padding: "6px 7px",
                                  fontWeight: 600, color: "#4B5659", fontSize: 11, lineHeight: 1.25,
                                  borderBottom: "1px solid #E2E6E3", cursor: "pointer", userSelect: "none",
-                                 whiteSpace: "normal", wordBreak: "break-word" }}>
+                                 whiteSpace: "normal", overflowWrap: "normal", hyphens: "none" }}>
                         {c.label}{prefs.sortKey === c.key ? (prefs.sortDir === "asc" ? " ▲" : " ▼") : ""}
                       </th>
                     );
