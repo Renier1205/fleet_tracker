@@ -197,6 +197,17 @@ const costByType = [
 ];
 
 // ---------------------------------------------------------------
+// Sidebar sections. Order here is the order on screen; every NAV key
+// must appear in exactly one section (there's a check below the list).
+const NAV_SECTIONS = [
+  { key: "overview",   label: "Overview",             keys: ["dashboard", "fleet_performance", "fleet_health"] },
+  { key: "capture",    label: "Daily Capture",        keys: ["daily_hours", "fuel_log", "oil_consumption", "inspections", "daily_service"] },
+  { key: "maintenance",label: "Maintenance",          keys: ["breakdowns", "work_requests", "defects", "work_orders", "planned_maintenance", "backlog_report"] },
+  { key: "assets",     label: "Assets & Components",  keys: ["assets", "components", "component_master", "component_status", "tyres", "parts", "warranty_docs"] },
+  { key: "reports",    label: "Reports",              keys: ["downtime_summary", "mtbf_mttr"] },
+  { key: "admin",      label: "Administration",       keys: ["site_management", "component_codes", "audit"] },
+];
+
 const NAV = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "fleet_performance", label: "Fleet Performance", icon: Layers },
@@ -212,11 +223,8 @@ const NAV = [
   { key: "mtbf_mttr", label: "MTBF / MTTR Report", icon: Activity },
   { key: "planned_maintenance", label: "Planned Maintenance", icon: CalendarClock },
   { key: "inspections", label: "Inspections", icon: ShieldCheck, operatorVisible: true },
-  // Backlogs is rendered as its own collapsible group in the sidebar
-  // (see engineeringExpanded/backlogsExpanded below) rather than as flat
-  // NAV entries, but the two keys still need to exist here so the rest of
-  // the app (page routing, operator visibility filtering) treats them
-  // like any other nav destination.
+  // Backlog Report and Daily Service sit in the Maintenance and Daily
+  // Capture sections respectively (see NAV_SECTIONS above).
   { key: "backlog_report", label: "Backlog Report", icon: ClipboardList, group: "backlogs", operatorVisible: true },
   { key: "daily_service", label: "Daily Service", icon: CalendarClock, group: "backlogs", operatorVisible: true },
   { key: "components", label: "Components", icon: CircleDot },
@@ -233,6 +241,15 @@ const NAV = [
   { key: "component_codes", label: "Component Codes", icon: CircleDot },
   { key: "audit", label: "Audit Trail", icon: History },
 ];
+
+// Any NAV key not placed in a section would silently disappear from the
+// sidebar. Surfaced in the console rather than left to be noticed.
+const NAV_UNSECTIONED = NAV.map((n) => n.key).filter(
+  (k) => !NAV_SECTIONS.some((sec) => sec.keys.includes(k))
+);
+if (NAV_UNSECTIONED.length) {
+  console.warn("Nav keys not in any sidebar section:", NAV_UNSECTIONED.join(", "));
+}
 
 function statusColor(status) {
   const s = (status || "").toUpperCase();
@@ -9501,6 +9518,7 @@ const CI_DESTINATIONS = ["Rebuild", "Repair", "Scrap", "Returned to OEM", "Store
 function ConsumptionCharts() {
   const [rows, setRows] = useState([]);
   const [machines, setMachines] = useState([]);
+  const [oilTypes, setOilTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [drill, setDrill] = useState(null);
@@ -9508,13 +9526,14 @@ function ConsumptionCharts() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [f, m] = await Promise.all([
+      const [f, m, o] = await Promise.all([
         supabase.from("consumption_by_fleet_month").select("*").order("month", { ascending: true }),
         supabase.from("consumption_by_month").select("*").order("month", { ascending: true }),
+        supabase.from("consumption_oil_by_type").select("*"),
       ]);
       if (cancelled) return;
       if (f.error || m.error) setError((f.error || m.error).message);
-      else { setRows(f.data || []); setMachines(m.data || []); }
+      else { setRows(f.data || []); setMachines(m.data || []); setOilTypes(o.data || []); }
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -9620,6 +9639,7 @@ function ConsumptionCharts() {
           fleet={drill.fleet} metric={drill.metric}
           rows={machines.filter((m) => m.fleet === drill.fleet && m.month === months.cur)}
           prevRows={machines.filter((m) => m.fleet === drill.fleet && m.month === months.prev)}
+          byType={oilTypes.filter((t) => t.fleet === drill.fleet && t.month === months.cur)}
           fleetAvg={drill.metric === "fuel" ? fuelAvg : oilAvg}
           monthLabel={monthLabel(months.cur)}
           onClose={() => setDrill(null)}
@@ -9629,7 +9649,7 @@ function ConsumptionCharts() {
   );
 }
 
-function ConsumptionDrilldown({ fleet, metric, rows, prevRows, fleetAvg, monthLabel, onClose }) {
+function ConsumptionDrilldown({ fleet, metric, rows, prevRows, byType = [], fleetAvg, monthLabel, onClose }) {
   const key = metric === "fuel" ? "fuel_l_per_hour" : "oil_l_per_hour";
   const litreKey = metric === "fuel" ? "fuel_litres" : "oil_litres";
   const unit = "L/hr";
@@ -9639,6 +9659,18 @@ function ConsumptionDrilldown({ fleet, metric, rows, prevRows, fleetAvg, monthLa
     () => [...rows].sort((a, b) => (Number(b[key]) || 0) - (Number(a[key]) || 0)),
     [rows, key]
   );
+
+  // Which oil each machine is actually using. Engine, hydraulic and final
+  // drive are different systems - a single total says the machine is
+  // using oil without saying what is losing it.
+  const typesByAsset = useMemo(() => {
+    const out = {};
+    byType.forEach((t) => {
+      (out[t.asset_id] = out[t.asset_id] || []).push(t);
+    });
+    Object.values(out).forEach((arr) => arr.sort((a, b) => Number(b.litres) - Number(a.litres)));
+    return out;
+  }, [byType]);
 
   const num = (v, d = 1) => (v == null || v === "" ? "-" : Number(v).toLocaleString(undefined, { maximumFractionDigits: d }));
   const th = { textAlign: "left", padding: "7px 9px", fontSize: 11, fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3", whiteSpace: "nowrap" };
@@ -9673,7 +9705,8 @@ function ConsumptionDrilldown({ fleet, metric, rows, prevRows, fleetAvg, monthLa
                 const delta = isFinite(now) && isFinite(was) && was > 0 ? ((now - was) / was) * 100 : null;
                 const over = isFinite(now) && now > fleetAvg;
                 return (
-                  <tr key={r.asset_id} style={{ borderBottom: "1px solid #EFEEE7" }}>
+                  <React.Fragment key={r.asset_id}>
+                  <tr style={{ borderBottom: metric === "oil" ? "none" : "1px solid #EFEEE7" }}>
                     <td style={{ ...td, fontWeight: 600 }}>{r.asset_id}</td>
                     <td style={td}>{r.asset_name}</td>
                     <td style={tdR}>{num(r.engine_hours)}</td>
@@ -9684,6 +9717,23 @@ function ConsumptionDrilldown({ fleet, metric, rows, prevRows, fleetAvg, monthLa
                       {delta == null ? "-" : `${delta > 0 ? "+" : ""}${delta.toFixed(0)}%`}
                     </td>
                   </tr>
+                  {metric === "oil" && (typesByAsset[r.asset_id] || []).length > 0 && (
+                    <tr key={`${r.asset_id}-types`} style={{ borderBottom: "1px solid #EFEEE7" }}>
+                      <td colSpan={7} style={{ padding: "0 9px 8px 22px" }}>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {(typesByAsset[r.asset_id] || []).map((t, i) => (
+                            <span key={t.oil_type}
+                              title={`${t.fills} fill${t.fills === 1 ? "" : "s"} · ${num(t.l_per_hour, 3)} L/hr`}
+                              style={{ background: i === 0 ? "#E2EFE9" : "#F2F1EA", color: i === 0 ? "#2C5646" : "#4B5659",
+                                       padding: "2px 9px", borderRadius: 6, fontSize: 11, fontWeight: i === 0 ? 700 : 500, whiteSpace: "nowrap" }}>
+                              {t.oil_type} — {num(t.litres, 0)} L
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
                 );
               })}
               {sorted.length === 0 && (
@@ -9696,6 +9746,7 @@ function ConsumptionDrilldown({ fleet, metric, rows, prevRows, fleetAvg, monthLa
         </div>
         <p style={{ margin: "8px 2px 0", fontSize: 11, color: "#859195" }}>
           Sorted worst first. Change compares against the same machine last month — a machine can sit below the site average and still be climbing.
+          {metric === "oil" && " The chips under each machine show which oils it actually took, largest first: engine, hydraulic and final drive are different systems and different failures."}
         </p>
       </div>
     </div>
@@ -12675,8 +12726,18 @@ function buildTableConfig(assets, dailyHours, breakdowns, fuelLog, oilConsumptio
 export default function App({ userEmail, isAdmin, myRole = "manager", mySites = [], myPageAccess = [], myFullName, onNameSaved }) {
   const [active, setActive] = useState(() => (myRole === "operator" ? "daily_hours" : "about"));
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [engineeringExpanded, setEngineeringExpanded] = useState(true);
-  const [backlogsExpanded, setBacklogsExpanded] = useState(true);
+  // Collapsed sections are remembered, the same way column layouts are.
+  // Stored as "false = collapsed" so a section added in a later release
+  // defaults to open rather than hidden.
+  const [expandedSections, setExpandedSections] = useState(() => {
+    try {
+      const raw = window.sessionStorage.getItem("m2u_nav_sections");
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  });
+  useEffect(() => {
+    try { window.sessionStorage.setItem("m2u_nav_sections", JSON.stringify(expandedSections)); } catch { /* not fatal */ }
+  }, [expandedSections]);
   const isMobile = useIsMobile();
   const [selectedSiteId, setSelectedSiteId] = useState(mySites[0]?.id);
 
@@ -12982,79 +13043,54 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
         )}
 
         <div style={{ overflowY: "auto", flex: 1 }}>
-          {sidebarOpen && (
-            <button
-              onClick={() => setEngineeringExpanded((v) => !v)}
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", border: "none", cursor: "pointer", padding: "14px 16px 6px" }}
-            >
-              <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>Engineering</span>
-              <ChevronDown size={13} style={{ color: "rgba(255,255,255,0.5)", transform: engineeringExpanded ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
-            </button>
-          )}
-          {(engineeringExpanded || !sidebarOpen) && NAV.filter((n) =>
-            !n.group &&
-            ((n.key !== "audit" && n.key !== "site_management" && n.key !== "component_codes") || isAdmin) &&
-            canSeePage(n.key)
-          ).map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              className="nav-item"
-              onClick={() => handleNavClick(key)}
-              title={label}
-              style={{
-                display: "flex", alignItems: "center", gap: 10, padding: isMobile ? "12px 16px" : "9px 16px", margin: "1px 8px", borderRadius: 8,
-                background: active === key ? ACCENT : "transparent",
-                border: "none", color: active === key ? "#fff" : "rgba(241,245,244,0.75)",
-                cursor: "pointer", fontSize: 14, textAlign: "left", justifyContent: sidebarOpen ? "flex-start" : "center",
-                width: sidebarOpen ? "calc(100% - 16px)" : "auto", minHeight: 40,
-              }}
-            >
-              <Icon size={16} style={{ flexShrink: 0 }} />
-              {sidebarOpen && <span>{label}</span>}
-            </button>
-          ))}
+          {NAV_SECTIONS.map((section) => {
+            // Pages this user can actually reach. A section with nothing
+            // visible is dropped entirely rather than shown empty.
+            const items = NAV.filter((n) =>
+              section.keys.includes(n.key) &&
+              ((n.key !== "audit" && n.key !== "site_management" && n.key !== "component_codes") || isAdmin) &&
+              canSeePage(n.key)
+            );
+            if (items.length === 0) return null;
 
-          {/* Backlogs - its own collapsible group inside Engineering, same
-              expand/collapse pattern as the Engineering heading itself. */}
-          {(engineeringExpanded || !sidebarOpen) && (
-            <>
-              {sidebarOpen ? (
-                <button
-                  onClick={() => setBacklogsExpanded((v) => !v)}
-                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, width: "calc(100% - 16px)", background: "transparent", border: "none", cursor: "pointer", padding: isMobile ? "12px 16px" : "9px 16px", margin: "1px 8px", borderRadius: 8, color: "rgba(241,245,244,0.75)" }}
-                >
-                  <span style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14 }}>
-                    <AlertTriangle size={16} style={{ flexShrink: 0 }} />
-                    Backlogs
-                  </span>
-                  <ChevronDown size={13} style={{ transform: backlogsExpanded ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
-                </button>
-              ) : null}
-              {(backlogsExpanded || !sidebarOpen) && NAV.filter((n) =>
-                n.group === "backlogs" && canSeePage(n.key)
-              ).map(({ key, label, icon: Icon }) => (
-                <button
-                  key={key}
-                  className="nav-item"
-                  onClick={() => handleNavClick(key)}
-                  title={label}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    padding: isMobile ? "12px 16px" : "9px 16px",
-                    paddingLeft: sidebarOpen ? 30 : (isMobile ? 16 : 9),
-                    margin: "1px 8px", borderRadius: 8,
-                    background: active === key ? ACCENT : "transparent",
-                    border: "none", color: active === key ? "#fff" : "rgba(241,245,244,0.75)",
-                    cursor: "pointer", fontSize: 13.5, textAlign: "left", justifyContent: sidebarOpen ? "flex-start" : "center",
-                    width: sidebarOpen ? "calc(100% - 16px)" : "auto", minHeight: 38,
-                  }}
-                >
-                  <Icon size={15} style={{ flexShrink: 0 }} />
-                  {sidebarOpen && <span>{label}</span>}
-                </button>
-              ))}
-            </>
-          )}
+            const holdsActive = items.some((n) => n.key === active);
+            // The section holding the current page is always open, so the
+            // highlighted item can never be hidden inside a collapsed group.
+            const open = !sidebarOpen || holdsActive || expandedSections[section.key] !== false;
+
+            return (
+              <React.Fragment key={section.key}>
+                {sidebarOpen && (
+                  <button
+                    onClick={() => setExpandedSections((prev) => ({ ...prev, [section.key]: prev[section.key] === false }))}
+                    title={holdsActive ? "Contains the page you're on" : undefined}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", border: "none", cursor: "pointer", padding: "14px 16px 6px" }}
+                  >
+                    <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>{section.label}</span>
+                    <ChevronDown size={13} style={{ color: "rgba(255,255,255,0.5)", transform: open ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
+                  </button>
+                )}
+                {open && items.map(({ key, label, icon: Icon }) => (
+                  <button
+                    key={key}
+                    className="nav-item"
+                    onClick={() => handleNavClick(key)}
+                    title={label}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10, padding: isMobile ? "12px 16px" : "9px 16px", margin: "1px 8px", borderRadius: 8,
+                      background: active === key ? ACCENT : "transparent",
+                      border: "none", color: active === key ? "#fff" : "rgba(241,245,244,0.75)",
+                      cursor: "pointer", fontSize: 14, textAlign: "left", justifyContent: sidebarOpen ? "flex-start" : "center",
+                      width: sidebarOpen ? "calc(100% - 16px)" : "auto", minHeight: 40,
+                    }}
+                  >
+                    <Icon size={16} style={{ flexShrink: 0 }} />
+                    {sidebarOpen && <span>{label}</span>}
+                  </button>
+                ))}
+              </React.Fragment>
+            );
+          })}
 
           {sidebarOpen && <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 700, letterSpacing: 0.5, margin: "18px 16px 6px", textTransform: "uppercase" }}>Production</p>}
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: isMobile ? "12px 16px" : "9px 16px", margin: "1px 8px", borderRadius: 8, color: "rgba(255,255,255,0.32)", fontSize: 14, cursor: "not-allowed", minHeight: 40 }}>
