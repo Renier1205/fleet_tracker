@@ -5562,6 +5562,217 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, myFullName, dai
 // Full Plant Performance KPI column set: [key, label, group, format].
 // Groups drive the merged banner row above the headers.
 //   n1/n2 = numbers to 1 / 2 decimals, int = whole, pct = fraction shown as %
+// ---------------------------------------------------------------------
+// KPI row drill-down: the events behind one machine's figures.
+//
+// Reconciliation is the point of this screen. Individual event hours can
+// sum to MORE than the row's Total Downtime, because plant_performance_kpi
+// merges overlapping events so a machine is never down twice at once.
+// That difference is shown explicitly rather than left to look like an
+// error in the report.
+//
+// Events are clipped to the report period here exactly as the function
+// clips them, so a breakdown spanning the period boundary contributes
+// only the hours that fall inside it.
+// ---------------------------------------------------------------------
+function KpiEventsDrilldown({ machine, fromDateTime, toDateTime, onClose }) {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const periodStart = useMemo(() => new Date(fromDateTime), [fromDateTime]);
+  const periodEnd = useMemo(() => new Date(toDateTime), [toDateTime]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [bd, wo] = await Promise.all([
+        supabase.from("breakdown_log_calc").select("*").eq("asset_id", machine.asset_id),
+        supabase.from("work_orders_calc").select("*").eq("asset_id", machine.asset_id).eq("work_type", "Preventive"),
+      ]);
+      if (cancelled) return;
+      if (bd.error || wo.error) { setError((bd.error || wo.error).message); setLoading(false); return; }
+
+      const clip = (startIso, endIso) => {
+        if (!startIso) return null;
+        const s = new Date(startIso);
+        const e = endIso ? new Date(endIso) : new Date();
+        if (s >= periodEnd || e <= periodStart) return null;          // outside the period
+        const cs = s < periodStart ? periodStart : s;
+        const ce = e > periodEnd ? periodEnd : e;
+        return { start: s, end: endIso ? e : null, clippedStart: cs, clippedEnd: ce,
+                 hours: (ce - cs) / 3600000, trimmed: cs > s || ce < e };
+      };
+
+      const rows = [];
+      (bd.data || []).forEach((b) => {
+        const c = clip(b.downtime_start, b.downtime_end);
+        if (!c) return;
+        rows.push({
+          id: `b${b.id}`, kind: b.event_type === "Planned" ? "Planned" : "Breakdown",
+          description: b.description, cause: b.cause_code, component: b.component_affected,
+          responsibility: b.responsibility, status: b.repair_status,
+          open: !b.downtime_end, ...c,
+        });
+      });
+      (wo.data || []).forEach((w) => {
+        const c = clip(w.actual_start, w.actual_finish);
+        if (!c) return;
+        rows.push({
+          id: `w${w.id}`, kind: "Planned", description: w.problem_scope,
+          cause: w.work_type, component: w.component, responsibility: w.responsibility,
+          status: w.status, open: !w.actual_finish, ...c,
+        });
+      });
+      rows.sort((a, b) => b.clippedStart - a.clippedStart);
+      setEvents(rows);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [machine.asset_id, periodStart, periodEnd]);
+
+  // Merge overlapping intervals the same way the SQL does, so the
+  // drill-down can show WHY the sum differs from the row.
+  const merged = useMemo(() => {
+    const iv = events.map((e) => [e.clippedStart.getTime(), e.clippedEnd.getTime()]).sort((a, b) => a[0] - b[0]);
+    let total = 0, curS = null, curE = null;
+    iv.forEach(([s, e]) => {
+      if (curS === null) { curS = s; curE = e; return; }
+      if (s <= curE) { curE = Math.max(curE, e); }
+      else { total += curE - curS; curS = s; curE = e; }
+    });
+    if (curS !== null) total += curE - curS;
+    return total / 3600000;
+  }, [events]);
+
+  const sums = useMemo(() => {
+    const unplanned = events.filter((e) => e.kind === "Breakdown");
+    const planned = events.filter((e) => e.kind === "Planned");
+    const h = (arr) => arr.reduce((a, e) => a + e.hours, 0);
+    return {
+      unplannedHours: h(unplanned), plannedHours: h(planned),
+      unplannedCount: unplanned.length, plannedCount: planned.length,
+      rawTotal: h(events),
+    };
+  }, [events]);
+
+  const overlap = sums.rawTotal - merged;
+
+  const n = (v, d = 2) => (v == null || isNaN(v) ? "-" : Number(v).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d }));
+  const dt = (d) => (d ? new Date(d).toLocaleString("en-ZA", { dateStyle: "short", timeStyle: "short" }) : "-");
+
+  const th = { textAlign: "left", padding: "7px 9px", fontSize: 11, fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3", whiteSpace: "nowrap" };
+  const thR = { ...th, textAlign: "right" };
+  const td = { padding: "7px 9px", fontSize: 12, verticalAlign: "top" };
+  const tdR = { ...td, textAlign: "right", whiteSpace: "nowrap" };
+
+  const recon = (label, value, expected, note) => {
+    const diff = expected == null ? null : Math.abs(Number(value) - Number(expected));
+    const ok = diff == null || diff < 0.05;
+    return (
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "5px 0", fontSize: 12, borderBottom: "1px solid #EFEEE7" }}>
+        <span style={{ color: "#4B5659" }}>{label}</span>
+        <span style={{ whiteSpace: "nowrap" }}>
+          <strong>{n(value)}</strong>
+          {expected != null && (
+            <span style={{ color: ok ? "#2C5646" : "#B85450", marginLeft: 8 }}>
+              {ok ? "✓ matches report" : `report shows ${n(expected)}`}
+            </span>
+          )}
+          {note && <span style={{ color: "#859195", marginLeft: 8 }}>{note}</span>}
+        </span>
+      </div>
+    );
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(24,54,66,0.45)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 24, zIndex: 100, overflowY: "auto" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, padding: 22, width: 1080, maxWidth: "97vw", maxHeight: "92vh", overflowY: "auto" }}>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
+          <div>
+            <p style={{ margin: 0, fontSize: 17, fontWeight: 700, color: NAVY }}>
+              {machine.asset_id}{machine.asset_name ? ` — ${machine.asset_name}` : ""}
+            </p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#859195" }}>
+              {[machine.fleet, machine.model].filter(Boolean).join(" · ")} · {formatRangeForDisplay(fromDateTime, toDateTime)}
+            </p>
+          </div>
+          <button onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#4B5659", padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Close</button>
+        </div>
+
+        {error && <p style={{ fontSize: 12.5, color: "#B85450" }}>{error}</p>}
+        {loading ? <p style={{ fontSize: 13, color: "#859195" }}>Loading events…</p> : (
+          <>
+            <div style={{ background: "#F7F8F6", borderRadius: 10, padding: "10px 14px", marginBottom: 14 }}>
+              <p style={{ margin: "0 0 4px", fontSize: 12.5, fontWeight: 700, color: NAVY }}>Reconciliation against the report row</p>
+              {recon(`Unplanned events (${sums.unplannedCount})`, sums.unplannedHours, machine.unplanned_downtime_hrs)}
+              {recon(`Planned events (${sums.plannedCount})`, sums.plannedHours, machine.planned_downtime_hrs)}
+              {recon("Sum of every event", sums.rawTotal, null, "before overlap is merged")}
+              {recon("Total downtime", merged, machine.total_downtime_hrs, "overlap counted once")}
+              {overlap > 0.05 && (
+                <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "#8A6320", background: "#F5E9D8", padding: "7px 10px", borderRadius: 8 }}>
+                  {n(overlap)} hours of these events overlap each other. A machine cannot be down twice at the same time, so the report counts that time once — which is why the events above sum to more than Total Downtime.
+                </p>
+              )}
+              <div style={{ display: "flex", gap: 18, marginTop: 10, fontSize: 12, flexWrap: "wrap" }}>
+                <span style={{ color: "#4B5659" }}>MTBF <strong>{machine.mtbf ?? "-"}</strong></span>
+                <span style={{ color: "#4B5659" }}>MTTR <strong>{machine.mttr ?? "-"}</strong></span>
+                <span style={{ color: "#4B5659" }}>Availability <strong>{machine.availability != null ? `${Math.round(machine.availability * 100)}%` : "-"}</strong></span>
+                <span style={{ color: "#4B5659" }}>Worked hrs <strong>{machine.worked_hours ?? "-"}</strong></span>
+                <span style={{ color: "#859195" }}>MTTR = unplanned hours ÷ {sums.unplannedCount || 0} event{sums.unplannedCount === 1 ? "" : "s"}</span>
+              </div>
+            </div>
+
+            <p style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 700, color: NAVY }}>Events in this period ({events.length})</p>
+            <div style={{ border: "1px solid #E2E6E3", borderRadius: 10, overflow: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "#F7F8F6" }}>
+                    <th style={th}>Event</th><th style={th}>Component</th><th style={th}>Cause</th>
+                    <th style={th}>Responsibility</th><th style={th}>Description</th>
+                    <th style={thR}>Down</th><th style={thR}>Up</th><th style={thR}>Hours</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {events.map((e) => (
+                    <tr key={e.id} style={{ borderBottom: "1px solid #EFEEE7", background: e.kind === "Planned" ? "#FBFBF8" : "transparent" }}>
+                      <td style={td}>
+                        <span style={{ background: e.kind === "Planned" ? "#E2EFE9" : "#F6E2E0", color: e.kind === "Planned" ? "#2C5646" : "#7A3330",
+                                       padding: "2px 8px", borderRadius: 6, fontSize: 10.5, fontWeight: 600, whiteSpace: "nowrap" }}>{e.kind}</span>
+                      </td>
+                      <td style={td}>{e.component || "-"}</td>
+                      <td style={td}>{e.cause || "-"}</td>
+                      <td style={td}>{e.responsibility || <span style={{ color: "#B4B2A9" }}>not set</span>}</td>
+                      <td style={{ ...td, maxWidth: 300, whiteSpace: "normal" }}>{e.description || "-"}</td>
+                      <td style={tdR}>{dt(e.clippedStart)}</td>
+                      <td style={tdR}>{e.open ? <span style={{ color: "#B85450" }}>still down</span> : dt(e.clippedEnd)}</td>
+                      <td style={{ ...tdR, fontWeight: 600 }}>
+                        {n(e.hours)}
+                        {e.trimmed && <span title="Clipped to the report period" style={{ color: "#B07D2B", marginLeft: 4 }}>*</span>}
+                      </td>
+                    </tr>
+                  ))}
+                  {events.length === 0 && (
+                    <tr><td colSpan={8} style={{ padding: 18, textAlign: "center", color: "#859195", fontSize: 12.5 }}>
+                      No events for this machine in the selected period.
+                    </td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {events.some((e) => e.trimmed) && (
+              <p style={{ margin: "8px 2px 0", fontSize: 11, color: "#859195" }}>
+                * Event runs beyond the report period — only the hours inside the period are counted, exactly as the report does.
+              </p>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const KPI_REPORT_COLUMNS = [
   ["asset_id", "Equipment", "", "text", "Equipment"],
   ["asset_name", "Name", "", "text", "Name"],
@@ -5658,6 +5869,7 @@ function MtbfMttrReportPage({ assets }) {
   const [kpiData, setKpiData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [eventsDrill, setEventsDrill] = useState(null);
   const [sortKey, setSortKey] = useState("num_unplanned_events");
   const [sortDir, setSortDir] = useState("desc");
 
@@ -6138,8 +6350,14 @@ function MtbfMttrReportPage({ assets }) {
                         {fleetRows.map((row) => {
                           const conflict = hasHoursConflict(row);
                           return (
-                            <tr key={row.asset_id} title={conflict ? "Worked hours plus downtime exceed the hours in this period - the Daily Hours and downtime records contradict each other" : undefined}
-                              style={{ borderBottom: "1px solid #EFEEE7", background: conflict ? "#FDF3E3" : "transparent" }}>
+                            <tr key={row.asset_id}
+                              onClick={() => setEventsDrill(row)}
+                              title={conflict
+                                ? "Worked hours plus downtime exceed the hours in this period - the Daily Hours and downtime records contradict each other. Click to see the events."
+                                : "Click to see the events behind these figures"}
+                              style={{ borderBottom: "1px solid #EFEEE7", background: conflict ? "#FDF3E3" : "transparent", cursor: "pointer" }}
+                              onMouseEnter={(e) => { if (!conflict) e.currentTarget.style.background = "#F7F8F6"; }}
+                              onMouseLeave={(e) => { if (!conflict) e.currentTarget.style.background = "transparent"; }}>
                               {KPI_REPORT_COLUMNS.map(([key, , , fmtType]) => (
                                 <td key={key} title={fmtType === "text" ? String(row[key] ?? "") : undefined}
                                   style={{ ...cellStyle(fmtType), overflow: "hidden", textOverflow: "ellipsis",
@@ -6191,6 +6409,15 @@ function MtbfMttrReportPage({ assets }) {
           })()}
         </div>
       </>
+      )}
+
+      {eventsDrill && (
+        <KpiEventsDrilldown
+          machine={eventsDrill}
+          fromDateTime={fromDateTime}
+          toDateTime={toDateTime}
+          onClose={() => setEventsDrill(null)}
+        />
       )}
     </div>
   );
