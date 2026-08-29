@@ -8448,6 +8448,27 @@ function ExcelSync({ data, assets, fields, tableName, sheetTitle, filenamePrefix
 
   const headers = ["ID", "Equipment #", ...fields.map((f) => f.header)];
 
+  // The formatted report - same Mine2U layout as every other tab.
+  const exportReport = () =>
+    exportMine2UReport({
+      title: sheetTitle,
+      sheetName: sheetTitle.slice(0, 31),
+      fileName: `Mine2U_${filenamePrefix}`,
+      columns: [
+        { key: "asset_id", label: "Equipment #", fmt: "text" },
+        ...fields.map((f) => ({
+          key: f.key,
+          label: f.header.replace(/\s*\((YYYY-MM-DD|Pass\/Fail)[^)]*\)/i, "").trim(),
+          fmt: f.type === "number" ? "n2" : f.type === "date" ? "date" : f.type === "datetime" ? "datetime" : "text",
+        })),
+      ],
+      rows: data,
+      filterLines: [["Hierarchy", "[All]"], ["Additional Filters", "[None]"]],
+    });
+
+  // The round-trip file. Deliberately a plain grid with a hidden ID
+  // column: the importer reads fixed column positions, so any masthead,
+  // protection or styling here would break the upload.
   const exportToExcel = () => {
     const now = new Date();
     const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
@@ -8522,8 +8543,12 @@ function ExcelSync({ data, assets, fields, tableName, sheetTitle, filenamePrefix
         </div>
       )}
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
-        <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
+        <button onClick={exportReport} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
           <Download size={14} /> Export to Excel
+        </button>
+        <button onClick={exportToExcel} title="Plain grid for editing offline and uploading back - deliberately unformatted so the upload can read it"
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #E2E6E3", color: "#4B5659", fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
+          <Download size={14} /> Backup file
         </button>
         <button onClick={() => fileInputRef.current?.click()} disabled={importing} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: importing ? "default" : "pointer", opacity: importing ? 0.6 : 1 }}>
           <Upload size={14} /> {importing ? "Importing…" : "Upload Excel"}
@@ -8531,7 +8556,7 @@ function ExcelSync({ data, assets, fields, tableName, sheetTitle, filenamePrefix
         <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileSelected} style={{ display: "none" }} />
       </div>
       <p style={{ fontSize: 11.5, color: "#859195", margin: "6px 0 0", textAlign: "right" }}>
-        Offline backup: export, fill it in during an outage, then upload the same file once you're back online.
+        <strong>Export to Excel</strong> gives you the formatted Mine2U report. <strong>Backup file</strong> is a plain grid for working offline — fill it in during an outage and upload the same file once you're back online.
       </p>
     </div>
   );
@@ -11712,7 +11737,20 @@ function FleetPerformance({ assets, breakdowns }) {
           <p style={{ fontSize: 13, color: "#859195" }}>No events for this machine in the selected date range.</p>
         ) : (
           <DataTable
-            columns={[["breakdown_date","Date"],["wo_reference","Work order #"],["component_affected","Component"],["severity","Severity"],["repair_status","Status"],["downtime_hours","Downtime (hrs)"]].map(([key,label])=>({key,label}))}
+            columns={[
+              ["breakdown_date","Date"],
+              ["event_type","Event"],
+              ["component_affected","Component"],
+              ["cause_code","Cause"],
+              // What actually happened - the column that was missing. A
+              // component and a severity don't tell you what went wrong.
+              ["description","What happened"],
+              ["responsibility","Responsibility"],
+              ["wo_reference","Work order #"],
+              ["severity","Severity"],
+              ["repair_status","Status"],
+              ["downtime_hours","Downtime (hrs)"],
+            ].map(([key,label])=>({key,label}))}
             rows={eqBreakdowns}
             exportName={`${asset.asset_id}_Breakdowns`}
           />
