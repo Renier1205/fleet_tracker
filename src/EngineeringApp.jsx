@@ -297,40 +297,18 @@ function DataTable({ columns, rows, exportName }) {
     return rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q)));
   }, [rows, query]);
 
-  const exportToExcel = () => {
-    const now = new Date();
-    const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
-
-    const headerRow = columns.map((c) => c.label);
-    const dataRows = visibleRows.map((row) => columns.map((c) => row[c.key] ?? ""));
-
-    // Title + export timestamp on top, then a blank spacer row, then the
-    // real header row using the same friendly labels shown on screen -
-    // not the raw database column names.
-    const aoa = [
-      [exportName],
-      [`Exported: ${timestamp}`],
-      [],
-      headerRow,
-      ...dataRows,
-    ];
-
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-
-    // Merge the title and timestamp rows across the full table width
-    ws["!merges"] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: Math.max(columns.length - 1, 0) } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: Math.max(columns.length - 1, 0) } },
-    ];
-
-    // Reasonable column widths so it doesn't open looking cramped
-    ws["!cols"] = columns.map((c) => ({ wch: Math.max(c.label.length + 2, 14) }));
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, exportName.slice(0, 31));
-    const dateForFilename = now.toISOString().slice(0, 10);
-    XLSX.writeFile(wb, `${exportName.replace(/\s+/g, "_")}_${dateForFilename}.xlsx`);
-  };
+  // Every report export in Mine2U goes through the one helper, so the
+  // masthead, branding, number formats and copyright are identical
+  // wherever the file came from.
+  const exportToExcel = () =>
+    exportMine2UReport({
+      title: exportName,
+      sheetName: exportName.slice(0, 31),
+      fileName: exportName.replace(/\s+/g, "_"),
+      columns: columns.map((c) => ({ key: c.key, label: c.label, fmt: "text" })),
+      rows: visibleRows,
+      filterLines: [["Hierarchy", "[All]"], ["Additional Filters", "[None]"]],
+    });
 
   return (
     <div>
@@ -1646,22 +1624,19 @@ function DailyHoursPage({ assets, dailyHours, userEmail, selectedSiteId, onRefre
     }
   };
 
-  const exportToExcel = () => {
-    const now = new Date();
-    const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
-    const headerRow = columns.map((c) => c.label);
-    const dataRows = filtered.map((row) => columns.map((c) => row[c.key] ?? ""));
-    const aoa = [["Daily Hours"], [`Exported: ${timestamp}`], [], headerRow, ...dataRows];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!merges"] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: columns.length - 1 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: columns.length - 1 } },
-    ];
-    ws["!cols"] = columns.map((c) => ({ wch: Math.max(c.label.length + 2, 14) }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Daily Hours");
-    XLSX.writeFile(wb, `Daily_Hours_${now.toISOString().slice(0, 10)}.xlsx`);
-  };
+  const exportToExcel = () =>
+    exportMine2UReport({
+      title: "Daily Hours", sheetName: "Daily Hours", fileName: "Mine2U_Daily_Hours",
+      columns: columns.map((c) => ({ key: c.key, label: c.label,
+        fmt: ["opening_hours", "closing_hours", "hours_run"].includes(c.key) ? "n1"
+           : c.key === "log_date" ? "date" : "text" })),
+      rows: visibleRows,
+      filterLines: [
+        ["Hierarchy", `[Fleet: ${selectedFleet || "All"}]  [Equipment: ${selectedAsset || "All"}]`],
+        ["Additional Filters", (dateFrom || dateTo) ? `[${dateFrom || "start"} to ${dateTo || "today"}]` : "[Latest readings per machine]"],
+      ],
+      notes: ["Hours run is the difference between the opening and closing meter readings for that shift."],
+    });
 
   return (
     <div>
@@ -2322,26 +2297,19 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, myFullName, 
     setDeleting(null);
   };
 
-  const exportToExcel = () => {
-    const now = new Date();
-    const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
-    const headerRow = columns.map((c) => c.label);
-    const dataRows = filtered.map((row) => columns.map((c) =>
-      c.key === "downtime_start" ? formatDateTime(row.downtime_start) + (row.isScheduledPlaceholder ? " (planned)" : "")
-      : c.key === "downtime_end" ? (formatDateTime(row.downtime_end) || (row.isScheduledPlaceholder ? "Not booked down" : "Still down"))
-      : (row[c.key] ?? "")
-    ));
-    const aoa = [["Events"], [`Exported: ${timestamp}`], [], headerRow, ...dataRows];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!merges"] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: columns.length - 1 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: columns.length - 1 } },
-    ];
-    ws["!cols"] = columns.map((c) => ({ wch: Math.max(c.label.length + 2, 14) }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Events");
-    XLSX.writeFile(wb, `Events_${now.toISOString().slice(0, 10)}.xlsx`);
-  };
+  const exportToExcel = () =>
+    exportMine2UReport({
+      title: "Events", sheetName: "Events", fileName: "Mine2U_Events",
+      columns: columns.map((c) => ({ key: c.key, label: c.label,
+        fmt: c.key === "downtime_hours" ? "n2"
+           : ["downtime_start", "downtime_end"].includes(c.key) ? "datetime" : "text" })),
+      rows: filtered,
+      filterLines: [
+        ["Hierarchy", `[Fleet: ${selectedFleet || "All"}]  [Equipment: ${selectedAsset || "All"}]`],
+        ["Additional Filters", query.trim() ? `[Search: ${query.trim()}]` : "[None]"],
+      ],
+      notes: ["A blank Downtime End means the event was still open when this was exported."],
+    });
 
   const EVENT_FIELDS = [
     { key: "downtime_start", header: "Downtime Start (YYYY-MM-DD HH:MM)", type: "datetime" },
@@ -4745,22 +4713,20 @@ function BacklogsPage({ assets, backlogs, workOrders, userEmail, onRefresh }) {
     ["date_notified", "Date Notified"], ["age_days", "Age (days)"], ["status", "Status"],
   ];
 
-  const exportToExcel = () => {
-    const now = new Date();
-    const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
-    const headerRow = columns.map((c) => c[1]);
-    const dataRows = filtered.map((row) => [
-      row.asset_id, backlogSourceLabel(row.source_type), row.work_order_id ? (woNoById[row.work_order_id] || "") : "",
-      row.component_code ?? "", row.description ?? "", row.priority, row.date_notified, ageDays(row.date_notified), row.status,
-    ]);
-    const aoa = [["Backlog Management"], [`Exported: ${timestamp}`], [], headerRow, ...dataRows];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: columns.length - 1 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: columns.length - 1 } }];
-    ws["!cols"] = columns.map((c) => ({ wch: Math.max(c[1].length + 2, 14) }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Backlogs");
-    XLSX.writeFile(wb, `Backlog_Management_${now.toISOString().slice(0, 10)}.xlsx`);
-  };
+  const exportToExcel = () =>
+    exportMine2UReport({
+      title: "Backlog Management", sheetName: "Backlogs", fileName: "Mine2U_Backlog_Management",
+      columns: columns.map(([key, label]) => ({ key, label,
+        fmt: key === "age_days" ? "int" : key === "date_notified" ? "date" : "text" })),
+      rows: filtered.map((row) => ({
+        ...row,
+        source_type: backlogSourceLabel(row.source_type),
+        wo_no: row.work_order_id ? (woNoById[row.work_order_id] || "") : "",
+        age_days: ageDays(row.date_notified),
+      })),
+      filterLines: [["Hierarchy", "[All]"], ["Additional Filters", "[None]"]],
+      notes: ["Age is days since the item was notified, calculated at the moment of export."],
+    });
 
   return (
     <div>
@@ -8271,24 +8237,14 @@ function AuditTrailPage({ activityLog, profiles, isAdmin }) {
   const formatDT = (v) => v ? new Date(v).toLocaleString("en-ZA", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-";
   const nowPrinted = () => new Date().toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
 
-  const exportToExcel = () => {
-    const now = new Date();
-    const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
-    const headerRow = ACTIVITY_COLUMNS.map((c) => c[1]);
-    const dataRows = filtered.map((r) => [
-      formatDT(r.created_at), r.table_name, r.asset_id || "-", r.action, r.summary || "", nameByUser.get(r.user_id) || "-",
-    ]);
-    const aoa = [["Audit Trail"], [`Exported: ${timestamp}`], [], headerRow, ...dataRows];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!merges"] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: ACTIVITY_COLUMNS.length - 1 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: ACTIVITY_COLUMNS.length - 1 } },
-    ];
-    ws["!cols"] = ACTIVITY_COLUMNS.map((c) => ({ wch: c[0] === "summary" ? 50 : Math.max(c[1].length + 2, 16) }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Audit Trail");
-    XLSX.writeFile(wb, `Audit_Trail_${now.toISOString().slice(0, 10)}.xlsx`);
-  };
+  const exportToExcel = () =>
+    exportMine2UReport({
+      title: "Audit Trail", sheetName: "Audit Trail", fileName: "Mine2U_Audit_Trail",
+      columns: ACTIVITY_COLUMNS.map(([key, label]) => ({ key, label,
+        fmt: key === "created_at" ? "datetime" : "text" })),
+      rows: filtered.map((r) => ({ ...r, user_id: nameByUser.get(r.user_id) || "-" })),
+      filterLines: [["Hierarchy", "[All]"], ["Additional Filters", "[None]"]],
+    });
 
   const selectStyle = { padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', background: "#fff" };
   const dayHeaderStyle = { padding: "8px 12px", fontWeight: 700, fontSize: 12, color: NAVY, background: "#EFF3F2", textTransform: "uppercase", letterSpacing: 0.3 };
@@ -11300,22 +11256,14 @@ function AssetsPage({ assets, selectedSiteId, onRefresh, isAdmin, mySites = [] }
     onRefresh();
   };
 
-  const exportToExcel = () => {
-    const now = new Date();
-    const timestamp = now.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
-    const headerRow = columns.map((c) => c.label);
-    const dataRows = filtered.map((row) => columns.map((c) => row[c.key] ?? ""));
-    const aoa = [["Assets"], [`Exported: ${timestamp}`], [], headerRow, ...dataRows];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!merges"] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: columns.length - 1 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: columns.length - 1 } },
-    ];
-    ws["!cols"] = columns.map((c) => ({ wch: Math.max(c.label.length + 2, 14) }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Assets");
-    XLSX.writeFile(wb, `Assets_${now.toISOString().slice(0, 10)}.xlsx`);
-  };
+  const exportToExcel = () =>
+    exportMine2UReport({
+      title: "Assets", sheetName: "Assets", fileName: "Mine2U_Assets",
+      columns: columns.map((c) => ({ key: c.key, label: c.label,
+        fmt: c.key === "commission_date" ? "date" : c.key === "year" ? "int" : "text" })),
+      rows: filtered,
+      filterLines: [["Hierarchy", "[All fleets]"], ["Additional Filters", "[None]"]],
+    });
 
   return (
     <div>
