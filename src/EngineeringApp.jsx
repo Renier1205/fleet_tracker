@@ -10,6 +10,7 @@ import {
 import { supabase } from "./lib/supabaseClient";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ReferenceLine, LabelList,
+  LineChart, Line,
 } from "recharts";
 
 const NAVY = "#1F6668";
@@ -221,6 +222,7 @@ const NAV = [
   { key: "components", label: "Components", icon: CircleDot },
   { key: "component_master", label: "Component Master", icon: Package },
   { key: "component_status", label: "Component Status", icon: Activity },
+  { key: "fleet_health", label: "Fleet Health", icon: Activity },
   { key: "tyres", label: "Tyres", icon: CircleDot },
   { key: "parts", label: "Parts Inventory", icon: Package },
   { key: "warranty_docs", label: "Warranty & Documents", icon: FileText },
@@ -588,6 +590,9 @@ const OIL_CONSUMPTION_COLUMNS = [
 function useTablePrefs(tableKey, defaultColumns, initialSort) {
   const [order, setOrder] = useState(null);
   const [hidden, setHidden] = useState([]);
+  // Per-column pixel widths, dragged by the user and saved with the rest
+  // of their layout. Absent keys fall back to the table's own default.
+  const [widths, setWidths] = useState({});
   const [sortKey, setSortKey] = useState(initialSort?.key ?? null);
   const [sortDir, setSortDir] = useState(initialSort?.dir ?? "desc");
   const userIdRef = useRef(null);
@@ -604,13 +609,14 @@ function useTablePrefs(tableKey, defaultColumns, initialSort) {
         userIdRef.current = user.id;
         const { data, error } = await supabase
           .from("user_table_prefs")
-          .select("column_order, hidden_columns, sort_key, sort_dir")
+          .select("column_order, hidden_columns, sort_key, sort_dir, column_widths")
           .eq("user_id", user.id)
           .eq("table_key", tableKey)
           .maybeSingle();
         if (error || cancelled || !data) return;
         if (Array.isArray(data.column_order) && data.column_order.length) setOrder(data.column_order);
         if (Array.isArray(data.hidden_columns)) setHidden(data.hidden_columns);
+        if (data.column_widths && typeof data.column_widths === "object") setWidths(data.column_widths);
         if (data.sort_key) setSortKey(data.sort_key);
         if (data.sort_dir) setSortDir(data.sort_dir);
       } catch (err) {
@@ -633,6 +639,7 @@ function useTablePrefs(tableKey, defaultColumns, initialSort) {
           table_key: tableKey,
           column_order: next.order,
           hidden_columns: next.hidden,
+          column_widths: next.widths ?? {},
           sort_key: next.sortKey,
           sort_dir: next.sortDir,
           updated_at: new Date().toISOString(),
@@ -665,6 +672,14 @@ function useTablePrefs(tableKey, defaultColumns, initialSort) {
     return effectiveOrder.map((k) => byKey.get(k)).filter(Boolean);
   }, [defaultColumns, effectiveOrder]);
 
+  const setColumnWidth = useCallback((key, px) => {
+    setWidths((prev) => {
+      const next = { ...prev, [key]: Math.max(48, Math.round(px)) };
+      persist({ order: effectiveOrder, hidden, widths: next, sortKey, sortDir });
+      return next;
+    });
+  }, [effectiveOrder, hidden, sortKey, sortDir, persist]);
+
   const moveColumn = useCallback((fromKey, toKey) => {
     if (!fromKey || !toKey || fromKey === toKey) return;
     setOrder((prev) => {
@@ -673,7 +688,7 @@ function useTablePrefs(tableKey, defaultColumns, initialSort) {
       const from = merged.indexOf(fromKey), to = merged.indexOf(toKey);
       if (from < 0 || to < 0) return prev;
       merged.splice(to, 0, merged.splice(from, 1)[0]);
-      persist({ order: merged, hidden, sortKey, sortDir });
+      persist({ order: merged, hidden, widths, sortKey, sortDir });
       return merged;
     });
   }, [allKeys, hidden, sortKey, sortDir, persist]);
@@ -689,7 +704,7 @@ function useTablePrefs(tableKey, defaultColumns, initialSort) {
       const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
       // Hiding the last visible column would leave an empty grid.
       if (next.length >= allKeys.length) return prev;
-      persist({ order: effectiveOrder, hidden: next, sortKey, sortDir });
+      persist({ order: effectiveOrder, hidden: next, widths, sortKey, sortDir });
       return next;
     });
   }, [allKeys, effectiveOrder, sortKey, sortDir, persist]);
@@ -698,15 +713,16 @@ function useTablePrefs(tableKey, defaultColumns, initialSort) {
     const nextDir = key === sortKey ? (sortDir === "asc" ? "desc" : "asc") : "asc";
     setSortKey(key);
     setSortDir(nextDir);
-    persist({ order: effectiveOrder, hidden, sortKey: key, sortDir: nextDir });
+    persist({ order: effectiveOrder, hidden, widths, sortKey: key, sortDir: nextDir });
   }, [sortKey, sortDir, effectiveOrder, hidden, persist]);
 
   const resetPrefs = useCallback(() => {
     setOrder(null);
     setHidden([]);
+    setWidths({});
     setSortKey(initialSort?.key ?? null);
     setSortDir(initialSort?.dir ?? "desc");
-    persist({ order: allKeys, hidden: [], sortKey: initialSort?.key ?? null, sortDir: initialSort?.dir ?? "desc" });
+    persist({ order: allKeys, hidden: [], widths: {}, sortKey: initialSort?.key ?? null, sortDir: initialSort?.dir ?? "desc" });
   }, [allKeys, initialSort, persist]);
 
   // Sorts by the chosen column while leaving the caller's own ordering
@@ -730,15 +746,37 @@ function useTablePrefs(tableKey, defaultColumns, initialSort) {
     });
   }, [sortKey, sortDir]);
 
-  return { columns, allColumns, hidden, sortKey, sortDir, toggleSort, moveColumn, nudgeColumn, toggleHidden, resetPrefs, sortRows };
+  return { columns, allColumns, hidden, widths, setColumnWidth, sortKey, sortDir, toggleSort, moveColumn, nudgeColumn, toggleHidden, resetPrefs, sortRows };
 }
 
 // Header row: click to sort, drag to reorder. Drag uses the browser's
 // native HTML5 events, which do nothing on a touchscreen - that's what
 // the Columns panel below is for.
-function SmartTableHead({ prefs, trailingCell = true }) {
+function SmartTableHead({ prefs, trailingCell = true, defaultWidth }) {
   const [dragKey, setDragKey] = useState(null);
   const [overKey, setOverKey] = useState(null);
+
+  // Column resizing. Pointer events rather than HTML5 drag, so it works
+  // on a touchscreen as well as with a mouse - the same reason the
+  // Columns panel exists alongside header dragging.
+  const startResize = (e, key, th) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startW = th.getBoundingClientRect().width;
+    const move = (ev) => {
+      const w = Math.max(48, startW + (ev.clientX - startX));
+      th.style.width = `${w}px`;
+      th.style.minWidth = `${w}px`;
+    };
+    const up = (ev) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      prefs.setColumnWidth(key, Math.max(48, startW + (ev.clientX - startX)));
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
 
   return (
     <thead>
@@ -755,18 +793,28 @@ function SmartTableHead({ prefs, trailingCell = true }) {
               onDrop={(e) => { e.preventDefault(); prefs.moveColumn(dragKey, c.key); setDragKey(null); setOverKey(null); }}
               onDragEnd={() => { setDragKey(null); setOverKey(null); }}
               onClick={() => prefs.toggleSort(c.key)}
-              title="Click to sort, drag to move"
+              title="Click to sort, drag to move, drag the edge to resize"
               style={{
+                position: "relative",
                 textAlign: "left", padding: "9px 12px", fontWeight: 600, color: "#4B5659",
                 whiteSpace: "nowrap", borderBottom: "1px solid #E2E6E3", cursor: "pointer",
                 userSelect: "none", opacity: dragKey === c.key ? 0.4 : 1,
                 boxShadow: isOver ? `inset 3px 0 0 ${NAVY}` : "none",
+                width: prefs.widths?.[c.key] ?? defaultWidth?.(c.key) ?? undefined,
+                minWidth: prefs.widths?.[c.key] ?? undefined,
               }}
             >
               {c.label}{" "}
               <span style={{ display: "inline-block", width: 12, textAlign: "center", color: prefs.sortKey === c.key ? NAVY : "#C7C5BB" }}>
                 {prefs.sortKey === c.key ? (prefs.sortDir === "asc" ? "▲" : "▼") : "↕"}
               </span>
+              <span
+                onPointerDown={(e) => startResize(e, c.key, e.currentTarget.parentElement)}
+                onClick={(e) => e.stopPropagation()}
+                onDragStart={(e) => e.preventDefault()}
+                title="Drag to resize"
+                style={{ position: "absolute", top: 0, right: 0, height: "100%", width: 8, cursor: "col-resize", touchAction: "none" }}
+              />
             </th>
           );
         })}
@@ -9250,6 +9298,434 @@ const CM_CATEGORIES = ["Powertrain", "Hydraulics", "Undercarriage", "Electrical"
 const CM_CRITICALITY = ["Low", "Medium", "High", "Critical"];
 const CI_DESTINATIONS = ["Rebuild", "Repair", "Scrap", "Returned to OEM", "Stored"];
 
+// ---------------------------------------------------------------------
+// Consumption charts (homepage) and Fleet Health report.
+//
+// Both read from views, so no arithmetic happens in the browser. Rates
+// rather than raw litres throughout: total litres only says which
+// machine worked hardest, litres per hour says which one is drinking.
+// ---------------------------------------------------------------------
+function ConsumptionCharts() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error: err } = await supabase
+        .from("consumption_by_fleet_month")
+        .select("*")
+        .order("month", { ascending: true });
+      if (cancelled) return;
+      if (err) setError(err.message); else setRows(data || []);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const { fuelRows, oilSeries, months } = useMemo(() => {
+    const ms = [...new Set(rows.map((r) => r.month))].sort();
+    const recent = ms.slice(-6);
+    const thisMonth = ms[ms.length - 1];
+    const lastMonth = ms[ms.length - 2];
+    const fleets = [...new Set(rows.map((r) => r.fleet))].filter(Boolean).sort();
+
+    const fuel = fleets.map((f) => {
+      const cur = rows.find((r) => r.fleet === f && r.month === thisMonth);
+      const prev = rows.find((r) => r.fleet === f && r.month === lastMonth);
+      return {
+        fleet: f,
+        current: cur?.fuel_l_per_hour ?? null,
+        previous: prev?.fuel_l_per_hour ?? null,
+      };
+    }).filter((r) => r.current != null || r.previous != null);
+
+    const oil = recent.map((m) => {
+      const inMonth = rows.filter((r) => r.month === m);
+      const litres = inMonth.reduce((a, r) => a + Number(r.oil_litres || 0), 0);
+      const hours = inMonth.reduce((a, r) => a + Number(r.engine_hours || 0), 0);
+      const point = { month: String(m).slice(0, 7) };
+      inMonth.forEach((r) => { point[r.fleet] = r.oil_l_per_100_hours; });
+      point.__avg = hours > 0 ? Math.round((litres / hours) * 100 * 100) / 100 : null;
+      return point;
+    });
+
+    return { fuelRows: fuel, oilSeries: oil, months: recent };
+  }, [rows]);
+
+  const oilFleets = useMemo(
+    () => [...new Set(rows.map((r) => r.fleet))].filter(Boolean).sort().slice(0, 5),
+    [rows]
+  );
+
+  // Biggest month-on-month rise, so the chart says something rather than
+  // leaving the reader to spot it.
+  const biggestRise = useMemo(() => {
+    let best = null;
+    fuelRows.forEach((r) => {
+      if (r.current == null || !r.previous) return;
+      const pct = ((r.current - r.previous) / r.previous) * 100;
+      if (pct > 10 && (!best || pct > best.pct)) best = { fleet: r.fleet, pct: Math.round(pct) };
+    });
+    return best;
+  }, [fuelRows]);
+
+  if (error) {
+    return (
+      <p style={{ fontSize: 12.5, color: "#B85450", background: "#F6E2E0", padding: "9px 12px", borderRadius: 8 }}>
+        {error.includes("does not exist")
+          ? "Consumption views aren't in the database yet - run fleet_health_and_consumption.sql."
+          : error}
+      </p>
+    );
+  }
+  if (loading) return <p style={{ fontSize: 13, color: "#859195" }}>Loading consumption…</p>;
+  if (rows.length === 0) return null;
+
+  const card = { background: "#fff", border: "1px solid #E2E6E3", borderRadius: 10, padding: 14 };
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>
+      <div style={card}>
+        <p style={{ margin: "0 0 2px", fontSize: 13.5, fontWeight: 700, color: NAVY }}>Fuel — litres per engine hour</p>
+        <p style={{ margin: "0 0 10px", fontSize: 11.5, color: "#859195" }}>This month against last, by fleet</p>
+        <ResponsiveContainer width="100%" height={190}>
+          <BarChart data={fuelRows} margin={{ top: 14, right: 8, left: -18, bottom: 4 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" vertical={false} />
+            <XAxis dataKey="fleet" tick={{ fontSize: 10, fill: "#859195" }} interval={0} angle={-18} textAnchor="end" height={44} />
+            <YAxis tick={{ fontSize: 10, fill: "#859195" }} />
+            <Tooltip formatter={(v) => `${v} L/hr`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+            <Bar dataKey="current" name="This month" fill={CHART_COLOURS.last24h} radius={[3, 3, 0, 0]}>
+              <LabelList dataKey="current" position="top" fontSize={10} fill="#4B5659" />
+            </Bar>
+            <Bar dataKey="previous" name="Last month" fill={CHART_COLOURS.period} radius={[3, 3, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+        <div style={{ display: "flex", gap: 14, fontSize: 11, color: "#4B5659", marginTop: 2 }}>
+          <span><span style={{ display: "inline-block", width: 9, height: 9, background: CHART_COLOURS.last24h, borderRadius: 2, marginRight: 5 }} />This month</span>
+          <span><span style={{ display: "inline-block", width: 9, height: 9, background: CHART_COLOURS.period, borderRadius: 2, marginRight: 5 }} />Last month</span>
+        </div>
+        {biggestRise && (
+          <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "#B85450" }}>
+            {biggestRise.fleet} up {biggestRise.pct}% on last month — worth a look
+          </p>
+        )}
+      </div>
+
+      <div style={card}>
+        <p style={{ margin: "0 0 2px", fontSize: 13.5, fontWeight: 700, color: NAVY }}>Oil — litres per 100 engine hours</p>
+        <p style={{ margin: "0 0 10px", fontSize: 11.5, color: "#859195" }}>Top-ups only; scheduled changes excluded</p>
+        <ResponsiveContainer width="100%" height={190}>
+          <LineChart data={oilSeries} margin={{ top: 14, right: 8, left: -18, bottom: 4 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" vertical={false} />
+            <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#859195" }} />
+            <YAxis tick={{ fontSize: 10, fill: "#859195" }} />
+            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+            {oilFleets.map((f, i) => (
+              <Line key={f} type="monotone" dataKey={f} stroke={[NAVY, "#C79A12", "#7A9E7E", "#B85450", "#5B7C99"][i % 5]} strokeWidth={2} dot={{ r: 2 }} />
+            ))}
+            <Line type="monotone" dataKey="__avg" name="Site average" stroke="#B4B2A9" strokeWidth={2} strokeDasharray="5 4" dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+        <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "#859195" }}>
+          Rising oil use often shows up weeks before a failure — a fleet climbing away from the dashed average is the signal.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+const FLEET_HEALTH_COLUMNS = [
+  ["asset_id", "Equipment", "", "text"],
+  ["asset_name", "Name", "", "text"],
+  ["fleet", "Fleet", "", "text"],
+  ["current_equip_hours", "Machine Hours", "", "n1"],
+  ["health_score", "Health", "", "pct100"],
+  ["health_band", "Band", "", "text"],
+  ["overdue_count", "Overdue", "Components", "int"],
+  ["due_count", "Due", "Components", "int"],
+  ["approaching_count", "Approaching", "Components", "int"],
+  ["coverage", "Coverage", "Components", "text"],
+  ["components_scored", "Scored", "Components", "int"],
+  ["components", "Fitted", "Components", "int"],
+  ["worst_component", "Worst Component", "Limiting", "text"],
+  ["worst_life_used_pct", "Life Used", "Limiting", "pct100"],
+  ["days_to_first_changeout", "Days to First", "Next Changeout", "int"],
+  ["first_changeout_date", "Expected Date", "Next Changeout", "date"],
+];
+const FLEET_HEALTH_PREF_COLUMNS = FLEET_HEALTH_COLUMNS.map(([key, label]) => ({ key, label }));
+
+function FleetHealthPage({ assets }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const [selectedFleet, setSelectedFleet] = useState("");
+  const [selectedAsset, setSelectedAsset] = useState("");
+  const [bandFilter, setBandFilter] = useState("");
+  const prefs = useTablePrefs("fleet_health", FLEET_HEALTH_PREF_COLUMNS);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error: err } = await supabase.from("fleet_health_calc").select("*").order("health_score", { ascending: true, nullsFirst: false });
+      if (cancelled) return;
+      if (err) setError(err.message); else setRows(data || []);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const filtered = useMemo(() => {
+    let r = rows;
+    if (selectedAsset) r = r.filter((x) => x.asset_id === selectedAsset);
+    else if (selectedFleet) r = r.filter((x) => x.fleet === selectedFleet);
+    if (bandFilter) r = r.filter((x) => x.health_band === bandFilter);
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      r = r.filter((x) => Object.values(x).some((v) => String(v ?? "").toLowerCase().includes(q)));
+    }
+    return prefs.sortRows(r);
+  }, [rows, selectedAsset, selectedFleet, bandFilter, query, prefs.sortRows]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const totals = useMemo(() => ({
+    machines: filtered.length,
+    atRisk: filtered.filter((r) => r.health_band === "AT RISK").length,
+    monitor: filtered.filter((r) => r.health_band === "MONITOR").length,
+    healthy: filtered.filter((r) => r.health_band === "HEALTHY").length,
+    notScored: filtered.filter((r) => r.health_band === "NOT SCORED").length,
+    overdue: filtered.reduce((a, r) => a + Number(r.overdue_count || 0), 0),
+  }), [filtered]);
+
+  const bandTone = (b) =>
+    b === "AT RISK" ? { bg: "#F6E2E0", text: "#7A3330", bar: "#B85450" }
+    : b === "MONITOR" ? { bg: "#F5E9D8", text: "#7A5A22", bar: "#C79A12" }
+    : b === "HEALTHY" ? { bg: "#E2EFE9", text: "#2C5646", bar: "#2F9E63" }
+    : { bg: "#EDEBE4", text: "#4B5659", bar: "#B4B2A9" };
+
+  const fmt = (key, val) => {
+    const type = FLEET_HEALTH_COLUMNS.find((c) => c[0] === key)?.[3];
+    if (val == null || val === "") return "-";
+    switch (type) {
+      case "n1": return Number(val).toLocaleString(undefined, { maximumFractionDigits: 1 });
+      case "int": return String(Math.round(Number(val)));
+      case "pct100": return `${Number(val).toFixed(1)}%`;
+      case "date": return String(val).slice(0, 10);
+      default: return val;
+    }
+  };
+
+  const exportReport = () =>
+    exportMine2UReport({
+      title: "Fleet Health",
+      sheetName: "Fleet Health",
+      fileName: "Mine2U_Fleet_Health",
+      columns: prefs.columns.map((c) => {
+        const def = FLEET_HEALTH_COLUMNS.find((x) => x[0] === c.key);
+        return { key: c.key, label: def ? `${def[2] ? def[2] + " - " : ""}${def[1]}` : c.label, fmt: def?.[3] || "text" };
+      }),
+      rows: filtered,
+      filterLines: [
+        ["Hierarchy", `[Fleet: ${selectedFleet || "All"}]  [Equipment: ${selectedAsset || "All"}]`],
+        ["Additional Filters", `[Band: ${bandFilter || "All"}]`],
+      ],
+      notes: [
+        "Health is the straight average of life remaining across each machine's scored components, calculated from meter readings at the moment of export.",
+        "Overdue components are counted separately rather than folded into the score, so one overdue item does not mask an otherwise sound machine.",
+        "Components with no life target are excluded from the average but included in the Fitted count.",
+        "Coverage shows how much of the machine the score actually covers. A machine scored on one component of eight is not a whole-machine verdict - read the score against its coverage.",
+      ],
+    });
+
+  const widthFor = (key, type) => {
+    if (key === "asset_id" || key === "asset_name" || key === "worst_component") return 120;
+    if (key === "health_score") return 190;
+    if (key === "coverage") return 110;
+    if (key === "health_band" || key === "fleet") return 96;
+    if (type === "date") return 104;
+    return 72;
+  };
+
+  const spans = [];
+  FLEET_HEALTH_COLUMNS.forEach(([, , group]) => {
+    const last = spans[spans.length - 1];
+    if (last && last.group === group) last.span += 1;
+    else spans.push({ group, span: 1 });
+  });
+
+  const chip = (label, value, tone) => (
+    <div style={{ background: tone.bg, color: tone.text, borderRadius: 8, padding: "7px 12px", fontSize: 12.5 }}>
+      <strong style={{ fontSize: 15 }}>{value}</strong> {label}
+    </div>
+  );
+
+  return (
+    <div>
+      <h1 style={{ fontSize: 21, fontWeight: 700, color: NAVY, margin: "0 0 12px" }}>Fleet Health</h1>
+
+      {error && (
+        <p style={{ fontSize: 13, color: "#B85450", background: "#F6E2E0", padding: "9px 12px", borderRadius: 8 }}>
+          {error.includes("does not exist")
+            ? "The Fleet Health view isn't in the database yet - run fleet_health_and_consumption.sql."
+            : error}
+        </p>
+      )}
+
+      <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ position: "relative", flex: 1, maxWidth: 250 }}>
+          <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search equipment"
+            style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }} />
+        </div>
+        <select value={bandFilter} onChange={(e) => setBandFilter(e.target.value)} style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8 }}>
+          <option value="">All bands</option>
+          {["AT RISK", "MONITOR", "HEALTHY", "NOT SCORED"].map((b) => <option key={b} value={b}>{b}</option>)}
+        </select>
+        <ColumnsButton prefs={prefs} />
+        <button onClick={() => { setQuery(""); setBandFilter(""); setSelectedFleet(""); setSelectedAsset(""); }}
+          style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#4B5659", fontSize: 12.5, fontWeight: 600, padding: "8px 12px", borderRadius: 8, cursor: "pointer" }}>
+          Clear filters
+        </button>
+        <button onClick={exportReport}
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
+          <Download size={14} /> Export to Excel
+        </button>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+        {chip("machines", totals.machines, { bg: "#F2F1EA", text: "#183642" })}
+        {chip("at risk", totals.atRisk, { bg: "#F6E2E0", text: "#7A3330" })}
+        {chip("monitor", totals.monitor, { bg: "#F5E9D8", text: "#7A5A22" })}
+        {chip("healthy", totals.healthy, { bg: "#E2EFE9", text: "#2C5646" })}
+        {totals.notScored > 0 && chip("not scored", totals.notScored, { bg: "#EDEBE4", text: "#4B5659" })}
+        {totals.overdue > 0 && chip("overdue components", totals.overdue, { bg: "#F6E2E0", text: "#7A3330" })}
+      </div>
+
+      {loading ? <p style={{ fontSize: 13, color: "#859195" }}>Loading…</p> : (
+        <div style={{ overflow: "auto", maxHeight: "62vh", border: "1px solid #E2E6E3", borderRadius: 10 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, tableLayout: "fixed" }}>
+            <colgroup>
+              {prefs.columns.map((c) => {
+                const def = FLEET_HEALTH_COLUMNS.find((x) => x[0] === c.key);
+                return <col key={c.key} style={{ width: prefs.widths?.[c.key] ?? widthFor(c.key, def?.[3]) }} />;
+              })}
+            </colgroup>
+            <thead>
+              <tr style={{ background: "#E9ECEA" }}>
+                {spans.map((sp, i) => (
+                  <th key={i} colSpan={sp.span} title={sp.group}
+                    style={{ position: "sticky", top: 0, zIndex: 3, background: "#E9ECEA", textAlign: "center", padding: "5px 6px",
+                             fontWeight: 700, fontSize: 11, color: NAVY, borderBottom: "1px solid #E2E6E3",
+                             borderLeft: i > 0 ? "1px solid #DCE0DD" : "none", whiteSpace: "nowrap" }}>
+                    {sp.group}
+                  </th>
+                ))}
+              </tr>
+              <tr style={{ background: "#F7F8F6" }}>
+                {prefs.columns.map((c) => {
+                  const def = FLEET_HEALTH_COLUMNS.find((x) => x[0] === c.key);
+                  const type = def?.[3];
+                  return (
+                    <th key={c.key} onClick={() => prefs.toggleSort(c.key)} title={c.label}
+                      style={{ position: "sticky", top: 26, zIndex: c.key === "asset_id" ? 5 : 3, background: "#F7F8F6",
+                               ...(c.key === "asset_id" ? { left: 0 } : {}),
+                               textAlign: type === "text" ? "left" : "right", padding: "6px 7px",
+                               fontWeight: 600, color: "#4B5659", fontSize: 11, lineHeight: 1.25,
+                               borderBottom: "1px solid #E2E6E3", cursor: "pointer", userSelect: "none",
+                               whiteSpace: "normal", wordBreak: "break-word" }}>
+                      {c.label}{prefs.sortKey === c.key ? (prefs.sortDir === "asc" ? " ▲" : " ▼") : ""}
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((row) => {
+                const tone = bandTone(row.health_band);
+                return (
+                  <tr key={row.asset_id} style={{ borderBottom: "1px solid #EFEEE7" }}>
+                    {prefs.columns.map((c) => {
+                      const def = FLEET_HEALTH_COLUMNS.find((x) => x[0] === c.key);
+                      const type = def?.[3];
+
+                      if (c.key === "health_score") {
+                        const pct = row.health_score;
+                        return (
+                          <td key={c.key} style={{ padding: "6px 7px" }}>
+                            {pct == null ? <span style={{ fontSize: 11, color: "#859195" }}>not scored</span> : (
+                              <>
+                                <span style={{ display: "block", height: 7, background: "#F2F1EA", borderRadius: 4, overflow: "hidden" }}>
+                                  <span style={{ display: "block", height: "100%", width: `${Math.max(2, Math.min(100, pct))}%`, background: tone.bar }} />
+                                </span>
+                                <span style={{ fontSize: 10.5, color: tone.text }}>{Number(pct).toFixed(0)}</span>
+                                {row.thin_coverage && (
+                                  <span title={`Scored on only ${row.components_scored} component(s) - not a whole-machine verdict`}
+                                    style={{ fontSize: 10, color: "#B07D2B", marginLeft: 6 }}>
+                                    ⚠ {row.coverage}
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </td>
+                        );
+                      }
+
+                      if (c.key === "overdue_count") {
+                        const n = Number(row.overdue_count || 0);
+                        return (
+                          <td key={c.key} style={{ padding: "6px 7px", textAlign: "right" }}>
+                            {n > 0
+                              ? <span style={{ background: "#F6E2E0", color: "#7A3330", padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>{n} overdue</span>
+                              : <span style={{ color: "#B4B2A9" }}>-</span>}
+                          </td>
+                        );
+                      }
+
+                      if (c.key === "health_band") {
+                        return (
+                          <td key={c.key} style={{ padding: "6px 7px" }}>
+                            <span style={{ background: tone.bg, color: tone.text, padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>{row.health_band}</span>
+                          </td>
+                        );
+                      }
+
+                      if (c.key === "worst_component") {
+                        return (
+                          <td key={c.key} style={{ padding: "6px 7px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                            title={`${row.worst_component || ""}${row.worst_position ? " " + row.worst_position : ""}`}>
+                            {row.worst_component ? `${row.worst_component}${row.worst_position ? ` ${row.worst_position}` : ""}` : "-"}
+                          </td>
+                        );
+                      }
+
+                      return (
+                        <td key={c.key} title={String(row[c.key] ?? "")}
+                          style={{ padding: "6px 7px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                                   textAlign: type === "text" ? "left" : "right",
+                                   ...(c.key === "asset_id" ? { position: "sticky", left: 0, zIndex: 2, background: "#fff", fontWeight: 600 } : {}) }}>
+                          {fmt(c.key, row[c.key])}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+              {filtered.length === 0 && (
+                <tr><td colSpan={prefs.columns.length} style={{ padding: 20, textAlign: "center", color: "#859195" }}>
+                  {rows.length === 0 ? "No equipment with components fitted yet." : "No machines match the current filters."}
+                </td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ComponentMasterPage({ assets, selectedSiteId, myFullName }) {
   const [tab, setTab] = useState("master");
   const [master, setMaster] = useState([]);
@@ -9346,7 +9822,7 @@ function ComponentMasterPage({ assets, selectedSiteId, myFullName }) {
                     </td>
                     <td style={{ padding: "8px 10px", textAlign: "right" }}>{r.warning_pct ?? "site default"}</td>
                     <td style={{ padding: "8px 10px", textAlign: "right" }}>{r.expected_cost != null ? Number(r.expected_cost).toLocaleString(undefined, { minimumFractionDigits: 2 }) : "-"}</td>
-                    <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>{[r.applies_manufacturer, r.applies_model].filter(Boolean).join(" ") || "All"}</td>
+                    <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>{[r.applies_make, r.applies_model].filter(Boolean).join(" ") || "All"}</td>
                     <td style={{ padding: "8px 10px" }}>{r.criticality || "-"}</td>
                     <td style={{ padding: "8px 10px" }}>{r.active ? "Yes" : "No"}</td>
                     <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
@@ -9425,10 +9901,11 @@ function ComponentMasterForm({ existing, selectedSiteId, onClose, onSaved }) {
     supplier: existing?.supplier || "",
     target_life_hours: existing?.target_life_hours ?? "", min_expected_hours: existing?.min_expected_hours ?? "",
     max_expected_hours: existing?.max_expected_hours ?? "",
-    warning_pct: existing?.warning_pct ?? "", critical_pct: existing?.critical_pct ?? "",
+    warning_hours: existing?.warning_hours ?? "", critical_hours: existing?.critical_hours ?? "",
+    uses_positions: existing?.uses_positions ?? false,
     expected_cost: existing?.expected_cost ?? "", warranty_hours: existing?.warranty_hours ?? "",
     warranty_months: existing?.warranty_months ?? "",
-    applies_equipment_type: existing?.applies_equipment_type || "", applies_manufacturer: existing?.applies_manufacturer || "",
+    applies_equip_type: existing?.applies_equip_type || "", applies_make: existing?.applies_make || "",
     applies_model: existing?.applies_model || "", default_position: existing?.default_position || "",
     criticality: existing?.criticality || "Medium", active: existing?.active ?? true,
   });
@@ -9446,8 +9923,8 @@ function ComponentMasterForm({ existing, selectedSiteId, onClose, onSaved }) {
       component_type: f.component_type.trim(),
       site_id: selectedSiteId || null,
       target_life_hours: num(f.target_life_hours), min_expected_hours: num(f.min_expected_hours),
-      max_expected_hours: num(f.max_expected_hours), warning_pct: num(f.warning_pct),
-      critical_pct: num(f.critical_pct), expected_cost: num(f.expected_cost),
+      max_expected_hours: num(f.max_expected_hours), warning_hours: num(f.warning_hours),
+      critical_hours: num(f.critical_hours), expected_cost: num(f.expected_cost),
       warranty_hours: num(f.warranty_hours), warranty_months: num(f.warranty_months),
     };
     const { error: err } = existing
@@ -9490,11 +9967,11 @@ function ComponentMasterForm({ existing, selectedSiteId, onClose, onSaved }) {
           <div><label style={ls}>Target life (hrs)</label><input type="number" step="1" value={f.target_life_hours} onChange={(e) => set("target_life_hours", e.target.value)} style={fs} /></div>
           <div><label style={ls}>Min expected</label><input type="number" step="1" value={f.min_expected_hours} onChange={(e) => set("min_expected_hours", e.target.value)} style={fs} /></div>
           <div><label style={ls}>Max expected</label><input type="number" step="1" value={f.max_expected_hours} onChange={(e) => set("max_expected_hours", e.target.value)} style={fs} /></div>
-          <div><label style={ls}>Warning %</label><input type="number" step="1" value={f.warning_pct} onChange={(e) => set("warning_pct", e.target.value)} placeholder="site default" style={fs} /></div>
-          <div><label style={ls}>Critical %</label><input type="number" step="1" value={f.critical_pct} onChange={(e) => set("critical_pct", e.target.value)} placeholder="site default" style={fs} /></div>
+          <div><label style={ls}>Warning hrs</label><input type="number" step="1" value={f.warning_hours} onChange={(e) => set("warning_hours", e.target.value)} style={fs} /></div>
+          <div><label style={ls}>Critical hrs</label><input type="number" step="1" value={f.critical_hours} onChange={(e) => set("critical_hours", e.target.value)} style={fs} /></div>
         </div>
         <p style={{ fontSize: 11.5, color: "#859195", margin: "4px 0 0" }}>
-          Leave the percentages blank to use the site's own thresholds. Without a target life this component reports LIFE TARGET NOT CONFIGURED rather than a percentage.
+          The warning and critical PERCENTAGES that drive status are set per site in component_life_settings, not here. Without a target life this component reports LIFE TARGET NOT CONFIGURED rather than a percentage.
         </p>
 
         <p style={sec}>Cost &amp; warranty</p>
@@ -9506,8 +9983,8 @@ function ComponentMasterForm({ existing, selectedSiteId, onClose, onSaved }) {
 
         <p style={sec}>Applies to</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
-          <div><label style={ls}>Equipment type</label><input value={f.applies_equipment_type} onChange={(e) => set("applies_equipment_type", e.target.value)} placeholder="Dump Truck" style={fs} /></div>
-          <div><label style={ls}>Manufacturer</label><input value={f.applies_manufacturer} onChange={(e) => set("applies_manufacturer", e.target.value)} placeholder="Komatsu" style={fs} /></div>
+          <div><label style={ls}>Equipment type</label><input value={f.applies_equip_type} onChange={(e) => set("applies_equip_type", e.target.value)} placeholder="Dump Truck" style={fs} /></div>
+          <div><label style={ls}>Manufacturer</label><input value={f.applies_make} onChange={(e) => set("applies_make", e.target.value)} placeholder="Komatsu" style={fs} /></div>
           <div><label style={ls}>Model</label><input value={f.applies_model} onChange={(e) => set("applies_model", e.target.value)} placeholder="HD785" style={fs} /></div>
           <div><label style={ls}>Default position</label><input value={f.default_position} onChange={(e) => set("default_position", e.target.value)} placeholder="LH / RH" style={fs} /></div>
           <div>
@@ -9517,9 +9994,14 @@ function ComponentMasterForm({ existing, selectedSiteId, onClose, onSaved }) {
             </select>
           </div>
         </div>
-        <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, color: "#183642", marginTop: 10 }}>
-          <input type="checkbox" checked={f.active} onChange={(e) => set("active", e.target.checked)} /> Active
-        </label>
+        <div style={{ display: "flex", gap: 18, marginTop: 10, flexWrap: "wrap" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, color: "#183642" }}>
+            <input type="checkbox" checked={f.active} onChange={(e) => set("active", e.target.checked)} /> Active
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, color: "#183642" }}>
+            <input type="checkbox" checked={f.uses_positions} onChange={(e) => set("uses_positions", e.target.checked)} /> Tracked by position (LH / RH)
+          </label>
+        </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
           <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#4B5659", padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
@@ -9539,8 +10021,9 @@ function ComponentInstallForm({ master, assets, selectedSiteId, myFullName, onCl
     position_label: master.default_position || "", serial_number: "", part_no: master.oem_part_no || "",
     supplier: master.supplier || "", condition: "New",
     installed_date: todayForInput(), installed_equip_hours: "", hours_at_install: "0",
-    target_life_hours: master.target_life_hours ?? "", purchase_cost: master.expected_cost ?? "",
-    install_cost: "", warranty_end: "", warranty_hours: master.warranty_hours ?? "",
+    purchase_cost: master.expected_cost ?? "",
+    install_work_order: "", install_reason: "",
+    warranty_end: "", warranty_hours: master.warranty_hours ?? "",
     purchase_order: "", grn_ref: "", technician: myFullName || "", notes: "",
   });
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
@@ -9568,25 +10051,22 @@ function ComponentInstallForm({ master, assets, selectedSiteId, myFullName, onCl
     setSaving(true); setError("");
     const num = (v) => (v === "" || v == null ? null : Number(v));
     const { error: err } = await supabase.from("component_installations").insert({
-      site_id: selectedSiteId || null,
       asset_id: assetId,
-      component_master_id: master.id,
+      master_id: master.id,
       component_type: master.component_type,
       position_label: f.position_label.trim() || null,
       serial_number: f.serial_number.trim() || null,
       part_no: f.part_no.trim() || null,
       supplier: f.supplier.trim() || null,
-      condition: f.condition,
+      condition_at_install: f.condition,
       installed_date: f.installed_date,
       installed_equip_hours: num(f.installed_equip_hours),
-      hours_at_install: num(f.hours_at_install) ?? 0,
-      target_life_hours: num(f.target_life_hours),
+      installed_comp_hours: num(f.hours_at_install) ?? 0,
       purchase_cost: num(f.purchase_cost),
-      install_cost: num(f.install_cost),
       warranty_end: f.warranty_end || null,
       warranty_hours: num(f.warranty_hours),
       purchase_order: f.purchase_order.trim() || null,
-      grn_ref: f.grn_ref.trim() || null,
+      grn_reference: f.grn_ref.trim() || null,
       technician: f.technician.trim() || null,
       notes: f.notes.trim() || null,
     });
@@ -9639,9 +10119,9 @@ function ComponentInstallForm({ master, assets, selectedSiteId, myFullName, onCl
             </select>
           </div>
 
-          <div><label style={ls}>Target life (hrs)</label><input type="number" step="1" value={f.target_life_hours} onChange={(e) => set("target_life_hours", e.target.value)} style={fs} /></div>
           <div><label style={ls}>Purchase cost</label><input type="number" step="0.01" value={f.purchase_cost} onChange={(e) => set("purchase_cost", e.target.value)} style={fs} /></div>
-          <div><label style={ls}>Install cost</label><input type="number" step="0.01" value={f.install_cost} onChange={(e) => set("install_cost", e.target.value)} style={fs} /></div>
+          <div><label style={ls}>Work order</label><input value={f.install_work_order} onChange={(e) => set("install_work_order", e.target.value)} style={fs} /></div>
+          <div><label style={ls}>Reason</label><input value={f.install_reason} onChange={(e) => set("install_reason", e.target.value)} placeholder="New build / Changeout" style={fs} /></div>
           <div><label style={ls}>Supplier</label><input value={f.supplier} onChange={(e) => set("supplier", e.target.value)} style={fs} /></div>
 
           <div><label style={ls}>Warranty end</label><input type="date" value={f.warranty_end} onChange={(e) => set("warranty_end", e.target.value)} style={fs} /></div>
@@ -9683,7 +10163,7 @@ function ComponentChangeOutForm({ install, selectedSiteId, myFullName, onClose, 
   const achieved = useMemo(() => {
     const removedAt = Number(f.removed_equip_hours);
     if (isNaN(removedAt)) return null;
-    return (removedAt - Number(install.installed_equip_hours)) + Number(install.hours_at_install || 0);
+    return (removedAt - Number(install.installed_equip_hours)) + Number(install.installed_comp_hours || 0);
   }, [f.removed_equip_hours, install]);
 
   const pct = useMemo(() => {
@@ -9709,8 +10189,8 @@ function ComponentChangeOutForm({ install, selectedSiteId, myFullName, onClose, 
         removal_reason: f.removal_reason.trim() || null,
         failure_code: f.failure_code.trim() || null,
         failure_description: f.failure_description.trim() || null,
-        removed_condition: f.removed_condition.trim() || null,
-        removed_destination: f.removed_destination || null,
+        condition_at_removal: f.removed_condition.trim() || null,
+        destination: f.removed_destination || null,
         repair_cost: num(f.repair_cost),
         technician: f.technician.trim() || null,
         supervisor: f.supervisor.trim() || null,
@@ -9725,19 +10205,17 @@ function ComponentChangeOutForm({ install, selectedSiteId, myFullName, onClose, 
 
       if (f.fitReplacement) {
         const { error: e2 } = await supabase.from("component_installations").insert({
-          site_id: selectedSiteId || install.site_id || null,
           asset_id: install.asset_id,
-          component_master_id: install.component_master_id,
+          master_id: install.master_id,
           component_type: install.component_type,
           position_label: install.position_label,
           serial_number: f.new_serial.trim() || null,
           part_no: f.new_part_no.trim() || null,
           supplier: install.supplier,
-          condition: f.new_condition,
+          condition_at_install: f.new_condition,
           installed_date: f.removed_date,
           installed_equip_hours: num(f.removed_equip_hours),
-          hours_at_install: num(f.new_hours_at_install) ?? 0,
-          target_life_hours: install.target_life_hours,
+          installed_comp_hours: num(f.new_hours_at_install) ?? 0,
           purchase_cost: num(f.new_purchase_cost),
           warranty_end: f.new_warranty_end || null,
           technician: f.technician.trim() || null,
@@ -9841,12 +10319,11 @@ const COMPONENT_STATUS_COLUMNS = [
   ["component_type", "Component", "", "text"],
   ["position_label", "Position", "", "text"],
   ["oem", "OEM", "", "text"],
-  ["oem_part_no", "Part No", "", "text"],
   ["serial_number", "Serial No", "", "text"],
 
-  ["work_order_id", "Work Order", "Last Changeout", "text"],
+  ["install_work_order", "Work Order", "Last Changeout", "text"],
   ["installed_equip_hours", "Equip. Hrs", "Last Changeout", "n1"],
-  ["hours_at_install", "Comp. Hrs at Fit", "Last Changeout", "n1"],
+  ["installed_comp_hours", "Comp. Hrs at Fit", "Last Changeout", "n1"],
   ["installed_date", "Fitted", "Last Changeout", "date"],
 
   ["current_equip_hours", "Equip. Hrs", "Current", "n1"],
@@ -9862,6 +10339,7 @@ const COMPONENT_STATUS_COLUMNS = [
   ["estimated_days_remaining", "Days Left", "Next Changeout", "int"],
 
   ["purchase_cost", "Purchase", "Cost", "money"],
+  ["rebuild_cost", "Rebuild", "Cost", "money"],
   ["lifetime_cost", "Lifetime", "Cost", "money"],
   ["cost_per_hour", "Per Hour", "Cost", "money"],
   ["uvic", "UVIC", "Cost", "money"],
@@ -11719,6 +12197,9 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
               )}
             </div>
           </div>
+
+        <p style={{ fontSize: 13.5, fontWeight: 700, color: NAVY, margin: "20px 0 8px" }}>Consumption</p>
+        <ConsumptionCharts />
         </div>
       </div>
     </div>
@@ -12229,6 +12710,8 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
               <DailyServicePage assets={assets} dailyServiceChecklist={dailyServiceChecklist} breakdowns={breakdowns} dailyHours={dailyHours} userEmail={userEmail} myFullName={myFullName} onRefresh={loadRestOfData} />
             ) : active === "components" ? (
               <ComponentsPage assets={assets} components={components} breakdowns={breakdowns} workOrders={workOrders} dailyHours={dailyHours} userEmail={userEmail} onRefresh={loadRestOfData} />
+            ) : active === "fleet_health" ? (
+              <FleetHealthPage assets={assets} />
             ) : active === "component_master" ? (
               <ComponentMasterPage assets={assets} selectedSiteId={selectedSiteId} myFullName={myFullName} />
             ) : active === "component_status" ? (
