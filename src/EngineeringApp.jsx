@@ -9305,71 +9305,73 @@ const CI_DESTINATIONS = ["Rebuild", "Repair", "Scrap", "Returned to OEM", "Store
 // rather than raw litres throughout: total litres only says which
 // machine worked hardest, litres per hour says which one is drinking.
 // ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// Consumption charts (homepage).
+//
+// Built on the same KpiBarChart the availability charts use, so they
+// read as part of the same system. The reference line is the SITE
+// AVERAGE rather than an invented target: for consumption there is no
+// right number, only "worse than the rest of the fleet".
+//
+// Click a fleet to see the machines behind it.
+// ---------------------------------------------------------------------
 function ConsumptionCharts() {
   const [rows, setRows] = useState([]);
+  const [machines, setMachines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [drill, setDrill] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data, error: err } = await supabase
-        .from("consumption_by_fleet_month")
-        .select("*")
-        .order("month", { ascending: true });
+      const [f, m] = await Promise.all([
+        supabase.from("consumption_by_fleet_month").select("*").order("month", { ascending: true }),
+        supabase.from("consumption_by_month").select("*").order("month", { ascending: true }),
+      ]);
       if (cancelled) return;
-      if (err) setError(err.message); else setRows(data || []);
+      if (f.error || m.error) setError((f.error || m.error).message);
+      else { setRows(f.data || []); setMachines(m.data || []); }
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, []);
 
-  const { fuelRows, oilSeries, months } = useMemo(() => {
+  const { chartRows, months, fuelAvg, oilAvg } = useMemo(() => {
     const ms = [...new Set(rows.map((r) => r.month))].sort();
-    const recent = ms.slice(-6);
-    const thisMonth = ms[ms.length - 1];
-    const lastMonth = ms[ms.length - 2];
+    const cur = ms[ms.length - 1];
+    const prev = ms[ms.length - 2];
     const fleets = [...new Set(rows.map((r) => r.fleet))].filter(Boolean).sort();
 
-    const fuel = fleets.map((f) => {
-      const cur = rows.find((r) => r.fleet === f && r.month === thisMonth);
-      const prev = rows.find((r) => r.fleet === f && r.month === lastMonth);
+    const data = fleets.map((fleet) => {
+      const c = rows.find((r) => r.fleet === fleet && r.month === cur);
+      const p = rows.find((r) => r.fleet === fleet && r.month === prev);
       return {
-        fleet: f,
-        current: cur?.fuel_l_per_hour ?? null,
-        previous: prev?.fuel_l_per_hour ?? null,
+        fleet,
+        fuel: c?.fuel_l_per_hour ?? null,
+        fuelPrev: p?.fuel_l_per_hour ?? null,
+        oil: c?.oil_l_per_100_hours ?? null,
+        oilPrev: p?.oil_l_per_100_hours ?? null,
       };
-    }).filter((r) => r.current != null || r.previous != null);
+    }).filter((r) => r.fuel != null || r.oil != null);
 
-    const oil = recent.map((m) => {
-      const inMonth = rows.filter((r) => r.month === m);
-      const litres = inMonth.reduce((a, r) => a + Number(r.oil_litres || 0), 0);
-      const hours = inMonth.reduce((a, r) => a + Number(r.engine_hours || 0), 0);
-      const point = { month: String(m).slice(0, 7) };
-      inMonth.forEach((r) => { point[r.fleet] = r.oil_l_per_100_hours; });
-      point.__avg = hours > 0 ? Math.round((litres / hours) * 100 * 100) / 100 : null;
-      return point;
-    });
+    // Site average weighted by hours, not an average of averages - a
+    // machine that ran two hours shouldn't count as much as one that ran
+    // two hundred.
+    const inCur = rows.filter((r) => r.month === cur);
+    const hours = inCur.reduce((a, r) => a + Number(r.engine_hours || 0), 0);
+    const fuelL = inCur.reduce((a, r) => a + Number(r.fuel_litres || 0), 0);
+    const oilL = inCur.reduce((a, r) => a + Number(r.oil_litres || 0), 0);
 
-    return { fuelRows: fuel, oilSeries: oil, months: recent };
+    return {
+      chartRows: data,
+      months: { cur, prev },
+      fuelAvg: hours > 0 ? Math.round((fuelL / hours) * 100) / 100 : 0,
+      oilAvg: hours > 0 ? Math.round((oilL / hours) * 100 * 100) / 100 : 0,
+    };
   }, [rows]);
 
-  const oilFleets = useMemo(
-    () => [...new Set(rows.map((r) => r.fleet))].filter(Boolean).sort().slice(0, 5),
-    [rows]
-  );
-
-  // Biggest month-on-month rise, so the chart says something rather than
-  // leaving the reader to spot it.
-  const biggestRise = useMemo(() => {
-    let best = null;
-    fuelRows.forEach((r) => {
-      if (r.current == null || !r.previous) return;
-      const pct = ((r.current - r.previous) / r.previous) * 100;
-      if (pct > 10 && (!best || pct > best.pct)) best = { fleet: r.fleet, pct: Math.round(pct) };
-    });
-    return best;
-  }, [fuelRows]);
+  const monthLabel = (m) => (m ? new Date(`${String(m).slice(0, 7)}-01T12:00:00`).toLocaleDateString("en-ZA", { month: "short", year: "numeric" }) : "");
 
   if (error) {
     return (
@@ -9381,55 +9383,136 @@ function ConsumptionCharts() {
     );
   }
   if (loading) return <p style={{ fontSize: 13, color: "#859195" }}>Loading consumption…</p>;
-  if (rows.length === 0) return null;
+  if (chartRows.length === 0) return null;
 
-  const card = { background: "#fff", border: "1px solid #E2E6E3", borderRadius: 10, padding: 14 };
+  const fuelMax = Math.max(fuelAvg, ...chartRows.map((r) => Math.max(r.fuel || 0, r.fuelPrev || 0))) * 1.2;
+  const oilMax = Math.max(oilAvg, ...chartRows.map((r) => Math.max(r.oil || 0, r.oilPrev || 0))) * 1.2;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>
-      <div style={card}>
-        <p style={{ margin: "0 0 2px", fontSize: 13.5, fontWeight: 700, color: NAVY }}>Fuel — litres per engine hour</p>
-        <p style={{ margin: "0 0 10px", fontSize: 11.5, color: "#859195" }}>This month against last, by fleet</p>
-        <ResponsiveContainer width="100%" height={190}>
-          <BarChart data={fuelRows} margin={{ top: 14, right: 8, left: -18, bottom: 4 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" vertical={false} />
-            <XAxis dataKey="fleet" tick={{ fontSize: 10, fill: "#859195" }} interval={0} angle={-18} textAnchor="end" height={44} />
-            <YAxis tick={{ fontSize: 10, fill: "#859195" }} />
-            <Tooltip formatter={(v) => `${v} L/hr`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-            <Bar dataKey="current" name="This month" fill={CHART_COLOURS.last24h} radius={[3, 3, 0, 0]}>
-              <LabelList dataKey="current" position="top" fontSize={10} fill="#4B5659" />
-            </Bar>
-            <Bar dataKey="previous" name="Last month" fill={CHART_COLOURS.period} radius={[3, 3, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-        <div style={{ display: "flex", gap: 14, fontSize: 11, color: "#4B5659", marginTop: 2 }}>
-          <span><span style={{ display: "inline-block", width: 9, height: 9, background: CHART_COLOURS.last24h, borderRadius: 2, marginRight: 5 }} />This month</span>
-          <span><span style={{ display: "inline-block", width: 9, height: 9, background: CHART_COLOURS.period, borderRadius: 2, marginRight: 5 }} />Last month</span>
-        </div>
-        {biggestRise && (
-          <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "#B85450" }}>
-            {biggestRise.fleet} up {biggestRise.pct}% on last month — worth a look
-          </p>
-        )}
+    <>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, margin: "0 0 8px" }}>
+        <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: 0 }}>Consumption</p>
+        <p style={{ fontSize: 11.5, color: "#859195", margin: 0 }}>
+          {monthLabel(months.cur)}{months.prev ? ` against ${monthLabel(months.prev)}` : ""} · click a fleet for its machines
+        </p>
       </div>
 
-      <div style={card}>
-        <p style={{ margin: "0 0 2px", fontSize: 13.5, fontWeight: 700, color: NAVY }}>Oil — litres per 100 engine hours</p>
-        <p style={{ margin: "0 0 10px", fontSize: 11.5, color: "#859195" }}>Top-ups only; scheduled changes excluded</p>
-        <ResponsiveContainer width="100%" height={190}>
-          <LineChart data={oilSeries} margin={{ top: 14, right: 8, left: -18, bottom: 4 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#EFEEE7" vertical={false} />
-            <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#859195" }} />
-            <YAxis tick={{ fontSize: 10, fill: "#859195" }} />
-            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-            {oilFleets.map((f, i) => (
-              <Line key={f} type="monotone" dataKey={f} stroke={[NAVY, "#C79A12", "#7A9E7E", "#B85450", "#5B7C99"][i % 5]} strokeWidth={2} dot={{ r: 2 }} />
-            ))}
-            <Line type="monotone" dataKey="__avg" name="Site average" stroke="#B4B2A9" strokeWidth={2} strokeDasharray="5 4" dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
-        <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "#859195" }}>
-          Rising oil use often shows up weeks before a failure — a fleet climbing away from the dashed average is the signal.
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 8 }}>
+        <KpiBarChart
+          title="Fuel — litres per engine hour"
+          data={chartRows} xKey="fleet"
+          dataKey="fuel" dataKey2="fuelPrev"
+          seriesName="This month" seriesName2="Last month"
+          target={fuelAvg} domainMax={fuelMax} unitSuffix=" L/hr"
+          valueFormatter={(v) => (v == null ? "" : Number(v).toFixed(1))}
+          meetsTarget={(r) => (r.fuel ?? 0) <= fuelAvg}
+          meetsTarget2={(r) => (r.fuelPrev ?? 0) <= fuelAvg}
+          onBarClick={(r) => setDrill({ fleet: r.fleet, metric: "fuel" })}
+        />
+        <KpiBarChart
+          title="Oil — litres per 100 engine hours"
+          data={chartRows} xKey="fleet"
+          dataKey="oil" dataKey2="oilPrev"
+          seriesName="This month" seriesName2="Last month"
+          target={oilAvg} domainMax={oilMax} unitSuffix=" L/100h"
+          valueFormatter={(v) => (v == null ? "" : Number(v).toFixed(1))}
+          meetsTarget={(r) => (r.oil ?? 0) <= oilAvg}
+          meetsTarget2={(r) => (r.oilPrev ?? 0) <= oilAvg}
+          onBarClick={(r) => setDrill({ fleet: r.fleet, metric: "oil" })}
+        />
+      </div>
+
+      <div style={{ display: "flex", gap: 16, fontSize: 11.5, color: "#4B5659", flexWrap: "wrap", marginBottom: 4 }}>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, background: CHART_COLOURS.last24h, borderRadius: 2, marginRight: 5 }} />This month</span>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, background: CHART_COLOURS.period, borderRadius: 2, marginRight: 5 }} />Last month</span>
+        <span><span style={{ display: "inline-block", width: 12, height: 3, background: CHART_COLOURS.target, borderRadius: 2, marginRight: 6, verticalAlign: "middle" }} />Site average — {fuelAvg} L/hr · {oilAvg} L/100h</span>
+        <span style={{ color: "#859195" }}>A bar above the line is drinking more than the rest of the fleet</span>
+      </div>
+      <p style={{ fontSize: 11, color: "#859195", margin: "0 0 4px" }}>
+        Rates, not totals — a machine that ran twice as long should not look twice as thirsty. Oil counts top-ups only; scheduled changes are a service, not consumption.
+      </p>
+
+      {drill && (
+        <ConsumptionDrilldown
+          fleet={drill.fleet} metric={drill.metric}
+          rows={machines.filter((m) => m.fleet === drill.fleet && m.month === months.cur)}
+          prevRows={machines.filter((m) => m.fleet === drill.fleet && m.month === months.prev)}
+          fleetAvg={drill.metric === "fuel" ? fuelAvg : oilAvg}
+          monthLabel={monthLabel(months.cur)}
+          onClose={() => setDrill(null)}
+        />
+      )}
+    </>
+  );
+}
+
+function ConsumptionDrilldown({ fleet, metric, rows, prevRows, fleetAvg, monthLabel, onClose }) {
+  const key = metric === "fuel" ? "fuel_l_per_hour" : "oil_l_per_100_hours";
+  const litreKey = metric === "fuel" ? "fuel_litres" : "oil_litres";
+  const unit = metric === "fuel" ? "L/hr" : "L/100h";
+  const prevBy = useMemo(() => Object.fromEntries(prevRows.map((r) => [r.asset_id, r[key]])), [prevRows, key]);
+
+  const sorted = useMemo(
+    () => [...rows].sort((a, b) => (Number(b[key]) || 0) - (Number(a[key]) || 0)),
+    [rows, key]
+  );
+
+  const num = (v, d = 1) => (v == null || v === "" ? "-" : Number(v).toLocaleString(undefined, { maximumFractionDigits: d }));
+  const th = { textAlign: "left", padding: "7px 9px", fontSize: 11, fontWeight: 600, color: "#4B5659", borderBottom: "1px solid #E2E6E3", whiteSpace: "nowrap" };
+  const thR = { ...th, textAlign: "right" };
+  const td = { padding: "7px 9px", fontSize: 12, whiteSpace: "nowrap" };
+  const tdR = { ...td, textAlign: "right" };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(24,54,66,0.45)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 24, zIndex: 100, overflowY: "auto" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, padding: 22, width: 860, maxWidth: "96vw", maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 4 }}>
+          <div>
+            <p style={{ margin: 0, fontSize: 17, fontWeight: 700, color: NAVY }}>{fleet} — {metric === "fuel" ? "fuel" : "oil"} consumption</p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#859195" }}>{monthLabel} · site average {fleetAvg} {unit}</p>
+          </div>
+          <button onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#4B5659", padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Close</button>
+        </div>
+
+        <div style={{ border: "1px solid #E2E6E3", borderRadius: 10, overflow: "auto", marginTop: 12 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: "#F7F8F6" }}>
+                <th style={th}>Equipment</th><th style={th}>Name</th>
+                <th style={thR}>Engine hrs</th><th style={thR}>Litres</th>
+                <th style={thR}>{unit}</th><th style={thR}>Last month</th><th style={thR}>Change</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((r) => {
+                const now = Number(r[key]);
+                const was = Number(prevBy[r.asset_id]);
+                const delta = isFinite(now) && isFinite(was) && was > 0 ? ((now - was) / was) * 100 : null;
+                const over = isFinite(now) && now > fleetAvg;
+                return (
+                  <tr key={r.asset_id} style={{ borderBottom: "1px solid #EFEEE7" }}>
+                    <td style={{ ...td, fontWeight: 600 }}>{r.asset_id}</td>
+                    <td style={td}>{r.asset_name}</td>
+                    <td style={tdR}>{num(r.engine_hours)}</td>
+                    <td style={tdR}>{num(r[litreKey])}</td>
+                    <td style={{ ...tdR, fontWeight: 700, color: over ? "#B85450" : "#2C5646" }}>{num(now, 2)}</td>
+                    <td style={{ ...tdR, color: "#859195" }}>{num(was, 2)}</td>
+                    <td style={{ ...tdR, color: delta == null ? "#B4B2A9" : delta > 10 ? "#B85450" : delta < -10 ? "#2C5646" : "#4B5659" }}>
+                      {delta == null ? "-" : `${delta > 0 ? "+" : ""}${delta.toFixed(0)}%`}
+                    </td>
+                  </tr>
+                );
+              })}
+              {sorted.length === 0 && (
+                <tr><td colSpan={7} style={{ padding: 18, textAlign: "center", color: "#859195", fontSize: 12.5 }}>
+                  No consumption recorded for this fleet in {monthLabel}.
+                </td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <p style={{ margin: "8px 2px 0", fontSize: 11, color: "#859195" }}>
+          Sorted worst first. Change compares against the same machine last month — a machine can sit below the site average and still be climbing.
         </p>
       </div>
     </div>
@@ -12386,9 +12469,9 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
             </div>
           </div>
 
-        <p style={{ fontSize: 13.5, fontWeight: 700, color: NAVY, margin: "20px 0 8px" }}>Consumption</p>
-        <ConsumptionCharts />
         </div>
+
+        <ConsumptionCharts />
       </div>
     </div>
   );
