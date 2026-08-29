@@ -9577,8 +9577,8 @@ function ConsumptionCharts() {
         fleet,
         fuel: c?.fuel_l_per_hour ?? null,
         fuelPrev: p?.fuel_l_per_hour ?? null,
-        oil: c?.oil_l_per_100_hours ?? null,
-        oilPrev: p?.oil_l_per_100_hours ?? null,
+        oil: c?.oil_l_per_hour ?? null,
+        oilPrev: p?.oil_l_per_hour ?? null,
       };
     }).filter((r) => r.fuel != null || r.oil != null);
 
@@ -9594,7 +9594,7 @@ function ConsumptionCharts() {
       chartRows: data,
       months: { cur, prev },
       fuelAvg: hours > 0 ? Math.round((fuelL / hours) * 100) / 100 : 0,
-      oilAvg: hours > 0 ? Math.round((oilL / hours) * 100 * 100) / 100 : 0,
+      oilAvg: hours > 0 ? Math.round((oilL / hours) * 1000) / 1000 : 0,
     };
   }, [rows]);
 
@@ -9637,12 +9637,12 @@ function ConsumptionCharts() {
           onBarClick={(r) => setDrill({ fleet: r.fleet, metric: "fuel" })}
         />
         <KpiBarChart
-          title="Oil — litres per 100 engine hours"
+          title="Oil — litres per engine hour"
           data={chartRows} xKey="fleet"
           dataKey="oil" dataKey2="oilPrev"
           seriesName="This month" seriesName2="Last month"
-          target={oilAvg} domainMax={oilMax} unitSuffix=" L/100h"
-          valueFormatter={(v) => (v == null ? "" : Number(v).toFixed(1))}
+          target={oilAvg} domainMax={oilMax} unitSuffix=" L/hr"
+          valueFormatter={(v) => (v == null ? "" : Number(v).toFixed(2))}
           meetsTarget={(r) => (r.oil ?? 0) <= oilAvg}
           meetsTarget2={(r) => (r.oilPrev ?? 0) <= oilAvg}
           onBarClick={(r) => setDrill({ fleet: r.fleet, metric: "oil" })}
@@ -9652,7 +9652,7 @@ function ConsumptionCharts() {
       <div style={{ display: "flex", gap: 16, fontSize: 11.5, color: "#4B5659", flexWrap: "wrap", marginBottom: 4 }}>
         <span><span style={{ display: "inline-block", width: 10, height: 10, background: CHART_COLOURS.last24h, borderRadius: 2, marginRight: 5 }} />This month</span>
         <span><span style={{ display: "inline-block", width: 10, height: 10, background: CHART_COLOURS.period, borderRadius: 2, marginRight: 5 }} />Last month</span>
-        <span><span style={{ display: "inline-block", width: 12, height: 3, background: CHART_COLOURS.target, borderRadius: 2, marginRight: 6, verticalAlign: "middle" }} />Site average — {fuelAvg} L/hr · {oilAvg} L/100h</span>
+        <span><span style={{ display: "inline-block", width: 12, height: 3, background: CHART_COLOURS.target, borderRadius: 2, marginRight: 6, verticalAlign: "middle" }} />Site average — fuel {fuelAvg} L/hr · oil {oilAvg} L/hr</span>
         <span style={{ color: "#859195" }}>A bar above the line is drinking more than the rest of the fleet</span>
       </div>
       <p style={{ fontSize: 11, color: "#859195", margin: "0 0 4px" }}>
@@ -9674,9 +9674,9 @@ function ConsumptionCharts() {
 }
 
 function ConsumptionDrilldown({ fleet, metric, rows, prevRows, fleetAvg, monthLabel, onClose }) {
-  const key = metric === "fuel" ? "fuel_l_per_hour" : "oil_l_per_100_hours";
+  const key = metric === "fuel" ? "fuel_l_per_hour" : "oil_l_per_hour";
   const litreKey = metric === "fuel" ? "fuel_litres" : "oil_litres";
-  const unit = metric === "fuel" ? "L/hr" : "L/100h";
+  const unit = "L/hr";
   const prevBy = useMemo(() => Object.fromEntries(prevRows.map((r) => [r.asset_id, r[key]])), [prevRows, key]);
 
   const sorted = useMemo(
@@ -9722,8 +9722,8 @@ function ConsumptionDrilldown({ fleet, metric, rows, prevRows, fleetAvg, monthLa
                     <td style={td}>{r.asset_name}</td>
                     <td style={tdR}>{num(r.engine_hours)}</td>
                     <td style={tdR}>{num(r[litreKey])}</td>
-                    <td style={{ ...tdR, fontWeight: 700, color: over ? "#B85450" : "#2C5646" }}>{num(now, 2)}</td>
-                    <td style={{ ...tdR, color: "#859195" }}>{num(was, 2)}</td>
+                    <td style={{ ...tdR, fontWeight: 700, color: over ? "#B85450" : "#2C5646" }}>{num(now, 3)}</td>
+                    <td style={{ ...tdR, color: "#859195" }}>{num(was, 3)}</td>
                     <td style={{ ...tdR, color: delta == null ? "#B4B2A9" : delta > 10 ? "#B85450" : delta < -10 ? "#2C5646" : "#4B5659" }}>
                       {delta == null ? "-" : `${delta > 0 ? "+" : ""}${delta.toFixed(0)}%`}
                     </td>
