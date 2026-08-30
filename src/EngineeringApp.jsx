@@ -291,7 +291,7 @@ class PageErrorBoundary extends React.Component {
         <div style={{ background: "#F6E2E0", border: "1px solid #DDB6B2", borderRadius: 10, padding: 20, color: "#7A3330" }}>
           <p style={{ fontWeight: 700, fontSize: 14, margin: "0 0 6px" }}>This page hit an error and couldn't display.</p>
           <p style={{ fontSize: 13, margin: "0 0 10px" }}>{String(this.state.error.message || this.state.error)}</p>
-          <button
+          <button type="button"
             onClick={() => this.setState({ error: null })}
             style={{ background: "#fff", border: "1px solid #DDB6B2", color: "#7A3330", padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
           >
@@ -339,7 +339,7 @@ function DataTable({ columns, rows, exportName }) {
             style={{ width: "100%", padding: "10px 10px 10px 32px", fontSize: 14, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none", boxSizing: "border-box", minHeight: 42 }}
           />
         </div>
-        <button
+        <button type="button"
           onClick={exportToExcel}
           style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 14, fontWeight: 600, padding: "10px 14px", borderRadius: 8, cursor: "pointer", minHeight: 42, width: isMobile ? "100%" : "auto" }}
         >
@@ -945,7 +945,7 @@ function MachineTableBody({ groups, columns, onRowClick, onDelete, emptyMessage,
               ))}
               <td style={{ padding: "9px 12px" }}>
                 {onDelete && (
-                  <button onClick={() => onDelete(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
+                  <button type="button" onClick={() => onDelete(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
                     <Trash2 size={15} />
                   </button>
                 )}
@@ -1156,7 +1156,7 @@ function DailyHoursForm({ assets, dailyHours, existing, selectedSiteId, onClose,
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
           <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab before logging hours.</p>
-          <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+          <button type="button" onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
             Close
           </button>
         </div>
@@ -1693,7 +1693,7 @@ function DailyHoursPage({ assets, dailyHours, userEmail, selectedSiteId, onRefre
         </div>
       )}
       <div style={{ marginBottom: 20 }}>
-        <button onClick={() => setShowBudgetForm(true)} style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "7px 14px", borderRadius: 8, cursor: "pointer" }}>
+        <button type="button" onClick={() => setShowBudgetForm(true)} style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "7px 14px", borderRadius: 8, cursor: "pointer" }}>
           Set Monthly Scheduled Hours
         </button>
       </div>
@@ -1710,10 +1710,10 @@ function DailyHoursPage({ assets, dailyHours, userEmail, selectedSiteId, onRefre
             onChange={(e) => setTemplateMonth(e.target.value)}
             style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}
           />
-          <button onClick={downloadBulkTemplate} disabled={assets.length === 0} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: assets.length === 0 ? "default" : "pointer", opacity: assets.length === 0 ? 0.5 : 1 }}>
+          <button type="button" onClick={downloadBulkTemplate} disabled={assets.length === 0} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: assets.length === 0 ? "default" : "pointer", opacity: assets.length === 0 ? 0.5 : 1 }}>
             <Download size={14} /> Download Template
           </button>
-          <button onClick={() => bulkFileInputRef.current?.click()} disabled={bulkImporting} style={{ display: "flex", alignItems: "center", gap: 6, background: NAVY, border: "none", color: "#fff", fontSize: 13, fontWeight: 700, padding: "8px 14px", borderRadius: 8, cursor: bulkImporting ? "default" : "pointer", opacity: bulkImporting ? 0.6 : 1 }}>
+          <button type="button" onClick={() => bulkFileInputRef.current?.click()} disabled={bulkImporting} style={{ display: "flex", alignItems: "center", gap: 6, background: NAVY, border: "none", color: "#fff", fontSize: 13, fontWeight: 700, padding: "8px 14px", borderRadius: 8, cursor: bulkImporting ? "default" : "pointer", opacity: bulkImporting ? 0.6 : 1 }}>
             <Upload size={14} /> {bulkImporting ? "Uploading…" : "Upload Filled Template"}
           </button>
           <input ref={bulkFileInputRef} type="file" accept=".xlsx,.xls" onChange={handleBulkFileSelected} style={{ display: "none" }} />
@@ -1740,7 +1740,7 @@ function DailyHoursPage({ assets, dailyHours, userEmail, selectedSiteId, onRefre
         <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
           style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8 }} />
         {(dateFrom || dateTo) ? (
-          <button onClick={() => { setDateFrom(""); setDateTo(""); }}
+          <button type="button" onClick={() => { setDateFrom(""); setDateTo(""); }}
             style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12.5, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: "pointer" }}>
             Back to latest {RECENT_READINGS_PER_MACHINE} readings
           </button>
@@ -1752,11 +1752,11 @@ function DailyHoursPage({ assets, dailyHours, userEmail, selectedSiteId, onRefre
       <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <GroupByMachineToggle value={groupByMachine} onChange={setGroupByMachine} />
-          <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
+          <button type="button" onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
             <Download size={14} /> Export to Excel
           </button>
           <ColumnsButton prefs={prefs} />
-          <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+          <button type="button" onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
             + Log Daily Hours
           </button>
         </div>
@@ -1868,7 +1868,7 @@ function BreakdownForm({ assets, existing, activatingWorkOrder, onClose, onSaved
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
           <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab before logging a breakdown.</p>
-          <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+          <button type="button" onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
             Close
           </button>
         </div>
@@ -2354,13 +2354,13 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, myFullName, 
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <GroupByMachineToggle value={groupByMachine} onChange={setGroupByMachine} />
-          <button
+          <button type="button"
             onClick={exportToExcel}
             style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}
           >
             <Download size={14} /> Export to Excel
           </button>
-          <button
+          <button type="button"
             onClick={() => { setEditing(null); setActivating(null); setShowForm(true); }}
             style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}
           >
@@ -2445,7 +2445,7 @@ function BreakdownsPage({ assets, breakdowns, onRefresh, userEmail, myFullName, 
                         SCHEDULED
                       </span>
                     ) : (
-                      <button onClick={() => setDeleting(row)} title="Delete this entry" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "flex" }}>
+                      <button type="button" onClick={() => setDeleting(row)} title="Delete this entry" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "flex" }}>
                         <Trash2 size={15} />
                       </button>
                     )}
@@ -2529,8 +2529,8 @@ function ReasonPromptModal({ title, message, confirmLabel, confirmColor, reasonR
         />
         {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "8px 0 0" }}>{error}</p>}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-          <button onClick={onCancel} disabled={busy} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
-          <button onClick={handleConfirm} disabled={busy} style={{ background: confirmColor || NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>
+          <button type="button" onClick={onCancel} disabled={busy} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="button" onClick={handleConfirm} disabled={busy} style={{ background: confirmColor || NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>
             {busy ? "Saving…" : confirmLabel}
           </button>
         </div>
@@ -2556,7 +2556,7 @@ function WorkRequestForm({ assets, onClose, onSaved, userEmail, myFullName }) {
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
           <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
-          <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
+          <button type="button" onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
         </div>
       </div>
     );
@@ -2715,7 +2715,7 @@ function WorkRequestsPage({ assets, workRequests, workOrders, userEmail, myFullN
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <GroupByMachineToggle value={groupByMachine} onChange={setGroupByMachine} />
-        <button onClick={() => setShowForm(true)} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+        <button type="button" onClick={() => setShowForm(true)} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
           + Report a Problem
           </button>
         </div>
@@ -2746,15 +2746,15 @@ function WorkRequestsPage({ assets, workRequests, workOrders, userEmail, myFullN
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
                   {r.status === "Open" && (
                     <div style={{ display: "flex", gap: 6 }}>
-                      <button onClick={() => handleApprove(r)} disabled={busyId === r.id} title="Approve & Create Work Order" style={{ background: "#2C5646", border: "none", color: "#fff", padding: "5px 9px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: busyId === r.id ? "default" : "pointer" }}>
+                      <button type="button" onClick={() => handleApprove(r)} disabled={busyId === r.id} title="Approve & Create Work Order" style={{ background: "#2C5646", border: "none", color: "#fff", padding: "5px 9px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: busyId === r.id ? "default" : "pointer" }}>
                         {busyId === r.id ? "…" : "Approve"}
                       </button>
                       {openWorkOrdersForAsset(r.asset_id).length > 0 && (
-                        <button onClick={() => setMerging(r)} title="Merge into an existing Work Order" style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, padding: "5px 9px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        <button type="button" onClick={() => setMerging(r)} title="Merge into an existing Work Order" style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, padding: "5px 9px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                           Merge
                         </button>
                       )}
-                      <button onClick={() => setRejecting(r)} title="Reject" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4 }}>
+                      <button type="button" onClick={() => setRejecting(r)} title="Reject" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4 }}>
                         <X size={16} />
                       </button>
                     </div>
@@ -2833,8 +2833,8 @@ function MergeWorkRequestModal({ request, candidateWorkOrders, userEmail, myFull
         </select>
         {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "8px 0 0" }}>{error}</p>}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-          <button onClick={onCancel} disabled={saving} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
-          <button onClick={handleConfirm} disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
+          <button type="button" onClick={onCancel} disabled={saving} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="button" onClick={handleConfirm} disabled={saving} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
             {saving ? "Merging…" : "Merge"}
           </button>
         </div>
@@ -2859,7 +2859,7 @@ function DefectForm({ assets, onClose, onSaved, userEmail, myFullName }) {
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
           <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
-          <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
+          <button type="button" onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
         </div>
       </div>
     );
@@ -3021,7 +3021,7 @@ function DefectsPage({ assets, defects, userEmail, myFullName, onRefresh }) {
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <GroupByMachineToggle value={groupByMachine} onChange={setGroupByMachine} />
-        <button onClick={() => setShowForm(true)} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+        <button type="button" onClick={() => setShowForm(true)} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
           + Report Defect
           </button>
         </div>
@@ -3057,12 +3057,12 @@ function DefectsPage({ assets, defects, userEmail, myFullName, onRefresh }) {
                 <td style={{ padding: "9px 12px" }}><Badge value={r.status} /></td>
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
                   {r.status === "Open" && (
-                    <button onClick={() => handleCreateWorkOrder(r)} disabled={busyId === r.id} style={{ background: NAVY, border: "none", color: "#fff", padding: "5px 9px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: busyId === r.id ? "default" : "pointer" }}>
+                    <button type="button" onClick={() => handleCreateWorkOrder(r)} disabled={busyId === r.id} style={{ background: NAVY, border: "none", color: "#fff", padding: "5px 9px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: busyId === r.id ? "default" : "pointer" }}>
                     {busyId === r.id ? "…" : "Create Work Order"}
                     </button>
                   )}
                   {r.status === "Completed" && (
-                    <button onClick={() => handleVerify(r)} disabled={busyId === r.id} style={{ background: "#2C5646", border: "none", color: "#fff", padding: "5px 9px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: busyId === r.id ? "default" : "pointer" }}>
+                    <button type="button" onClick={() => handleVerify(r)} disabled={busyId === r.id} style={{ background: "#2C5646", border: "none", color: "#fff", padding: "5px 9px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: busyId === r.id ? "default" : "pointer" }}>
                       {busyId === r.id ? "…" : "Verify & Close"}
                     </button>
                   )}
@@ -3129,7 +3129,7 @@ function WorkOrderForm({ assets, existing, defaultWorkType, defaultAssetId, even
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
           <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
-          <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
+          <button type="button" onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
         </div>
       </div>
     );
@@ -3317,7 +3317,7 @@ function PartUsedForm({ parts, workOrder, event, onClose, onSaved }) {
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No parts in inventory yet</p>
           <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add parts on the Parts Inventory tab first.</p>
-          <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
+          <button type="button" onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
         </div>
       </div>
     );
@@ -3435,7 +3435,7 @@ function PartsUsedList({ workOrder, parts }) {
     <div style={{ background: "#F9F8F4", borderRadius: 8, padding: "10px 12px", marginTop: 6 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
         <span style={{ fontSize: 11.5, fontWeight: 700, color: "#4B5659", textTransform: "uppercase", letterSpacing: 0.3 }}>Parts Used</span>
-        <button onClick={() => setShowAdd(true)} style={{ background: "none", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 11.5, fontWeight: 600, padding: "3px 10px", borderRadius: 6, cursor: "pointer" }}>
+        <button type="button" onClick={() => setShowAdd(true)} style={{ background: "none", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 11.5, fontWeight: 600, padding: "3px 10px", borderRadius: 6, cursor: "pointer" }}>
           + Add Part
         </button>
       </div>
@@ -3453,7 +3453,7 @@ function PartsUsedList({ workOrder, parts }) {
                 <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Badge value={r.status} />
                   {r.status === "Pending" && (
-                    <button onClick={() => confirmRow(r)} style={{ background: "none", border: "none", color: "#2C5646", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>Confirm</button>
+                    <button type="button" onClick={() => confirmRow(r)} style={{ background: "none", border: "none", color: "#2C5646", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>Confirm</button>
                   )}
                 </span>
               </div>
@@ -3767,7 +3767,7 @@ function EventPulledPartsPanel({ event, parts, onRefresh }) {
                 <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Badge value={r.status} />
                   {r.status === "Pending" && (
-                    <button onClick={() => confirmRow(r)} style={{ background: "none", border: "none", color: "#2C5646", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>Confirm</button>
+                    <button type="button" onClick={() => confirmRow(r)} style={{ background: "none", border: "none", color: "#2C5646", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>Confirm</button>
                   )}
                 </span>
               </div>
@@ -3969,8 +3969,8 @@ function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
         <div className="job-card-no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <p style={{ fontSize: 15, fontWeight: 700, color: NAVY, margin: 0 }}>Job Card</p>
           <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Close</button>
-            <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, background: NAVY, border: "none", color: "#fff", padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+            <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Close</button>
+            <button type="button" onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, background: NAVY, border: "none", color: "#fff", padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
               <Printer size={14} /> Print / Save as PDF
             </button>
           </div>
@@ -4062,7 +4062,7 @@ function JobCardPrintModal({ workOrder, asset, onClose, onUploaded }) {
           )}
 
           <div style={{ marginTop: 10 }}>
-            <button onClick={() => fileInputRef.current?.click()} disabled={uploading} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "7px 14px", borderRadius: 8, cursor: uploading ? "default" : "pointer", opacity: uploading ? 0.6 : 1 }}>
+            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "7px 14px", borderRadius: 8, cursor: uploading ? "default" : "pointer", opacity: uploading ? 0.6 : 1 }}>
               <Upload size={14} /> {uploading ? "Uploading…" : "Upload completed document"}
             </button>
             <input ref={fileInputRef} type="file" accept="image/*,.pdf" onChange={handleUpload} style={{ display: "none" }} />
@@ -4156,7 +4156,7 @@ function FuelLogForm({ assets, existing, userEmail, myFullName, dailyHours, fuel
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
           <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
-          <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
+          <button type="button" onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
         </div>
       </div>
     );
@@ -4285,7 +4285,7 @@ function InspectionForm({ assets, existing, userEmail, myFullName, onClose, onSa
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
           <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
-          <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
+          <button type="button" onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
         </div>
       </div>
     );
@@ -4460,7 +4460,7 @@ function InspectionsPage({ assets, inspections, userEmail, myFullName, onRefresh
           <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: "#859195" }} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search inspections" style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }} />
         </div>
-        <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+        <button type="button" onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
           + Log Inspection
         </button>
       </div>
@@ -4486,7 +4486,7 @@ function InspectionsPage({ assets, inspections, userEmail, myFullName, onRefresh
                   </td>
                 ))}
                 <td style={{ padding: "9px 12px" }}>
-                  <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
+                  <button type="button" onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
                     <Trash2 size={15} />
                   </button>
                 </td>
@@ -4560,7 +4560,7 @@ function BacklogForm({ assets, workOrders, existing, userEmail, onClose, onSaved
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
           <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
-          <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
+          <button type="button" onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
         </div>
       </div>
     );
@@ -4767,10 +4767,10 @@ function BacklogsPage({ assets, backlogs, workOrders, userEmail, onRefresh }) {
           </select>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
+          <button type="button" onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
             <Download size={14} /> Export to Excel
           </button>
-          <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+          <button type="button" onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
             + Add Backlog
           </button>
         </div>
@@ -4797,11 +4797,11 @@ function BacklogsPage({ assets, backlogs, workOrders, userEmail, onRefresh }) {
                 <td onClick={() => { setEditing(row); setShowForm(true); }} style={{ padding: "9px 12px", cursor: "pointer" }}><Badge value={row.status} /></td>
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
                   {row.status === "Open" && (
-                    <button onClick={() => quickClose(row)} title="Mark Closed" style={{ background: "none", border: "none", color: "#2C5646", cursor: "pointer", padding: 4, fontSize: 12, fontWeight: 600 }}>
+                    <button type="button" onClick={() => quickClose(row)} title="Mark Closed" style={{ background: "none", border: "none", color: "#2C5646", cursor: "pointer", padding: 4, fontSize: 12, fontWeight: 600 }}>
                       Close
                     </button>
                   )}
-                  <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
+                  <button type="button" onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
                     <Trash2 size={15} />
                   </button>
                 </td>
@@ -5127,7 +5127,7 @@ function DailyServicePage({ assets, dailyServiceChecklist, breakdowns, dailyHour
             <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#F1EFE8", borderRadius: 2, marginRight: 4 }} />NU - not utilised</span>
             <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#F9D8D8", borderRadius: 2, marginRight: 4 }} />missing</span>
           </div>
-          <button onClick={() => openLogForm(filteredAssets[0]?.asset_id || "", todayStr)} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+          <button type="button" onClick={() => openLogForm(filteredAssets[0]?.asset_id || "", todayStr)} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
             + Log Daily Service
           </button>
         </div>
@@ -5153,7 +5153,7 @@ function DailyServicePage({ assets, dailyServiceChecklist, breakdowns, dailyHour
                   const label = isFuture ? "" : (dailyServiceStatus(a.asset_id, dateStr, checklistByKey, breakdowns, dailyHours) || "");
                   return (
                     <td key={d} style={{ padding: 0, textAlign: "center", borderLeft: "1px solid #F2F1EA" }}>
-                      <button
+                      <button type="button"
                         onClick={() => !isFuture && openLogForm(a.asset_id, dateStr)}
                         disabled={isFuture}
                         title={isFuture ? "" : `${a.asset_id} - ${dateStr}${label ? `: ${label}` : ": no daily service logged"}`}
@@ -5244,11 +5244,11 @@ function FuelLogPage({ assets, fuelLog, userEmail, myFullName, dailyHours, onRef
         <span>to</span>
         <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
           style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8 }} />
-        <button onClick={() => { setDateFrom(firstOfMonthForInput()); setDateTo(todayForInput()); }}
+        <button type="button" onClick={() => { setDateFrom(firstOfMonthForInput()); setDateTo(todayForInput()); }}
           style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12.5, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: "pointer" }}>
           Month to date
         </button>
-        <button onClick={() => { setDateFrom(""); setDateTo(""); }}
+        <button type="button" onClick={() => { setDateFrom(""); setDateTo(""); }}
           style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#4B5659", fontSize: 12.5, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: "pointer" }}>
           Show all
         </button>
@@ -5261,7 +5261,7 @@ function FuelLogPage({ assets, fuelLog, userEmail, myFullName, dailyHours, onRef
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <GroupByMachineToggle value={groupByMachine} onChange={setGroupByMachine} />
           <ColumnsButton prefs={prefs} />
-          <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+          <button type="button" onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
             + Log Fuel
           </button>
         </div>
@@ -5333,7 +5333,7 @@ function OilConsumptionForm({ assets, existing, userEmail, myFullName, dailyHour
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
           <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
-          <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
+          <button type="button" onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
         </div>
       </div>
     );
@@ -5488,11 +5488,11 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, myFullName, dai
         <span>to</span>
         <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
           style={{ padding: "8px 10px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8 }} />
-        <button onClick={() => { setDateFrom(firstOfMonthForInput()); setDateTo(todayForInput()); }}
+        <button type="button" onClick={() => { setDateFrom(firstOfMonthForInput()); setDateTo(todayForInput()); }}
           style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12.5, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: "pointer" }}>
           Month to date
         </button>
-        <button onClick={() => { setDateFrom(""); setDateTo(""); }}
+        <button type="button" onClick={() => { setDateFrom(""); setDateTo(""); }}
           style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#4B5659", fontSize: 12.5, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: "pointer" }}>
           Show all
         </button>
@@ -5505,7 +5505,7 @@ function OilConsumptionPage({ assets, oilConsumption, userEmail, myFullName, dai
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <GroupByMachineToggle value={groupByMachine} onChange={setGroupByMachine} />
           <ColumnsButton prefs={prefs} />
-          <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+          <button type="button" onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
             + Log Oil
           </button>
         </div>
@@ -5683,7 +5683,7 @@ function KpiEventsDrilldown({ machine, fromDateTime, toDateTime, onClose }) {
               {[machine.fleet, machine.model].filter(Boolean).join(" · ")} · {formatRangeForDisplay(fromDateTime, toDateTime)}
             </p>
           </div>
-          <button onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#4B5659", padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Close</button>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#4B5659", padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Close</button>
         </div>
 
         {error && <p style={{ fontSize: 12.5, color: "#B85450" }}>{error}</p>}
@@ -6175,7 +6175,7 @@ function MtbfMttrReportPage({ assets }) {
               {showByFleet ? "Click a fleet to see individual machines." : `Showing ${selectedAsset || selectedFleet}.`}
             </p>
             {!showByFleet && (
-              <button
+              <button type="button"
                 onClick={() => { setSelectedFleet(""); setSelectedAsset(""); }}
                 style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: NAVY, fontSize: 12.5, fontWeight: 600, textDecoration: "underline" }}
               >
@@ -6222,7 +6222,7 @@ function MtbfMttrReportPage({ assets }) {
         <p style={{ fontSize: 13, color: "#4B5659", margin: 0 }}>
           Sorted by most breakdowns first, so problem equipment surfaces automatically. Click any column to sort by it instead.
         </p>
-        <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer", whiteSpace: "nowrap" }}>
+        <button type="button" onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer", whiteSpace: "nowrap" }}>
           <Download size={14} /> Export to Excel
         </button>
       </div>
@@ -6763,10 +6763,10 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
       <FleetEquipmentFilter assets={assets} selectedFleet={selectedFleet} setSelectedFleet={setSelectedFleet} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
 
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginBottom: 12 }}>
-        <button onClick={exportToExcel} disabled={exporting} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: exporting ? "default" : "pointer", opacity: exporting ? 0.6 : 1 }}>
+        <button type="button" onClick={exportToExcel} disabled={exporting} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: exporting ? "default" : "pointer", opacity: exporting ? 0.6 : 1 }}>
           <Download size={14} /> {exporting ? "Preparing…" : "Export to Excel"}
         </button>
-        <button onClick={() => setShowPrint(true)} style={{ display: "flex", alignItems: "center", gap: 6, background: NAVY, border: "none", color: "#fff", fontSize: 13, fontWeight: 700, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
+        <button type="button" onClick={() => setShowPrint(true)} style={{ display: "flex", alignItems: "center", gap: 6, background: NAVY, border: "none", color: "#fff", fontSize: 13, fontWeight: 700, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
           <Printer size={14} /> Print for Sign-off
         </button>
       </div>
@@ -6817,8 +6817,8 @@ function DowntimeSummaryPage({ assets, breakdowns, workOrders }) {
             <div className="job-card-no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <p style={{ fontSize: 15, fontWeight: 700, color: NAVY, margin: 0 }}>Shift Downtime Summary</p>
               <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => setShowPrint(false)} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Close</button>
-                <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, background: NAVY, border: "none", color: "#fff", padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                <button type="button" onClick={() => setShowPrint(false)} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Close</button>
+                <button type="button" onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, background: NAVY, border: "none", color: "#fff", padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                   <Printer size={14} /> Print / Save as PDF
                 </button>
               </div>
@@ -6937,7 +6937,7 @@ function WorkOrdersPage({ assets, workOrders, userEmail, onRefresh }) {
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <GroupByMachineToggle value={groupByMachine} onChange={setGroupByMachine} />
-          <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+          <button type="button" onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
             + Add Work Order
           </button>
         </div>
@@ -6968,10 +6968,10 @@ function WorkOrdersPage({ assets, workOrders, userEmail, onRefresh }) {
                   </td>
                 ))}
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
-                  <button onClick={() => setPrinting(row)} title="Print Job Card" style={{ background: "none", border: "none", color: NAVY, cursor: "pointer", padding: 4, display: "inline-flex", marginRight: 4 }}>
+                  <button type="button" onClick={() => setPrinting(row)} title="Print Job Card" style={{ background: "none", border: "none", color: NAVY, cursor: "pointer", padding: 4, display: "inline-flex", marginRight: 4 }}>
                     <Printer size={15} />
                   </button>
-                  <button onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
+                  <button type="button" onClick={() => setDeleting(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
                     <Trash2 size={15} />
                   </button>
                 </td>
@@ -7043,7 +7043,7 @@ function ServiceScheduleForm({ assets, existing, onClose, onSaved }) {
         <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 360, maxWidth: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>No equipment added yet</p>
           <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 18px" }}>Add at least one asset on the Assets tab first.</p>
-          <button onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
+          <button type="button" onClick={onClose} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Close</button>
         </div>
       </div>
     );
@@ -7313,7 +7313,7 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
       )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
         <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: NAVY }}>Service Intervals</h3>
-        <button onClick={() => checkForDuePM(false)} disabled={pmChecking} style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12.5, fontWeight: 600, padding: "6px 12px", borderRadius: 8, cursor: pmChecking ? "default" : "pointer" }}>
+        <button type="button" onClick={() => checkForDuePM(false)} disabled={pmChecking} style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12.5, fontWeight: 600, padding: "6px 12px", borderRadius: 8, cursor: pmChecking ? "default" : "pointer" }}>
           {pmChecking ? "Checking…" : "Check for Due Maintenance"}
         </button>
       </div>
@@ -7321,7 +7321,7 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
         Overdue hours keep counting even when past due - nothing is capped or hidden. Due maintenance is checked automatically every time this page loads, and generates a work order under Planned Maintenance Jobs below. Use "Mark Serviced" once work is done to reset the interval and start the next count from now.
       </p>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-        <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+        <button type="button" onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
           + Add Service Schedule
         </button>
       </div>
@@ -7354,7 +7354,7 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
                 <td style={{ padding: "9px 12px" }}><Badge value={row.status} /></td>
                 <td style={{ padding: "9px 12px" }}>{row.assigned_technician ?? "-"}</td>
                 <td style={{ padding: "9px 12px" }}>
-                  <button onClick={() => setServicing(row)} style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 6, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  <button type="button" onClick={() => setServicing(row)} style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 6, cursor: "pointer", whiteSpace: "nowrap" }}>
                     Mark Serviced
                   </button>
                 </td>
@@ -7373,7 +7373,7 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
       </p>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
         <GroupByMachineToggle value={groupByMachine} onChange={setGroupByMachine} />
-        <button onClick={() => { setEditingJob(null); setShowJobForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+        <button type="button" onClick={() => { setEditingJob(null); setShowJobForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
           + Add Planned Maintenance
         </button>
       </div>
@@ -7400,10 +7400,10 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
                 <td style={{ padding: "9px 12px" }}><Badge value={row.status} /></td>
                 <td style={{ padding: "9px 12px" }}>{row.planned_start ?? "-"}</td>
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
-                  <button onClick={() => setPrintingJob(row)} title="Print Job Card" style={{ background: "none", border: "none", color: NAVY, cursor: "pointer", padding: 4, display: "inline-flex", marginRight: 4 }}>
+                  <button type="button" onClick={() => setPrintingJob(row)} title="Print Job Card" style={{ background: "none", border: "none", color: NAVY, cursor: "pointer", padding: 4, display: "inline-flex", marginRight: 4 }}>
                     <Printer size={15} />
                   </button>
-                  <button onClick={() => setDeletingJob(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
+                  <button type="button" onClick={() => setDeletingJob(row)} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "inline-flex" }}>
                     <Trash2 size={15} />
                   </button>
                 </td>
@@ -7455,8 +7455,8 @@ function PlannedMaintenancePage({ assets, plannedMaintenance, workOrders, userEm
               This resets the interval - Last Service Hours becomes the asset's current hours ({assets.find((a) => a.asset_id === servicing.asset_id)?.current_hours ?? "-"}), and the next due point starts counting from here.
             </p>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button onClick={() => setServicing(null)} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
-              <button onClick={() => handleMarkServiced(servicing)} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Confirm</button>
+              <button type="button" onClick={() => setServicing(null)} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+              <button type="button" onClick={() => handleMarkServiced(servicing)} style={{ background: NAVY, border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>Confirm</button>
             </div>
           </div>
         </div>
@@ -7769,7 +7769,7 @@ function ComponentCodesAdminPage({ componentCodes, isAdmin, onRefresh }) {
         ) : componentCodes.map((c, i) => (
           <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 14px", borderBottom: i < componentCodes.length - 1 ? "1px solid #EFEEE7" : "none" }}>
             <span style={{ fontSize: 13.5, color: "#183642" }}>{c.name}</span>
-            <button onClick={() => handleDelete(c.id)} disabled={deleting === c.id} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "flex" }}>
+            <button type="button" onClick={() => handleDelete(c.id)} disabled={deleting === c.id} title="Delete" style={{ background: "none", border: "none", color: "#B85450", cursor: "pointer", padding: 4, display: "flex" }}>
               <Trash2 size={15} />
             </button>
           </div>
@@ -8007,8 +8007,8 @@ function SiteManagementPage({ isAdmin, onSitesChanged, onNameSaved }) {
                             placeholder="Full name and surname"
                             style={{ padding: "4px 7px", fontSize: 12.5, border: "1px solid #E2E6E3", borderRadius: 6, width: 150 }}
                           />
-                          <button onClick={() => handleSaveName(u.id)} disabled={savingName} style={{ fontSize: 11.5, color: NAVY, background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Save</button>
-                          <button onClick={() => setEditingNameFor(null)} style={{ fontSize: 11.5, color: "#859195", background: "none", border: "none", cursor: "pointer" }}>Cancel</button>
+                          <button type="button" onClick={() => handleSaveName(u.id)} disabled={savingName} style={{ fontSize: 11.5, color: NAVY, background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Save</button>
+                          <button type="button" onClick={() => setEditingNameFor(null)} style={{ fontSize: 11.5, color: "#859195", background: "none", border: "none", cursor: "pointer" }}>Cancel</button>
                         </span>
                       ) : (
                         <span
@@ -8042,7 +8042,7 @@ function SiteManagementPage({ isAdmin, onSitesChanged, onNameSaved }) {
                       {role === "admin" ? (
                         <span style={{ fontSize: 12, color: "#859195" }}>Full access</span>
                       ) : (
-                        <button onClick={() => setManagingUser(u)} style={{ fontSize: 12, color: NAVY, background: "none", border: `1px solid ${NAVY}`, borderRadius: 6, padding: "4px 9px", cursor: "pointer", fontWeight: 600 }}>
+                        <button type="button" onClick={() => setManagingUser(u)} style={{ fontSize: 12, color: NAVY, background: "none", border: `1px solid ${NAVY}`, borderRadius: 6, padding: "4px 9px", cursor: "pointer", fontWeight: 600 }}>
                           Manage pages
                         </button>
                       )}
@@ -8302,10 +8302,10 @@ function AuditTrailPage({ activityLog, profiles, isAdmin }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <p style={{ fontSize: 13, color: "#4B5659", margin: 0 }}>{filtered.length} of {activityLog.length} entries shown</p>
         <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
+          <button type="button" onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
             <Download size={14} /> Export to Excel
           </button>
-          <button onClick={() => setShowPrint(true)} style={{ display: "flex", alignItems: "center", gap: 6, background: NAVY, border: "none", color: "#fff", fontSize: 13, fontWeight: 700, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
+          <button type="button" onClick={() => setShowPrint(true)} style={{ display: "flex", alignItems: "center", gap: 6, background: NAVY, border: "none", color: "#fff", fontSize: 13, fontWeight: 700, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
             <Printer size={14} /> Print Report
           </button>
         </div>
@@ -8361,8 +8361,8 @@ function AuditTrailPage({ activityLog, profiles, isAdmin }) {
             <div className="job-card-no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <p style={{ fontSize: 15, fontWeight: 700, color: NAVY, margin: 0 }}>Audit Report</p>
               <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => setShowPrint(false)} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Close</button>
-                <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, background: NAVY, border: "none", color: "#fff", padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                <button type="button" onClick={() => setShowPrint(false)} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Close</button>
+                <button type="button" onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, background: NAVY, border: "none", color: "#fff", padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                   <Printer size={14} /> Print / Save as PDF
                 </button>
               </div>
@@ -8545,14 +8545,14 @@ function ExcelSync({ data, assets, fields, tableName, sheetTitle, filenamePrefix
         </div>
       )}
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
-        <button onClick={exportReport} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
+        <button type="button" onClick={exportReport} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
           <Download size={14} /> Export to Excel
         </button>
-        <button onClick={exportToExcel} title="Plain grid for editing offline and uploading back - deliberately unformatted so the upload can read it"
+        <button type="button" onClick={exportToExcel} title="Plain grid for editing offline and uploading back - deliberately unformatted so the upload can read it"
           style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #E2E6E3", color: "#4B5659", fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
           <Download size={14} /> Backup file
         </button>
-        <button onClick={() => fileInputRef.current?.click()} disabled={importing} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: importing ? "default" : "pointer", opacity: importing ? 0.6 : 1 }}>
+        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: importing ? "default" : "pointer", opacity: importing ? 0.6 : 1 }}>
           <Upload size={14} /> {importing ? "Importing…" : "Upload Excel"}
         </button>
         <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileSelected} style={{ display: "none" }} />
@@ -8650,7 +8650,7 @@ function PartsPage({ parts, selectedSiteId, onRefresh, userEmail, isAdmin }) {
     <div>
       <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #E2E6E3" }}>
         {[["inventory", "Inventory"], ["quotes", "Quote Price List"]].map(([key, label]) => (
-          <button
+          <button type="button"
             key={key}
             onClick={() => setSubTab(key)}
             style={{
@@ -8687,14 +8687,14 @@ function PartsPage({ parts, selectedSiteId, onRefresh, userEmail, isAdmin }) {
             style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }} />
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
+          <button type="button" onClick={exportToExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
             <Download size={14} /> Export to Excel
           </button>
-          <button onClick={() => fileInputRef.current?.click()} disabled={importing} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: importing ? "default" : "pointer", opacity: importing ? 0.6 : 1 }}>
+          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: importing ? "default" : "pointer", opacity: importing ? 0.6 : 1 }}>
             <Upload size={14} /> {importing ? "Importing…" : "Upload Excel"}
           </button>
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileSelected} style={{ display: "none" }} />
-          <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+          <button type="button" onClick={() => { setEditing(null); setShowForm(true); }} style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
             + Add Part
           </button>
         </div>
@@ -9713,7 +9713,7 @@ function ConsumptionDrilldown({ fleet, metric, rows, prevRows, byType = [], flee
             <p style={{ margin: 0, fontSize: 17, fontWeight: 700, color: NAVY }}>{fleet} — {metric === "fuel" ? "fuel" : "oil"} consumption</p>
             <p style={{ margin: "2px 0 0", fontSize: 12, color: "#859195" }}>{monthLabel} · site average {fleetAvg} {unit}</p>
           </div>
-          <button onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#4B5659", padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Close</button>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#4B5659", padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Close</button>
         </div>
 
         <div style={{ border: "1px solid #E2E6E3", borderRadius: 10, overflow: "auto", marginTop: 12 }}>
@@ -9847,7 +9847,7 @@ function FleetHealthDrilldown({ machine, onClose }) {
               {[machine.fleet, machine.model, machine.make].filter(Boolean).join(" · ")}
             </p>
           </div>
-          <button onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#4B5659", padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Close</button>
+          <button type="button" onClick={onClose} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#4B5659", padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Close</button>
         </div>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
@@ -9916,7 +9916,7 @@ function FleetHealthDrilldown({ machine, onClose }) {
 
             {history.length > 0 && (
               <>
-                <button onClick={() => setShowHistory((v) => !v)}
+                <button type="button" onClick={() => setShowHistory((v) => !v)}
                   style={{ background: "none", border: "none", color: NAVY, fontSize: 12.5, fontWeight: 600, cursor: "pointer", padding: "12px 0 6px" }}>
                   {showHistory ? "▾" : "▸"} Change out history ({history.length})
                 </button>
@@ -10112,11 +10112,11 @@ function FleetHealthPage({ assets }) {
           {["AT RISK", "MONITOR", "HEALTHY", "NOT SCORED"].map((b) => <option key={b} value={b}>{b}</option>)}
         </select>
         <ColumnsButton prefs={prefs} />
-        <button onClick={() => { setQuery(""); setBandFilter(""); setSelectedFleet(""); setSelectedAsset(""); }}
+        <button type="button" onClick={() => { setQuery(""); setBandFilter(""); setSelectedFleet(""); setSelectedAsset(""); }}
           style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#4B5659", fontSize: 12.5, fontWeight: 600, padding: "8px 12px", borderRadius: 8, cursor: "pointer" }}>
           Clear filters
         </button>
-        <button onClick={exportReport}
+        <button type="button" onClick={exportReport}
           style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
           <Download size={14} /> Export to Excel
         </button>
@@ -10293,7 +10293,7 @@ function ComponentMasterPage({ assets, selectedSiteId, myFullName }) {
   const activeInstalls = useMemo(() => installs.filter((r) => !r.removed_date), [installs]);
 
   const tabBtn = (key, label) => (
-    <button onClick={() => setTab(key)}
+    <button type="button" onClick={() => setTab(key)}
       style={{ background: tab === key ? NAVY : "#fff", color: tab === key ? "#fff" : "#4B5659",
                border: `1px solid ${tab === key ? NAVY : "#E2E6E3"}`, padding: "7px 14px", borderRadius: 8,
                fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{label}</button>
@@ -10323,7 +10323,7 @@ function ComponentMasterPage({ assets, selectedSiteId, myFullName }) {
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search catalogue"
                 style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 13, border: "1px solid #E2E6E3", borderRadius: 8, outline: "none" }} />
             </div>
-            <button onClick={() => { setEditing(null); setShowForm(true); }}
+            <button type="button" onClick={() => { setEditing(null); setShowForm(true); }}
               style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
               + Add Component
             </button>
@@ -10359,7 +10359,7 @@ function ComponentMasterPage({ assets, selectedSiteId, myFullName }) {
                     <td style={{ padding: "8px 10px" }}>{r.criticality || "-"}</td>
                     <td style={{ padding: "8px 10px" }}>{r.active ? "Yes" : "No"}</td>
                     <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
-                      <button onClick={() => setInstalling(r)} style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 7, cursor: "pointer" }}>
+                      <button type="button" onClick={() => setInstalling(r)} style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 7, cursor: "pointer" }}>
                         Install
                       </button>
                     </td>
@@ -10402,7 +10402,7 @@ function ComponentMasterPage({ assets, selectedSiteId, myFullName }) {
                       <span style={{ background: tone.bg, color: tone.text, padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>{r.status}</span>
                     </td>
                     <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
-                      <button onClick={() => setRemoving(r)} style={{ background: "#fff", border: "1px solid #B85450", color: "#B85450", fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 7, cursor: "pointer" }}>
+                      <button type="button" onClick={() => setRemoving(r)} style={{ background: "#fff", border: "1px solid #B85450", color: "#B85450", fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 7, cursor: "pointer" }}>
                         Change Out
                       </button>
                     </td>
@@ -11048,11 +11048,11 @@ function ComponentStatusPage({ assets, selectedSiteId }) {
         </label>
         <GroupByMachineToggle value={groupByMachine} onChange={setGroupByMachine} />
         <ColumnsButton prefs={prefs} />
-        <button onClick={() => { setQuery(""); setStatusFilter(""); setTypeFilter(""); setSelectedFleet(""); setSelectedAsset(""); }}
+        <button type="button" onClick={() => { setQuery(""); setStatusFilter(""); setTypeFilter(""); setSelectedFleet(""); setSelectedAsset(""); }}
           style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#4B5659", fontSize: 12.5, fontWeight: 600, padding: "8px 12px", borderRadius: 8, cursor: "pointer" }}>
           Clear filters
         </button>
-        <button onClick={exportReport}
+        <button type="button" onClick={exportReport}
           style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}>
           <Download size={14} /> Export to Excel
         </button>
@@ -11264,7 +11264,7 @@ function ComponentsPage({ assets, components, breakdowns, workOrders, dailyHours
                     <span style={{ display: "flex", gap: 4 }}>
                       <input type="number" autoFocus value={targetInput} onChange={(e) => setTargetInput(e.target.value)}
                         style={{ width: 70, padding: "3px 6px", fontSize: 12.5, border: "1px solid #E2E6E3", borderRadius: 6 }} />
-                      <button onClick={() => saveTarget(r.component_id)} style={{ fontSize: 11.5, color: NAVY, background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Save</button>
+                      <button type="button" onClick={() => saveTarget(r.component_id)} style={{ fontSize: 11.5, color: NAVY, background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Save</button>
                     </span>
                   ) : (
                     <span onClick={() => { setEditingTarget(r.component_id); setTargetInput(r.target ?? ""); }} style={{ cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted", color: r.target ? "#183642" : "#859195" }}>
@@ -11287,7 +11287,7 @@ function ComponentsPage({ assets, components, breakdowns, workOrders, dailyHours
                   {r.latest?.reason_for_change || <span style={{ color: "#B4B2A9" }}>-</span>}
                 </td>
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
-                  <button onClick={() => setChangeoutFor(r)} style={{ fontSize: 12, color: NAVY, background: "none", border: `1px solid ${NAVY}`, borderRadius: 6, padding: "4px 9px", cursor: "pointer", fontWeight: 600 }}>
+                  <button type="button" onClick={() => setChangeoutFor(r)} style={{ fontSize: 12, color: NAVY, background: "none", border: `1px solid ${NAVY}`, borderRadius: 6, padding: "4px 9px", cursor: "pointer", fontWeight: 600 }}>
                     Log Changeout
                   </button>
                 </td>
@@ -11356,13 +11356,13 @@ function AssetsPage({ assets, selectedSiteId, onRefresh, isAdmin, mySites = [] }
           />
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          <button
+          <button type="button"
             onClick={exportToExcel}
             style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${NAVY}`, color: NAVY, fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}
           >
             <Download size={14} /> Export to Excel
           </button>
-          <button
+          <button type="button"
             onClick={() => { setEditing(null); setShowForm(true); }}
             style={{ background: NAVY, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}
           >
@@ -11531,8 +11531,8 @@ function DeleteConfirmModal({ itemLabel, userEmail, onCancel, onConfirm }) {
         />
         {error && <p style={{ color: "#B85450", fontSize: 12.5, margin: "8px 0 0" }}>{error}</p>}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-          <button onClick={onCancel} disabled={deleting} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
-          <button onClick={handleConfirm} disabled={deleting} style={{ background: "#B85450", border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: deleting ? "default" : "pointer", opacity: deleting ? 0.7 : 1 }}>
+          <button type="button" onClick={onCancel} disabled={deleting} style={{ background: "#fff", border: "1px solid #E2E6E3", color: "#183642", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+          <button type="button" onClick={handleConfirm} disabled={deleting} style={{ background: "#B85450", border: "none", color: "#fff", padding: "9px 16px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: deleting ? "default" : "pointer", opacity: deleting ? 0.7 : 1 }}>
             {deleting ? "Deleting…" : "Delete"}
           </button>
         </div>
@@ -11654,11 +11654,11 @@ function FleetPerformance({ assets, breakdowns }) {
 
   const crumbs = (
     <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#4B5659", marginBottom: 16, flexWrap: "wrap" }}>
-      <button onClick={resetToFleetList} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: selectedFleet ? NAVY : "#4B5659", fontWeight: selectedFleet ? 400 : 700, fontSize: 13 }}>All fleets</button>
+      <button type="button" onClick={resetToFleetList} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: selectedFleet ? NAVY : "#4B5659", fontWeight: selectedFleet ? 400 : 700, fontSize: 13 }}>All fleets</button>
       {selectedFleet && (
         <>
           <ChevronRight size={13} />
-          <button onClick={backToFleet} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: selectedEquipment ? NAVY : "#4B5659", fontWeight: selectedEquipment ? 400 : 700, fontSize: 13 }}>{selectedFleet}</button>
+          <button type="button" onClick={backToFleet} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: selectedEquipment ? NAVY : "#4B5659", fontWeight: selectedEquipment ? 400 : 700, fontSize: 13 }}>{selectedFleet}</button>
         </>
       )}
       {selectedEquipment && (
@@ -11706,7 +11706,7 @@ function FleetPerformance({ assets, breakdowns }) {
         <p style={{ fontSize: 13, color: "#4B5659", margin: "0 0 16px" }}>Select a fleet to see its performance, then drill into an individual machine. Figures below are for {rangeLabel}.</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(200px,100%),1fr))", gap: 14 }}>
           {fleets.map((f) => (
-            <button
+            <button type="button"
               key={f.fleet}
               onClick={() => setSelectedFleet(f.fleet)}
               style={{ textAlign: "left", background: "#F7F8F6", border: "1px solid #E2E6E3", borderRadius: 10, padding: 16, cursor: "pointer" }}
@@ -11769,7 +11769,7 @@ function FleetPerformance({ assets, breakdowns }) {
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h4 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: NAVY }}>Equipment in this fleet</h4>
-          <button
+          <button type="button"
             onClick={() => { setCompareMode(!compareMode); setCompareIds([]); }}
             style={{ display: "flex", alignItems: "center", gap: 6, background: compareMode ? NAVY : "#fff", color: compareMode ? "#fff" : NAVY, border: `1px solid ${NAVY}`, fontSize: 13, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: "pointer" }}
           >
@@ -11995,7 +11995,7 @@ function UserMenu({ myFullName, isAdmin, myRole }) {
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button
+      <button type="button"
         onClick={() => setOpen((v) => !v)}
         style={{ display: "flex", alignItems: "center", gap: 9, background: "none", border: "none", cursor: "pointer", padding: "4px 6px", borderRadius: 8 }}
       >
@@ -12013,7 +12013,7 @@ function UserMenu({ myFullName, isAdmin, myRole }) {
         <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, background: "#fff", border: "1px solid #E2E6E3", borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", padding: 10, width: 200, zIndex: 30 }}>
           {/* Names are set by an admin only, from the User Access page -
               deliberately no self-service edit here. */}
-          <button onClick={() => supabase.auth.signOut()} style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: "8px 8px", fontSize: 13, color: "#B85450", cursor: "pointer", borderRadius: 6 }}>
+          <button type="button" onClick={() => supabase.auth.signOut()} style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: "8px 8px", fontSize: 13, color: "#B85450", cursor: "pointer", borderRadius: 6 }}>
             Sign out
           </button>
         </div>
@@ -12614,7 +12614,7 @@ function Dashboard({ assets, breakdowns, workOrders, plannedMaintenance, compone
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, margin: "0 0 12px" }}>
               <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: NAVY }}>MTBF, MTTR & Utilisation, this month{selectedFleet ? ` - ${selectedFleet}` : ""}</h3>
               {selectedFleet ? (
-                <button onClick={() => setSelectedFleet("")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: NAVY, fontSize: 12.5, fontWeight: 600, textDecoration: "underline" }}>
+                <button type="button" onClick={() => setSelectedFleet("")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: NAVY, fontSize: 12.5, fontWeight: 600, textDecoration: "underline" }}>
                   ← back to all fleets
                 </button>
               ) : (
@@ -13049,7 +13049,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: sidebarOpen ? "space-between" : "center", padding: "16px 14px", borderBottom: "1px solid rgba(255,255,255,0.12)" }}>
           {sidebarOpen && (
-            <button
+            <button type="button"
               onClick={() => handleNavClick("about")}
               title="About Mine2U"
               style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: GREEN, fontWeight: 700, fontSize: 15, textAlign: "left" }}
@@ -13058,12 +13058,12 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
             </button>
           )}
           {!isMobile && (
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", padding: 4 }}>
+            <button type="button" onClick={() => setSidebarOpen(!sidebarOpen)} style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", padding: 4 }}>
               {sidebarOpen ? <X size={16} /> : <Menu size={16} />}
             </button>
           )}
           {isMobile && (
-            <button onClick={() => setSidebarOpen(false)} aria-label="Close menu" style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", padding: 4 }}>
+            <button type="button" onClick={() => setSidebarOpen(false)} aria-label="Close menu" style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", padding: 4 }}>
               <X size={18} />
             </button>
           )}
@@ -13101,7 +13101,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
             return (
               <React.Fragment key={section.key}>
                 {sidebarOpen && (
-                  <button
+                  <button type="button"
                     onClick={() => setExpandedSections((prev) => ({ ...prev, [section.key]: prev[section.key] === false }))}
                     title={holdsActive ? "Contains the page you're on" : undefined}
                     style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", border: "none", cursor: "pointer", padding: "14px 16px 6px" }}
@@ -13111,7 +13111,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
                   </button>
                 )}
                 {open && items.map(({ key, label, icon: Icon }) => (
-                  <button
+                  <button type="button"
                     key={key}
                     className="nav-item"
                     onClick={() => handleNavClick(key)}
@@ -13138,7 +13138,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
             {sidebarOpen && <span>Coming soon</span>}
           </div>
 
-          <button
+          <button type="button"
             onClick={() => supabase.auth.signOut()}
             style={{ display: "flex", alignItems: "center", gap: 10, padding: isMobile ? "12px 16px" : "9px 16px", margin: "12px 8px 8px", borderRadius: 8, background: "transparent", border: "none", color: "rgba(241,245,244,0.75)", fontSize: 14, cursor: "pointer", minHeight: 40, justifyContent: sidebarOpen ? "flex-start" : "center" }}
           >
@@ -13153,7 +13153,7 @@ export default function App({ userEmail, isAdmin, myRole = "manager", mySites = 
         {isMobile && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 16px", borderBottom: "1px solid #E2E6E3", position: "sticky", top: 0, background: "#fff", zIndex: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <button onClick={() => setSidebarOpen(true)} aria-label="Open menu" style={{ background: "none", border: "none", color: NAVY, cursor: "pointer", padding: 6, display: "flex" }}>
+              <button type="button" onClick={() => setSidebarOpen(true)} aria-label="Open menu" style={{ background: "none", border: "none", color: NAVY, cursor: "pointer", padding: 6, display: "flex" }}>
                 <Menu size={20} />
               </button>
               <span style={{ fontSize: 16, fontWeight: 700, color: NAVY }}>
