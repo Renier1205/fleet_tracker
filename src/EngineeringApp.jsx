@@ -3843,7 +3843,9 @@ function EventWorkOrdersPanel({ event, assets, parts, onRefresh }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Badge value={w.priority} />
                   <Badge value={w.status} />
-                  <button onClick={() => setExpanded(expanded === w.id ? null : w.id)} style={{ background: "none", border: "none", color: NAVY, cursor: "pointer", padding: 2, display: "inline-flex" }}>
+                  <button type="button" title={expanded === w.id ? "Hide parts used" : "Show parts used"}
+                    onClick={(e) => { e.stopPropagation(); setExpanded(expanded === w.id ? null : w.id); }}
+                    style={{ background: "none", border: "none", color: NAVY, cursor: "pointer", padding: 2, display: "inline-flex" }}>
                     <ChevronDown size={15} style={{ transform: expanded === w.id ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
                   </button>
                 </div>
